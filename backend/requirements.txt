@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+beanie
+motor
+pydantic-settings
+python-dotenv
+langchain
+langgraph
+langchain-groq
+httpx
+pyjwt
+firecrawl-py
+websockets
