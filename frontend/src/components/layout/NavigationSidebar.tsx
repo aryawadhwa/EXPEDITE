@@ -17,11 +17,11 @@ import {
 } from "@/components/ui/tooltip";
 
 const navItems = [
-  { icon: Rocket, label: "Launchpad", path: "/dashboard" },
-  { icon: MessageSquare, label: "Missions", path: "/chat/new" },
-  { icon: ClipboardCheck, label: "Review Queue", path: "/review" },
-  { icon: Bot, label: "Active Agents", path: "/agents" },
-  { icon: Settings, label: "Settings", path: "/settings" },
+  { icon: Rocket, label: "Launchpad", path: "/dashboard", id: "sidebar-launchpad" },
+  { icon: MessageSquare, label: "Missions", path: "/chat/new", id: "sidebar-mission-chat" },
+  { icon: ClipboardCheck, label: "Review Queue", path: "/review", id: "sidebar-review-queue" },
+  { icon: Bot, label: "Active Agents", path: "/agents", id: "sidebar-active-agents" },
+  { icon: Settings, label: "Settings", path: "/settings", id: "sidebar-settings" },
 ];
 
 interface NavigationSidebarProps {
@@ -62,6 +62,7 @@ export function NavigationSidebar({ isCollapsed, onToggle }: NavigationSidebarPr
               <TooltipTrigger asChild>
                 <Link
                   to={item.path}
+                  id={item.id}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
                     "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",

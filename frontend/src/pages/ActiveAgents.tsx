@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -50,6 +52,14 @@ const statusConfig: Record<string, { label: string; dotClass: string }> = {
 };
 
 export default function ActiveAgents() {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate API call
+    const timer = setTimeout(() => setIsLoading(false), 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="h-full p-6 lg:p-8 overflow-auto">
       {/* Header */}
@@ -72,108 +82,149 @@ export default function ActiveAgents() {
 
       {/* Agent Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {agents.map((agent) => (
-          <Card key={agent.id} className="p-5 bg-card border-border">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  "w-10 h-10 rounded-lg flex items-center justify-center",
-                  agent.type === "scout" && "bg-info/10",
-                  agent.type === "writer" && "bg-primary/10",
-                  agent.type === "enricher" && "bg-warning/10"
-                )}>
-                  <Bot className={cn(
-                    "w-5 h-5",
-                    agent.type === "scout" && "text-info",
-                    agent.type === "writer" && "text-primary",
-                    agent.type === "enricher" && "text-warning"
-                  )} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-foreground">{agent.name}</h3>
-                    <Badge variant="secondary" className={cn("text-xs", typeConfig[agent.type].color)}>
-                      {typeConfig[agent.type].label}
-                    </Badge>
+        {isLoading ? (
+          Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="p-5 bg-card border border-border rounded-xl">
+              <div className="flex justify-between mb-4">
+                <div className="flex gap-3">
+                  <Skeleton className="w-10 h-10 rounded-lg" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-16" />
                   </div>
-                  <p className="text-xs text-muted-foreground font-mono">{agent.id}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-8 w-8 rounded-md" />
+                </div>
+              </div>
+              <Skeleton className="h-10 w-full mb-4 rounded-lg" />
+              <div className="mb-4 space-y-2">
+                <div className="flex justify-between">
+                  <Skeleton className="h-3 w-12" />
+                  <Skeleton className="h-3 w-8" />
+                </div>
+                <Skeleton className="h-1.5 w-full" />
+              </div>
+              <div className="grid grid-cols-4 gap-3 pt-4 border-t border-border">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+              <div className="mt-4">
+                <Skeleton className="h-9 w-full" />
+              </div>
+            </div>
+          ))
+        ) : agents.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-muted-foreground">
+            <Bot className="w-12 h-12 mx-auto mb-3 opacity-20" />
+            <p>No active agents deployed.</p>
+          </div>
+        ) : (
+          agents.map((agent) => (
+            <Card key={agent.id} className="p-5 bg-card border-border">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                    agent.type === "scout" && "bg-info/10",
+                    agent.type === "writer" && "bg-primary/10",
+                    agent.type === "enricher" && "bg-warning/10"
+                  )}>
+                    <Bot className={cn(
+                      "w-5 h-5",
+                      agent.type === "scout" && "text-info",
+                      agent.type === "writer" && "text-primary",
+                      agent.type === "enricher" && "text-warning"
+                    )} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-foreground">{agent.name}</h3>
+                      <Badge variant="secondary" className={cn("text-xs", typeConfig[agent.type].color)}>
+                        {typeConfig[agent.type].label}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground font-mono">{agent.id}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn("status-dot", statusConfig[agent.status].dotClass)} />
+                    <span className="text-xs text-muted-foreground">
+                      {statusConfig[agent.status].label}
+                    </span>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-popover">
+                      <DropdownMenuItem>View Logs</DropdownMenuItem>
+                      <DropdownMenuItem>Edit Configuration</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive">Terminate</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5">
-                  <span className={cn("status-dot", statusConfig[agent.status].dotClass)} />
-                  <span className="text-xs text-muted-foreground">
-                    {statusConfig[agent.status].label}
-                  </span>
+              {/* Mission */}
+              <div className="mb-4 p-3 rounded-lg bg-secondary/50">
+                <p className="text-sm text-foreground">{agent.mission}</p>
+              </div>
+
+              {/* Progress */}
+              {agent.status === "active" && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="font-mono text-foreground">{agent.progress}%</span>
+                  </div>
+                  <Progress value={agent.progress} className="h-1.5" />
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-popover">
-                    <DropdownMenuItem>View Logs</DropdownMenuItem>
-                    <DropdownMenuItem>Edit Configuration</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">Terminate</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-
-            {/* Mission */}
-            <div className="mb-4 p-3 rounded-lg bg-secondary/50">
-              <p className="text-sm text-foreground">{agent.mission}</p>
-            </div>
-
-            {/* Progress */}
-            {agent.status === "active" && (
-              <div className="mb-4">
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-muted-foreground">Progress</span>
-                  <span className="font-mono text-foreground">{agent.progress}%</span>
-                </div>
-                <Progress value={agent.progress} className="h-1.5" />
-              </div>
-            )}
-
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-3 pt-4 border-t border-border">
-              <div className="text-center">
-                <p className="font-mono text-lg text-foreground">{agent.stats.processed}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Processed</p>
-              </div>
-              <div className="text-center">
-                <p className="font-mono text-lg text-warning">{agent.stats.queued}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Queued</p>
-              </div>
-              <div className="text-center">
-                <p className="font-mono text-lg text-destructive">{agent.stats.errors}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Errors</p>
-              </div>
-              <div className="text-center">
-                <p className="font-mono text-lg text-muted-foreground">{agent.uptime}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Uptime</p>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2 mt-4">
-              {agent.status === "active" ? (
-                <Button variant="secondary" size="sm" className="flex-1 gap-2">
-                  <Pause className="w-3.5 h-3.5" />
-                  Pause
-                </Button>
-              ) : (
-                <Button variant="secondary" size="sm" className="flex-1 gap-2">
-                  <Play className="w-3.5 h-3.5" />
-                  Resume
-                </Button>
               )}
-            </div>
-          </Card>
-        ))}
+
+              {/* Stats */}
+              <div className="grid grid-cols-4 gap-3 pt-4 border-t border-border">
+                <div className="text-center">
+                  <p className="font-mono text-lg text-foreground">{agent.stats.processed}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Processed</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-mono text-lg text-warning">{agent.stats.queued}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Queued</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-mono text-lg text-destructive">{agent.stats.errors}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Errors</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-mono text-lg text-muted-foreground">{agent.uptime}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Uptime</p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 mt-4">
+                {agent.status === "active" ? (
+                  <Button variant="secondary" size="sm" className="flex-1 gap-2">
+                    <Pause className="w-3.5 h-3.5" />
+                    Pause
+                  </Button>
+                ) : (
+                  <Button variant="secondary" size="sm" className="flex-1 gap-2">
+                    <Play className="w-3.5 h-3.5" />
+                    Resume
+                  </Button>
+                )}
+              </div>
+            </Card>
+          )))}
       </div>
     </div>
   );

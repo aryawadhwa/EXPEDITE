@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { HeroInput } from "@/components/launchpad/HeroInput";
 import { RecipeCard } from "@/components/launchpad/RecipeCard";
 import { MissionCard } from "@/components/launchpad/MissionCard";
@@ -129,22 +130,47 @@ export default function Launchpad() {
           </span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {activeMissions.length === 0 && !isLoading && (
+          {isLoading ? (
+            // Loading Skeletons
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="p-4 rounded-xl border border-border bg-card">
+                <div className="flex justify-between mb-3">
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                </div>
+                <div className="mb-3 space-y-2">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-3 w-12" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                  <Skeleton className="h-1.5 w-full" />
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              </div>
+            ))
+          ) : activeMissions.length === 0 ? (
             <p className="text-muted-foreground text-sm col-span-full">No active missions. Launch one above!</p>
+          ) : (
+            activeMissions.map((mission) => (
+              <MissionCard
+                key={mission._id || mission.id}
+                id={mission._id || mission.id}
+                name={mission.objective || "Untitled Mission"}
+                status={mission.status === "waiting_approval" ? "paused" : mission.status || "running"}
+                stage={mission.status === "waiting_approval" ? 2 : 1}
+                totalStages={3}
+                prospectsFound={mission.prospects_count || 0}
+                emailsQueued={mission.drafts_count || 0}
+                startedAt={mission.created_at ? new Date(mission.created_at).toLocaleString() : "Just now"}
+              />
+            ))
           )}
-          {activeMissions.map((mission) => (
-            <MissionCard
-              key={mission._id || mission.id}
-              id={mission._id || mission.id}
-              name={mission.objective || "Untitled Mission"}
-              status={mission.status === "waiting_approval" ? "paused" : mission.status || "running"}
-              stage={mission.status === "waiting_approval" ? 2 : 1}
-              totalStages={3}
-              prospectsFound={mission.prospects_count || 0}
-              emailsQueued={mission.drafts_count || 0}
-              startedAt={mission.created_at ? new Date(mission.created_at).toLocaleString() : "Just now"}
-            />
-          ))}
         </div>
       </section>
     </div>

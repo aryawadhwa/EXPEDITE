@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, Brain } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -15,9 +16,12 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [brainOpen, setBrainOpen] = useState(true);
   const isMobile = useIsMobile();
 
+  const tour = <OnboardingTour />;
+
   if (isMobile) {
     return (
       <div className="flex flex-col h-screen bg-background">
+        {tour}
         {/* Mobile Header */}
         <header className="flex items-center justify-between h-14 px-4 border-b border-border bg-sidebar">
           <Sheet>
@@ -27,7 +31,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-64 bg-sidebar">
-              <NavigationSidebar isCollapsed={false} onToggle={() => {}} />
+              <NavigationSidebar isCollapsed={false} onToggle={() => { }} />
             </SheetContent>
           </Sheet>
 
@@ -40,7 +44,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="p-0 w-80 bg-terminal">
-              <LiveBrainSidebar isOpen={true} onToggle={() => {}} />
+              <LiveBrainSidebar isOpen={true} onToggle={() => { }} />
             </SheetContent>
           </Sheet>
         </header>
@@ -53,6 +57,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
+      {tour}
       {/* Left Navigation */}
       <NavigationSidebar
         isCollapsed={navCollapsed}
