@@ -35,6 +35,28 @@ export function useApi() {
             return res.json();
         },
 
+        chatWithMission: async (missionId: string, message: string) => {
+            const res = await fetchWithAuth(`/missions/${missionId}/chat`, {
+                method: "POST",
+                body: JSON.stringify({ message }),
+            });
+            return res.json();
+        },
+
+        deleteMission: async (missionId: string) => {
+            const res = await fetchWithAuth(`/missions/${missionId}`, {
+                method: "DELETE",
+            });
+            return res.json();
+        },
+
+        stopMission: async (missionId: string) => {
+            const res = await fetchWithAuth(`/missions/${missionId}/stop`, {
+                method: "PATCH",
+            });
+            return res.json();
+        },
+
         // Reviews
         getPendingDrafts: async () => {
             const res = await fetchWithAuth("/reviews/pending");
@@ -53,6 +75,13 @@ export function useApi() {
 
         rejectDraft: async (id: string, feedback: string) => {
             const res = await fetchWithAuth(`/reviews/${id}/reject?feedback=${encodeURIComponent(feedback)}`, {
+                method: "POST",
+            });
+            return res.json();
+        },
+
+        regenerateDraft: async (id: string) => {
+            const res = await fetchWithAuth(`/reviews/${id}/regenerate`, {
                 method: "POST",
             });
             return res.json();

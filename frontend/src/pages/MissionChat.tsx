@@ -131,21 +131,40 @@ export default function MissionChat() {
         setIsLoading(true);
 
         try {
-            // Create new mission from input
-            await api.createMission(input);
+            // If we're in an existing mission, chat with AI
+            if (mission && missionId && missionId !== "new") {
+                // Send message to AI and get response
+                const response = await api.chatWithMission(missionId, input);
+                setMessages(prev => [...prev, {
+                    id: `agent-${Date.now()}`,
+                    role: "agent",
+                    content: response.message,
+                    timestamp: new Date(),
+                    status: response.type === "error" ? "error" : "complete"
+                }]);
+            } else {
+                // Create new mission from input
+                const newMission = await api.createMission(input);
+                setMission(newMission);
 
-            setMessages(prev => [...prev, {
-                id: `agent-${Date.now()}`,
-                role: "agent",
-                content: "Mission launched! I'm scouting for prospects and will draft personalized emails. Check the Review Queue for drafts awaiting your approval.",
-                timestamp: new Date(),
-                status: "complete"
-            }]);
+                setMessages(prev => [...prev, {
+                    id: `agent-${Date.now()}`,
+                    role: "agent",
+                    content: "Mission launched! I'm scouting for prospects and will draft personalized emails. Check the Review Queue for drafts awaiting your approval.",
+                    timestamp: new Date(),
+                    status: "complete"
+                }]);
+
+                // Navigate to the new mission's chat
+                if (newMission._id || newMission.id) {
+                    navigate(`/chat/${newMission._id || newMission.id}`, { replace: true });
+                }
+            }
         } catch (error) {
             setMessages(prev => [...prev, {
                 id: `error-${Date.now()}`,
                 role: "agent",
-                content: "Failed to start mission. Please try again.",
+                content: "Failed to process request. Please try again.",
                 timestamp: new Date(),
                 status: "error"
             }]);

@@ -10,9 +10,6 @@ import {
   Pause,
   MoreVertical,
   Activity,
-  Clock,
-  Target,
-  Mail
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -21,11 +18,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
+import { useUser } from "@clerk/clerk-react";
 
+// Mock Agent Type - to be replaced with shared type
 interface Agent {
   id: string;
   name: string;
-  type: "scout" | "writer" | "enricher";
+  type: "scout" | "writer" | "enricher" | "custom";
   status: "active" | "idle" | "error";
   mission: string;
   progress: number;
@@ -37,12 +37,14 @@ interface Agent {
   uptime: string;
 }
 
+// TODO: Fetch from API
 const agents: Agent[] = [];
 
 const typeConfig: Record<string, { label: string; color: string }> = {
   scout: { label: "Scout", color: "bg-info/20 text-info" },
   writer: { label: "Writer", color: "bg-primary/20 text-primary" },
   enricher: { label: "Enricher", color: "bg-warning/20 text-warning" },
+  custom: { label: "Custom", color: "bg-purple-500/20 text-purple-500" },
 };
 
 const statusConfig: Record<string, { label: string; dotClass: string }> = {
@@ -53,6 +55,10 @@ const statusConfig: Record<string, { label: string; dotClass: string }> = {
 
 export default function ActiveAgents() {
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const { user } = useUser();
+
+  console.log("Active User:", user?.id);
 
   useEffect(() => {
     // Simulate API call
@@ -73,7 +79,7 @@ export default function ActiveAgents() {
             <Activity className="w-3 h-3" />
             {agents.filter(a => a.status === "active").length} Active
           </Badge>
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => navigate('/agents/deploy')}>
             <Bot className="w-4 h-4" />
             Deploy Agent
           </Button>
@@ -121,6 +127,9 @@ export default function ActiveAgents() {
           <div className="col-span-full text-center py-12 text-muted-foreground">
             <Bot className="w-12 h-12 mx-auto mb-3 opacity-20" />
             <p>No active agents deployed.</p>
+            <Button variant="outline" className="mt-4" onClick={() => navigate('/agents/deploy')}>
+              Deploy your first agent
+            </Button>
           </div>
         ) : (
           agents.map((agent) => (
@@ -129,22 +138,18 @@ export default function ActiveAgents() {
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     "w-10 h-10 rounded-lg flex items-center justify-center",
-                    agent.type === "scout" && "bg-info/10",
-                    agent.type === "writer" && "bg-primary/10",
-                    agent.type === "enricher" && "bg-warning/10"
+                    typeConfig[agent.type]?.color || typeConfig.custom.color
                   )}>
                     <Bot className={cn(
                       "w-5 h-5",
-                      agent.type === "scout" && "text-info",
-                      agent.type === "writer" && "text-primary",
-                      agent.type === "enricher" && "text-warning"
+                      typeConfig[agent.type]?.color.split(' ')[1] || typeConfig.custom.color.split(' ')[1]
                     )} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-foreground">{agent.name}</h3>
-                      <Badge variant="secondary" className={cn("text-xs", typeConfig[agent.type].color)}>
-                        {typeConfig[agent.type].label}
+                      <Badge variant="secondary" className={cn("text-xs", typeConfig[agent.type]?.color || typeConfig.custom.color)}>
+                        {typeConfig[agent.type]?.label || typeConfig.custom.label}
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground font-mono">{agent.id}</p>

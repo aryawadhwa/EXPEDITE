@@ -78,6 +78,32 @@ export default function Launchpad() {
     }
   };
 
+  const handleStopMission = async (missionId: string) => {
+    try {
+      await api.stopMission(missionId);
+      toast.success("Mission stopped");
+      // Refresh missions
+      const missions = await api.listMissions();
+      setActiveMissions(missions || []);
+    } catch (error) {
+      console.error("Failed to stop mission:", error);
+      toast.error("Failed to stop mission");
+    }
+  };
+
+  const handleDeleteMission = async (missionId: string) => {
+    try {
+      await api.deleteMission(missionId);
+      toast.success("Mission deleted");
+      // Refresh missions
+      const missions = await api.listMissions();
+      setActiveMissions(missions || []);
+    } catch (error) {
+      console.error("Failed to delete mission:", error);
+      toast.error("Failed to delete mission");
+    }
+  };
+
   return (
     <div className="min-h-full p-6 lg:p-8">
       {/* Hero Section */}
@@ -168,6 +194,8 @@ export default function Launchpad() {
                 prospectsFound={mission.prospects_count || 0}
                 emailsQueued={mission.drafts_count || 0}
                 startedAt={mission.created_at ? new Date(mission.created_at).toLocaleString() : "Just now"}
+                onStop={handleStopMission}
+                onDelete={handleDeleteMission}
               />
             ))
           )}

@@ -11,50 +11,50 @@
     /* Core Background Hierarchy */
     --background: 240 6% 6%;
     --foreground: 0 0% 98%;
-    
+
     --card: 240 5% 8%;
     --card-foreground: 0 0% 98%;
-    
+
     --popover: 240 5% 10%;
     --popover-foreground: 0 0% 98%;
-    
+
     /* AI Intelligence Accent - Electric Indigo */
     --primary: 239 84% 67%;
     --primary-foreground: 0 0% 100%;
     --primary-glow: 239 84% 67% / 0.3;
-    
+
     /* Secondary - Subtle Surface */
     --secondary: 240 4% 16%;
     --secondary-foreground: 0 0% 98%;
-    
+
     /* Muted Elements */
     --muted: 240 4% 16%;
     --muted-foreground: 240 5% 65%;
-    
+
     /* Accent for highlights */
     --accent: 240 4% 16%;
     --accent-foreground: 0 0% 98%;
-    
+
     /* Status Colors */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    
+
     --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
-    
+
     --warning: 43 96% 56%;
     --warning-foreground: 0 0% 0%;
-    
+
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
-    
+
     /* Border & Input */
     --border: 240 4% 16%;
     --input: 240 4% 16%;
     --ring: 239 84% 67%;
-    
+
     --radius: 0.5rem;
-    
+
     /* Sidebar - Darker than main */
     --sidebar-background: 240 6% 5%;
     --sidebar-foreground: 240 5% 65%;
@@ -64,16 +64,16 @@
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 240 4% 12%;
     --sidebar-ring: 239 84% 67%;
-    
+
     /* Terminal/Brain Sidebar - Darkest */
     --terminal-background: 240 6% 4%;
     --terminal-foreground: 160 60% 60%;
-    
+
     /* Custom Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(239 84% 67%) 0%, hsl(280 84% 60%) 100%);
     --gradient-surface: linear-gradient(180deg, hsl(240 5% 10%) 0%, hsl(240 6% 6%) 100%);
     --gradient-glow: radial-gradient(ellipse at center, hsl(239 84% 67% / 0.15) 0%, transparent 70%);
-    
+
     /* Shadows */
     --shadow-glow: 0 0 40px -10px hsl(239 84% 67% / 0.4);
     --shadow-card: 0 4px 24px -4px hsl(0 0% 0% / 0.5);
@@ -88,16 +88,16 @@
   * {
     @apply border-border;
   }
-  
+
   html {
     font-family: 'Inter', system-ui, sans-serif;
   }
-  
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
-  
+
   /* Monospace for technical elements */
   .font-mono {
     font-family: 'JetBrains Mono', monospace;
@@ -105,72 +105,86 @@
 }
 
 @layer components {
+
   /* Glowing AI elements */
   .ai-glow {
     box-shadow: var(--shadow-glow);
   }
-  
+
   .ai-pulse {
     animation: ai-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
-  
+
   @keyframes ai-pulse {
-    0%, 100% {
+
+    0%,
+    100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.5;
     }
   }
-  
+
   /* Status dot animations */
   .status-dot {
     @apply w-2 h-2 rounded-full;
   }
-  
+
   .status-dot-running {
     @apply bg-primary;
     animation: status-pulse 1.5s ease-in-out infinite;
   }
-  
+
   @keyframes status-pulse {
-    0%, 100% {
+
+    0%,
+    100% {
       box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7);
     }
+
     50% {
       box-shadow: 0 0 0 8px hsl(var(--primary) / 0);
     }
   }
-  
+
   /* Terminal typing cursor */
   .terminal-cursor {
     animation: blink 1s step-end infinite;
   }
-  
+
   @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0;
+    }
   }
-  
+
   /* Smooth scrollbar for terminal */
   .terminal-scroll::-webkit-scrollbar {
     width: 6px;
   }
-  
+
   .terminal-scroll::-webkit-scrollbar-track {
     background: transparent;
   }
-  
+
   .terminal-scroll::-webkit-scrollbar-thumb {
     background: hsl(var(--muted));
     border-radius: 3px;
   }
-  
+
   /* Hero input glow effect */
   .hero-input-glow {
     position: relative;
   }
-  
+
   .hero-input-glow::before {
     content: '';
     position: absolute;
@@ -182,7 +196,7 @@
     z-index: -1;
     filter: blur(8px);
   }
-  
+
   .hero-input-glow:focus-within::before {
     opacity: 0.5;
   }
@@ -195,12 +209,42 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  
+
   .bg-gradient-surface {
     background: var(--gradient-surface);
   }
-  
+
   .bg-gradient-glow {
     background: var(--gradient-glow);
   }
+}
+
+/* React Flow Controls Dark Theme */
+.react-flow__controls {
+  background: #18181b !important;
+  border: 1px solid #3f3f46 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+.react-flow__controls-button {
+  background: #27272a !important;
+  border: none !important;
+  border-bottom: 1px solid #3f3f46 !important;
+  fill: #a1a1aa !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.react-flow__controls-button:hover {
+  background: #3f3f46 !important;
+  fill: #fafafa !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button svg {
+  fill: inherit !important;
 }

@@ -13,6 +13,7 @@ export default function ReviewQueue() {
   const [drafts, setDrafts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isActioning, setIsActioning] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const api = useApi();
 
   const fetchDrafts = async () => {
@@ -85,6 +86,29 @@ export default function ReviewQueue() {
 
   const handleSkip = () => {
     handleNext();
+  };
+
+  const handleRegenerate = async () => {
+    if (!currentDraft) return;
+    setIsRegenerating(true);
+    try {
+      const result = await api.regenerateDraft(currentDraft.id || currentDraft._id);
+      // Update the current draft with new content
+      const updatedDrafts = [...drafts];
+      updatedDrafts[currentIndex] = {
+        ...updatedDrafts[currentIndex],
+        subject: result.subject,
+        body: result.body,
+        ai_reasoning: result.ai_reasoning,
+      };
+      setDrafts(updatedDrafts);
+      toast.success("Draft Regenerated", { description: "AI has created a new draft." });
+    } catch (error) {
+      console.error("Failed to regenerate:", error);
+      toast.error("Failed to regenerate draft");
+    } finally {
+      setIsRegenerating(false);
+    }
   };
 
   if (isLoading) {
@@ -201,6 +225,8 @@ export default function ReviewQueue() {
           <EmailEditor
             subject={currentDraft?.subject || ""}
             body={currentDraft?.body || ""}
+            onRegenerate={handleRegenerate}
+            isRegenerating={isRegenerating}
           />
         </div>
       </div>

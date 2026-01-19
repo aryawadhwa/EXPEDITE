@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Launchpad from "./pages/Launchpad";
 import ReviewQueue from "./pages/ReviewQueue";
 import ActiveAgents from "./pages/ActiveAgents";
+import DeployAgent from "./pages/DeployAgent";
 import Settings from "./pages/Settings";
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
@@ -72,6 +73,18 @@ const App = () => (
               <SignedIn>
                 <AppLayout>
                   <ActiveAgents />
+                </AppLayout>
+              </SignedIn>
+              <SignedOut>
+                <RedirectToSignIn />
+              </SignedOut>
+            </>
+          } />
+          <Route path="/agents/deploy" element={
+            <>
+              <SignedIn>
+                <AppLayout>
+                  <DeployAgent />
                 </AppLayout>
               </SignedIn>
               <SignedOut>

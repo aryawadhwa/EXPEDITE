@@ -55,3 +55,121 @@ async def get_mission_logs(mission_id: str, user: User = Depends(get_current_use
         for log in logs
     ]
 
+class ChatMessage(BaseModel):
+    message: str
+
+@router.post("/{mission_id}/chat")
+async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Depends(get_current_user)):
+    """Send a chat message and get AI response"""
+    from app.core.config import settings
+    from langchain_groq import ChatGroq
+    from langchain_core.messages import SystemMessage, HumanMessage
+    
+    # Verify mission belongs to user
+    mission = await Mission.get(mission_id)
+    if not mission or mission.user_id != user.clerk_id:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    
+    # Save user message as log
+    user_log = MissionLog(
+        mission_id=mission_id,
+        role="user",
+        content=chat.message,
+        log_type="action"
+    )
+    await user_log.insert()
+    
+    try:
+        llm = ChatGroq(
+            temperature=0.7, 
+            groq_api_key=settings.GROQ_API_KEY, 
+            model_name="llama-3.3-70b-versatile"
+        )
+        
+        system_prompt = f"""You are an AI assistant helping with an outbound sales mission.
+
+Mission objective: {mission.objective}
+
+You can:
+- Answer questions about the mission progress
+- Provide suggestions for outreach strategies
+- Explain what prospects were found
+- Help refine the messaging approach
+
+Be helpful, concise, and professional. If asked about specific prospects or drafts, remind the user to check the Review Queue."""
+
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=chat.message)
+        ]
+        
+        response = await llm.ainvoke(messages)
+        ai_content = response.content
+        
+        # Save AI response as log
+        ai_log = MissionLog(
+            mission_id=mission_id,
+            role="agent",
+            content=ai_content,
+            log_type="success"
+        )
+        await ai_log.insert()
+        
+        return {
+            "message": ai_content,
+            "role": "agent",
+            "type": "success"
+        }
+        
+    except Exception as e:
+        error_msg = f"Sorry, I encountered an error: {str(e)[:100]}"
+        # Save error log
+        error_log = MissionLog(
+            mission_id=mission_id,
+            role="agent",
+            content=error_msg,
+            log_type="error"
+        )
+        await error_log.insert()
+        
+        return {
+            "message": error_msg,
+            "role": "agent",
+            "type": "error"
+        }
+
+@router.delete("/{mission_id}")
+async def delete_mission(mission_id: str, user: User = Depends(get_current_user)):
+    """Delete a mission and its logs"""
+    mission = await Mission.get(mission_id)
+    if not mission or mission.user_id != user.clerk_id:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    
+    # Delete associated logs
+    await MissionLog.find(MissionLog.mission_id == mission_id).delete()
+    # Delete the mission
+    await mission.delete()
+    return {"status": "deleted", "mission_id": mission_id}
+
+@router.patch("/{mission_id}/stop")
+async def stop_mission(mission_id: str, user: User = Depends(get_current_user)):
+    """Stop/pause a running mission"""
+    mission = await Mission.get(mission_id)
+    if not mission or mission.user_id != user.clerk_id:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    
+    mission.status = "stopped"
+    await mission.save()
+    
+    # Log the stop event
+    log = MissionLog(
+        mission_id=mission_id,
+        role="system",
+        content="Mission stopped by user",
+        log_type="action"
+    )
+    await log.insert()
+    
+    return {"status": "stopped", "mission_id": mission_id}
+
+

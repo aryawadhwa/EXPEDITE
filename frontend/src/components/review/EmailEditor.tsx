@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Sparkles, RefreshCw } from "lucide-react";
+import { Sparkles, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface EmailEditorProps {
@@ -10,6 +10,8 @@ interface EmailEditorProps {
   body: string;
   onSubjectChange?: (value: string) => void;
   onBodyChange?: (value: string) => void;
+  onRegenerate?: () => Promise<void>;
+  isRegenerating?: boolean;
 }
 
 export function EmailEditor({
@@ -17,9 +19,20 @@ export function EmailEditor({
   body: initialBody,
   onSubjectChange,
   onBodyChange,
+  onRegenerate,
+  isRegenerating = false,
 }: EmailEditorProps) {
   const [subject, setSubject] = useState(initialSubject);
   const [body, setBody] = useState(initialBody);
+
+  // Sync state when props change (e.g., when navigating between drafts)
+  useEffect(() => {
+    setSubject(initialSubject);
+  }, [initialSubject]);
+
+  useEffect(() => {
+    setBody(initialBody);
+  }, [initialBody]);
 
   const handleSubjectChange = (value: string) => {
     setSubject(value);
@@ -40,9 +53,19 @@ export function EmailEditor({
             <Sparkles className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium text-foreground">AI-Generated Draft</span>
           </div>
-          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
-            <RefreshCw className="w-3.5 h-3.5" />
-            Regenerate
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-muted-foreground"
+            onClick={onRegenerate}
+            disabled={isRegenerating || !onRegenerate}
+          >
+            {isRegenerating ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5" />
+            )}
+            {isRegenerating ? "Regenerating..." : "Regenerate"}
           </Button>
         </div>
 

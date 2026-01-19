@@ -7,14 +7,14 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import json
 
 from app.core.config import settings
-from app.models import User, Mission, Prospect, Draft, MissionLog
-from app.routers import missions, reviews
+from app.models import User, Mission, Prospect, Draft, MissionLog, Agent
+from app.routers import missions, reviews, agents
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     client = AsyncIOMotorClient(settings.MONGODB_URI)
-    await init_beanie(database=client.outbound_ai, document_models=[User, Mission, Prospect, Draft, MissionLog])
+    await init_beanie(database=client.outbound_ai, document_models=[User, Mission, Prospect, Draft, MissionLog, Agent])
     yield
     # Shutdown
 
@@ -30,6 +30,7 @@ app.add_middleware(
 
 app.include_router(missions.router, prefix="/api/v1/missions", tags=["missions"])
 app.include_router(reviews.router, prefix="/api/v1/reviews", tags=["reviews"])
+app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 
 
 from fastapi import WebSocket, WebSocketDisconnect

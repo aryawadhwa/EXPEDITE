@@ -56,3 +56,17 @@ class MissionLog(Document):
     class Settings:
         name = "mission_logs"
 
+
+class Agent(Document):
+    user_id: str
+    name: str
+    description: Optional[str] = None
+    status: str = "active" # active, paused, error
+    workflow: Dict = {} # Stores the React Flow nodes and edges
+    integrations: List[str] = [] # List of enabled integration IDs
+    api_keys: Dict[str, str] = {} # Map of integration_id -> api_key
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "agents"

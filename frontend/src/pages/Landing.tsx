@@ -57,15 +57,10 @@ const Landing = () => {
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-3xl" />
 
         <div className="max-w-5xl mx-auto text-center relative z-10">
-          <Badge variant="outline" className="mb-6 border-primary/30 text-primary">
-            <Sparkles className="h-3 w-3 mr-1" />
-            AI-Powered Sales Automation
-          </Badge>
-
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
             Your AI-Powered
             <span className="block bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
-              Outbound Sales Team
+              Outbound Team
             </span>
           </h1>
 
