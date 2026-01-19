@@ -31,7 +31,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Save, Play, Puzzle, Box, ArrowLeft, Key, Code, Trash2, Edit, MoreVertical } from 'lucide-react';
+import { Search, Save, Play, Puzzle, Box, ArrowLeft, Key, Code, Trash2, Edit, MoreVertical, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { integrations, Integration } from '@/lib/integrations';
 import { toast } from 'sonner';
@@ -349,6 +349,22 @@ const DeployAgentContent = () => {
         i.category.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const handleClearCanvas = () => {
+        // Reset to default state with only Start Trigger
+        const defaultNode: Node = {
+            id: 'start',
+            type: 'input',
+            data: { label: 'Start Trigger' },
+            position: { x: 50, y: 150 },
+            className: 'bg-zinc-900 border-2 border-zinc-700 rounded-lg px-4 py-3 font-bold min-w-[120px] text-center shadow-lg text-zinc-100',
+        };
+        setNodes([defaultNode]);
+        setEdges([]);
+        setAgentName('My Agent');
+        localStorage.removeItem(STORAGE_KEY);
+        toast.success("Canvas cleared!");
+    };
+
     const handleDeploy = async () => {
         const payload = {
             name: agentName,
@@ -383,6 +399,9 @@ const DeployAgentContent = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-destructive" onClick={handleClearCanvas}>
+                        <RotateCcw className="w-4 h-4" /> Clear
+                    </Button>
                     <Button variant="outline" className="gap-2">
                         <Save className="w-4 h-4" /> Save Draft
                     </Button>
@@ -442,7 +461,7 @@ const DeployAgentContent = () => {
                             </div>
 
                             {/* Integrations List */}
-                            {['Communication', 'Project Management', 'Developer Tools', 'Intelligence', 'Storage'].map(category => {
+                            {['Communication', 'Project Management', 'Developer Tools', 'CRM', 'Intelligence', 'Storage', 'Social'].map(category => {
                                 const categoryItems = filteredIntegrations.filter(i => i.category.includes(category) || (category === 'Intelligence' && i.category === 'Intelligence'));
                                 if (categoryItems.length === 0) return null;
                                 return (
