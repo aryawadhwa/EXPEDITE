@@ -53,7 +53,8 @@ async def list_missions(user: User = Depends(get_current_user)):
         prospects_list = await Prospect.find(Prospect.mission_id == str(mission.id)).to_list()
         prospect_ids = [str(p.id) for p in prospects_list]
         
-        drafts = await Draft.find(Draft.prospect_id.in_(prospect_ids)).count()
+        from beanie.operators import In
+        drafts = await Draft.find(In(Draft.prospect_id, prospect_ids)).count()
         
         mission_dict["prospects_count"] = prospects
         mission_dict["drafts_count"] = drafts

@@ -16,6 +16,7 @@ interface Draft {
   ai_reasoning?: string;
   subject?: string;
   body?: string;
+  scraped_data?: any;
 }
 
 export default function ReviewQueue() {
@@ -220,13 +221,14 @@ export default function ReviewQueue() {
         <div className="w-1/2 border-r border-border overflow-auto bg-card/30">
           <ProspectCard
             name={currentDraft?.name || "Unknown"}
-            title=""
+            title={currentDraft?.scraped_data?.title || ""}
             company={currentDraft?.company || "Unknown"}
-            location=""
-            linkedinUrl=""
-            recentNews={[]}
+            location={currentDraft?.scraped_data?.location || ""}
+            linkedinUrl={currentDraft?.scraped_data?.linkedin_url || ""}
+            twitterUrl={currentDraft?.scraped_data?.twitter_url || ""}
+            recentNews={currentDraft?.scraped_data?.recent_news || []}
             aiReasoning={currentDraft?.ai_reasoning || "No reasoning provided."}
-            tags={[]}
+            tags={currentDraft?.scraped_data?.tags || []}
           />
         </div>
 
