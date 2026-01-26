@@ -50,6 +50,7 @@ async def get_mission_logs(mission_id: str, user: User = Depends(get_current_use
             "role": log.role,
             "content": log.content,
             "type": log.log_type,
+            "metadata": log.metadata,
             "timestamp": log.timestamp.isoformat()
         }
         for log in logs

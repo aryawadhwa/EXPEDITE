@@ -11,3 +11,5 @@ httpx
 pyjwt
 firecrawl-py
 websockets
+boto3
+python-multipart

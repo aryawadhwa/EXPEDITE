@@ -153,6 +153,40 @@ export function useApi() {
             });
             return res.json();
         },
+        // Assets
+        uploadAsset: async (file: File) => {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const token = await getToken();
+            const res = await fetch(`${API_BASE_URL}/assets/upload`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    // Note: Do NOT set Content-Type here, let browser set it with boundary
+                },
+                body: formData,
+            });
+            if (!res.ok) throw new Error("Upload failed");
+            return res.json();
+        },
+
+        getAssets: async () => {
+            try {
+                const res = await fetchWithAuth("/assets/");
+                if (!res.ok) return [];
+                return res.json();
+            } catch {
+                return [];
+            }
+        },
+
+        deleteAsset: async (id: string) => {
+            const res = await fetchWithAuth(`/assets/${id}`, {
+                method: "DELETE",
+            });
+            return res.json();
+        },
     };
 }
 
