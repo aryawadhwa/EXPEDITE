@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { HeroInput } from "@/components/launchpad/HeroInput";
 import { RecipeCard } from "@/components/launchpad/RecipeCard";
 import { MissionCard } from "@/components/launchpad/MissionCard";
@@ -39,7 +38,9 @@ const recipes = [
   },
 ];
 
-export default function Launchpad() {
+import MissionMap from "@/components/mission-control/MissionMap";
+
+const Launchpad = () => {
   const [activeMissions, setActiveMissions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const api = useApi();
@@ -101,27 +102,15 @@ export default function Launchpad() {
   };
 
   return (
-    <div className="min-h-full p-6 lg:p-8">
-      {/* Hero Section */}
-      <section className="relative py-12 lg:py-20">
-        {/* Background glow */}
-        <div
-          className="absolute inset-0 opacity-30 pointer-events-none"
-          style={{
-            background: "radial-gradient(ellipse 80% 50% at 50% 0%, hsl(239 84% 67% / 0.15) 0%, transparent 70%)",
-          }}
-        />
-
-        <div className="relative text-center mb-10">
-          <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-3">
-            Mission Control
-          </h1>
-          <p className="text-muted-foreground text-lg max-w-md mx-auto">
-            Command your AI agents to find and engage your ideal prospects.
-          </p>
+    <div className="min-h-full p-6 lg:p-8 space-y-8">
+      {/* Hero Section - Spatial Map */}
+      <section className="relative h-[500px] w-full rounded-xl overflow-hidden border border-border bg-black/50 shadow-2xl">
+        <MissionMap />
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-10">
+          <div className="bg-background/80 backdrop-blur-md p-2 rounded-xl border border-border shadow-lg">
+            <HeroInput />
+          </div>
         </div>
-
-        <HeroInput />
       </section>
 
       {/* Quick Recipes */}
@@ -158,21 +147,21 @@ export default function Launchpad() {
               <div key={i} className="p-4 rounded-xl border border-border bg-card">
                 <div className="flex justify-between mb-3">
                   <div className="space-y-2">
-                    <Skeleton className="h-5 w-32" />
-                    <Skeleton className="h-3 w-20" />
+                    <div className="h-5 w-32 animate-pulse bg-muted rounded" />
+                    <div className="h-3 w-20 animate-pulse bg-muted rounded" />
                   </div>
-                  <Skeleton className="h-6 w-16 rounded-full" />
+                  <div className="h-6 w-16 rounded-full animate-pulse bg-muted" />
                 </div>
                 <div className="mb-3 space-y-2">
                   <div className="flex justify-between">
-                    <Skeleton className="h-3 w-12" />
-                    <Skeleton className="h-3 w-16" />
+                    <div className="h-3 w-12 animate-pulse bg-muted rounded" />
+                    <div className="h-3 w-16 animate-pulse bg-muted rounded" />
                   </div>
-                  <Skeleton className="h-1.5 w-full" />
+                  <div className="h-1.5 w-full animate-pulse bg-muted rounded" />
                 </div>
                 <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-20" />
+                  <div className="h-4 w-20 animate-pulse bg-muted rounded" />
+                  <div className="h-4 w-20 animate-pulse bg-muted rounded" />
                 </div>
               </div>
             ))
@@ -200,3 +189,5 @@ export default function Launchpad() {
     </div>
   );
 }
+
+export default Launchpad;

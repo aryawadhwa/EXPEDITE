@@ -150,13 +150,13 @@ export function HeroInput() {
             onBlur={() => setTimeout(() => setIsFocused(false), 200)}
             onKeyDown={(e) => e.key === "Enter" && !showAssetPicker && handleSubmit(e)}
             placeholder="Describe your outbound mission..."
-            className="flex-1 bg-transparent px-4 py-5 text-lg text-foreground placeholder:text-muted-foreground focus:outline-none"
+            className="flex-1 bg-transparent px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
 
           <div className="pr-3">
             <Button
               type="submit"
-              size="lg"
+              size="default"
               disabled={!query.trim() || isLoading}
               className={cn(
                 "gap-2 rounded-lg transition-all",

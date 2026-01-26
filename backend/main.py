@@ -13,7 +13,7 @@ from app.routers import missions, reviews, agents
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    client = AsyncIOMotorClient(settings.MONGODB_URI)
+    client = AsyncIOMotorClient(settings.MONGODB_URI, tlsAllowInvalidCertificates=True)
     await init_beanie(database=client.outbound_ai, document_models=[User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset])
     yield
     # Shutdown

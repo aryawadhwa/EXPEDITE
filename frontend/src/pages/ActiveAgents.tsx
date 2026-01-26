@@ -3,7 +3,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Card } from "@/components/ui/card";
+import { SpatialCard } from "@/components/ui/SpatialCard";
+import { MagnetLines } from "@/components/ui/MagnetLines";
 import {
   Bot,
   Play,
@@ -147,16 +148,28 @@ export default function ActiveAgents() {
             </div>
           ))
         ) : agents.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            <Bot className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p>No active agents deployed.</p>
-            <Button variant="outline" className="mt-4" onClick={() => navigate('/agents/deploy')}>
-              Deploy your first agent
-            </Button>
+          <div className="col-span-full relative overflow-hidden rounded-xl border border-dashed border-muted-foreground/25 min-h-[400px] flex items-center justify-center bg-card/50">
+            <MagnetLines
+              rows={9}
+              columns={9}
+              containerSize="100%"
+              lineColor="hsl(var(--primary) / 0.2)"
+              lineWidth="2px"
+              lineHeight="20px"
+              baseAngle={0}
+              className="absolute inset-0 z-0"
+            />
+            <div className="relative z-10 text-center py-12 text-muted-foreground">
+              <Bot className="w-12 h-12 mx-auto mb-3 opacity-20" />
+              <p>No active agents deployed.</p>
+              <Button variant="outline" className="mt-4 bg-background/80 backdrop-blur-sm" onClick={() => navigate('/agents/deploy')}>
+                Deploy your first agent
+              </Button>
+            </div>
           </div>
         ) : (
           agents.map((agent) => (
-            <Card key={agent.id} className="p-5 bg-card border-border">
+            <SpatialCard key={agent.id} className="p-5 bg-card border-border" glowEffect={true}>
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className={cn(
@@ -251,9 +264,8 @@ export default function ActiveAgents() {
                   </Button>
                 )}
               </div>
-            </Card>
-          ))
-        )}
+            </SpatialCard>
+          )))}
       </div>
     </div>
   );
