@@ -84,3 +84,14 @@ class Agent(Document):
 
     class Settings:
         name = "agents"
+
+class UserAsset(Document):
+    user_id: str
+    filename: str
+    content_type: str  # e.g., "application/pdf"
+    file_data: bytes  # Binary content of the file
+    size_bytes: int
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "user_assets"

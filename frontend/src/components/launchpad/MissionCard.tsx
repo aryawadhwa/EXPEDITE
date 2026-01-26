@@ -61,12 +61,12 @@ export function MissionCard({
       className="group p-4 rounded-xl border border-border bg-card hover:border-primary/30 transition-all cursor-pointer relative"
       onClick={handleCardClick}
     >
-      <div className="flex items-start justify-between mb-3">
+      <div className="flex items-start justify-between mb-3 gap-4">
         <div className="flex-1 min-w-0">
           <h4 className="font-medium text-foreground truncate">{name}</h4>
           <p className="text-xs text-muted-foreground mt-0.5">{startedAt}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Badge
             variant="secondary"
             className={cn(

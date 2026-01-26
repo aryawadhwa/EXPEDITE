@@ -32,9 +32,52 @@ export default function Settings() {
   const api = useApi();
   const { getToken } = useAuth();
 
+  const [assets, setAssets] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
   useEffect(() => {
     fetchIntegrations();
+    fetchAssets();
   }, []);
+
+  const fetchAssets = async () => {
+    try {
+      const data = await api.getAssets();
+      console.log("Assets fetched:", data);
+      setAssets(data);
+    } catch (e) {
+      console.error("Failed to fetch assets", e);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setIsUploading(true);
+      try {
+        const res = await api.uploadAsset(e.target.files[0]);
+        // Short delay to ensure mongo consistency
+        if (res) {
+          await fetchAssets();
+          setTimeout(() => fetchAssets(), 1000);
+        }
+      } catch (err) {
+        alert("Upload failed. Max size 10MB.");
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
+
+  const handleDeleteAsset = async (id: string) => {
+    if (!confirm("Delete this file?")) return;
+    try {
+      await api.deleteAsset(id);
+      setAssets(prev => prev.filter(a => a.id !== id));
+      setTimeout(() => fetchAssets(), 500);
+    } catch (e) {
+      console.error("Failed to delete asset", e);
+    }
+  };
 
   const fetchIntegrations = async () => {
     try {
@@ -118,7 +161,69 @@ export default function Settings() {
         </Card>
       </section>
 
-      {/* Notifications */}
+      {/* My Files */}
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+          <ExternalLink className="w-5 h-5 text-primary" />
+          My Knowledge Assets
+        </h2>
+        <Card className="p-5 bg-card border-border space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-foreground">Mission Attachments</p>
+              <p className="text-sm text-muted-foreground">Upload PDFs, Docs, or Images for agents to use.</p>
+            </div>
+            <div className="relative">
+              <input
+                type="file"
+                id="asset-upload"
+                className="hidden"
+                onChange={handleFileUpload}
+                disabled={isUploading}
+              />
+              <Button asChild disabled={isUploading}>
+                <label htmlFor="asset-upload" className="cursor-pointer gap-2">
+                  {isUploading ? "Uploading..." : "Upload File"}
+                </label>
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          {assets && assets.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {assets.map((asset) => (
+                <div key={asset.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-secondary/10">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-primary">doc</span>
+                    </div>
+                    <div className="min-w-0">
+                      <a
+                        href={`http://localhost:8000/api/v1/assets/${asset.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium truncate hover:text-primary hover:underline cursor-pointer block"
+                      >
+                        {asset.filename}
+                      </a>
+                      <p className="text-xs text-muted-foreground">{(asset.size_bytes / 1024).toFixed(1)} KB</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => handleDeleteAsset(asset.id)} className="text-muted-foreground hover:text-destructive">
+                    Delete
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-sm text-muted-foreground">
+              No files uploaded yet.
+            </div>
+          )}
+        </Card>
+      </section>
       <section className="mb-8">
         <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <Bell className="w-5 h-5 text-primary" />
@@ -229,6 +334,6 @@ export default function Settings() {
           </div>
         </Card>
       </section>
-    </div>
+    </div >
   );
 }

@@ -55,6 +55,11 @@ export default function MissionChat() {
     const [connectParams, setConnectParams] = useState<Record<string, string>>({});
     const [targetTool, setTargetTool] = useState<string>("");
 
+    // Asset picker state
+    const [showAssetPicker, setShowAssetPicker] = useState(false);
+    const [availableAssets, setAvailableAssets] = useState<any[]>([]);
+    const [selectedAttachments, setSelectedAttachments] = useState<any[]>([]);
+
     // Scroll to bottom when messages change
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -162,6 +167,42 @@ export default function MissionChat() {
             // Fallback
             alert(`Connection failed: ${msg}`);
         }
+    };
+
+    // Handle input change to detect # trigger
+    const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setInput(value);
+
+        // Check if user just typed #
+        if (value.endsWith('#')) {
+            // Fetch assets
+            try {
+                const assets = await api.getAssets();
+                setAvailableAssets(assets || []);
+                setShowAssetPicker(true);
+            } catch (err) {
+                console.error("Failed to fetch assets", err);
+            }
+        } else if (!value.includes('#')) {
+            setShowAssetPicker(false);
+        }
+    };
+
+    // Handle asset selection
+    const handleSelectAsset = (asset: any) => {
+        // Add to selected attachments
+        if (!selectedAttachments.find(a => a.id === asset.id)) {
+            setSelectedAttachments(prev => [...prev, asset]);
+        }
+        // Replace the # with the filename tag
+        setInput(prev => prev.replace(/#$/, `[📎 ${asset.filename}] `));
+        setShowAssetPicker(false);
+    };
+
+    // Remove attachment
+    const handleRemoveAttachment = (id: string) => {
+        setSelectedAttachments(prev => prev.filter(a => a.id !== id));
     };
 
     const handleSend = async () => {
@@ -287,7 +328,7 @@ export default function MissionChat() {
                                     let toolMatch = message.metadata?.tool;
 
                                     if (!toolMatch) {
-                                        const match = message.content.match(/I need (Telegram|Discord|Slack|GitHub|Reddit|Perplexity|Google Sheets) access/i);
+                                        const match = message.content.match(/(?:I need|please connect) (Telegram|Discord|Slack|GitHub|Reddit|Perplexity|Google Sheets|Gmail|Email)/i);
                                         if (match) {
                                             toolMatch = match[1].toLowerCase().replace(" ", "_");
                                         }
@@ -355,28 +396,65 @@ export default function MissionChat() {
 
             {/* Input */}
             <div className="border-t border-border p-4 bg-card/50">
-                <div className="max-w-3xl mx-auto flex gap-3">
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                        placeholder="Describe your outbound mission..."
-                        className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        disabled={isLoading}
-                    />
-                    <Button
-                        onClick={handleSend}
-                        disabled={!input.trim() || isLoading}
-                        size="lg"
-                        className="rounded-xl"
-                    >
-                        {isLoading ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                            <Send className="w-4 h-4" />
+                <div className="max-w-3xl mx-auto">
+                    {/* Selected Attachments */}
+                    {selectedAttachments.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-2">
+                            {selectedAttachments.map(att => (
+                                <div key={att.id} className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">
+                                    <span>📎 {att.filename}</span>
+                                    <button onClick={() => handleRemoveAttachment(att.id)} className="ml-1 hover:bg-primary/20 rounded-full p-0.5">×</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="relative flex gap-3">
+                        {/* Asset Picker Dropdown */}
+                        {showAssetPicker && availableAssets.length > 0 && (
+                            <div className="absolute bottom-full left-0 mb-2 w-64 bg-popover border border-border rounded-xl shadow-xl z-50 max-h-48 overflow-auto">
+                                <div className="p-2 text-xs text-muted-foreground border-b border-border">Select an attachment</div>
+                                {availableAssets.map(asset => (
+                                    <button
+                                        key={asset.id}
+                                        onClick={() => handleSelectAsset(asset)}
+                                        className="w-full text-left px-3 py-2 hover:bg-secondary/50 flex items-center gap-2 text-sm"
+                                    >
+                                        <span className="text-primary">📄</span>
+                                        <span className="truncate">{asset.filename}</span>
+                                    </button>
+                                ))}
+                            </div>
                         )}
-                    </Button>
+
+                        {showAssetPicker && availableAssets.length === 0 && (
+                            <div className="absolute bottom-full left-0 mb-2 w-64 bg-popover border border-border rounded-xl shadow-xl z-50 p-3 text-sm text-muted-foreground">
+                                No files uploaded. Go to Settings to add files.
+                            </div>
+                        )}
+
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={handleInputChange}
+                            onKeyDown={(e) => e.key === "Enter" && !showAssetPicker && handleSend()}
+                            placeholder="Describe your outbound mission..."
+                            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            disabled={isLoading}
+                        />
+                        <Button
+                            onClick={handleSend}
+                            disabled={!input.trim() || isLoading}
+                            size="lg"
+                            className="rounded-xl"
+                        >
+                            {isLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Send className="w-4 h-4" />
+                            )}
+                        </Button>
+                    </div>
                 </div>
             </div>
 

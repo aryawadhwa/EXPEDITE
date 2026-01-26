@@ -137,6 +137,34 @@ async def analyze_relevance(state: AgentState):
         "enriched": True # Mark as processed
     }
     
+    # Attachment Logic (New)
+    from app.models import UserAsset
+    attachments = []
+    
+    # Simple heuristic: If objective mentions "attach" or file keywords, fetch user assets
+    # In production, use semantic search or RAG to pick best file.
+    if any(k in state['objective'].lower() for k in ["attach", "file", "pdf", "deck", "case study"]):
+        user_assets = await UserAsset.find(UserAsset.user_id == state['user_id']).to_list()
+        
+        # Taking the first/most recent one for demo. 
+        # A smart agent would pick based on filename match (e.g. "pricing" -> "pricing.pdf")
+        if user_assets:
+             best_match = user_assets[0] 
+             attachments.append({
+                 "filename": best_match.filename,
+                 "id": str(best_match.id),
+                 "size": best_match.size_bytes
+             })
+             await log_event(state["mission_id"], state["user_id"], f"Found relevant attachment: {best_match.filename}", "success")
+    
+    enriched_cand = {
+        **cand,
+        "relevance_score": relevance_score,
+        "relevance_reason": relevance_reason,
+        "attachments": attachments, # Pass to draft
+        "enriched": True
+    }
+    
     await log_event(state["mission_id"], state["user_id"], f"Marked as relevant: {relevance_reason}", "success")
     return {"current_prospect": enriched_cand}
 
@@ -173,6 +201,7 @@ Source: {prospect.get('context_source')}
 Snippet: {prospect.get('snippet')}
 Relevance: {prospect.get('relevance_reason')}
 Mission: {state.get('objective')}
+Attachments Available: {[a['filename'] for a in prospect.get('attachments', [])]}
 """
         messages = [
             SystemMessage(content=system_prompt),
@@ -224,7 +253,13 @@ Mission: {state.get('objective')}
         subject=subject,
         body=body,
         ai_reasoning=reasoning,
-        status=DraftStatus.PENDING
+        status=DraftStatus.PENDING,
+        # We need to add 'attachments' field to Draft model later for full support
+        # For now, we just let the agent write about it in body.
+        # But we can store it in metadata if Draft allowed it.
+        # Let's assume we update the Draft Logic to pull from Prospect.scraped_data or similar if needed.
+        # Or ideally:
+        # attachments=prospect.get('attachments', [])
     )
     await d_doc.insert()
     
@@ -256,6 +291,7 @@ async def direct_intake(state: AgentState):
     if "telegram" in obj and not connections.get("telegram"): missing_tools.append("telegram")
     if "discord" in obj and not connections.get("discord"): missing_tools.append("discord")
     if "slack" in obj and not slack_connected: missing_tools.append("slack")
+    if ("gmail" in obj or "email" in obj) and not user.gmail_connection_id: missing_tools.append("gmail")
     if "github" in obj and not connections.get("github"): missing_tools.append("github")
     if "reddit" in obj and not connections.get("reddit"): missing_tools.append("reddit")
     if "perplexity" in obj and not connections.get("perplexity"): missing_tools.append("perplexity")
@@ -265,7 +301,10 @@ async def direct_intake(state: AgentState):
         for tool in missing_tools:
              print(f"DEBUG: Requesting connection for {tool}")
              label = tool.replace("_", " ").title()
-             await log_event(mission_id, user_id, f"I need {label} access to proceed with this mission.", "action", metadata={"action": "connect_tool", "tool": tool})
+             await log_event(mission_id, user_id, f"To proceed, please connect {label}.", "action", metadata={"action": "connect_tool", "tool": tool})
+        
+        # Stop here if we are just asking for connection
+        return {"prospects": []}
     
     await log_event(mission_id, user_id, "Skipping search (Direct Input Mode)", "thinking")
     
@@ -315,9 +354,22 @@ workflow.set_conditional_entry_point(
 )
 
 # Edges
+# Conditional Edges
+def should_draft(state: AgentState) -> str:
+    if state.get("current_prospect"):
+        return "draft"
+    return "end"
+
 workflow.add_edge("scout", "analyze")
 workflow.add_edge("direct_intake", "analyze")
-workflow.add_edge("analyze", "draft_node")
+workflow.add_conditional_edges(
+    "analyze",
+    should_draft,
+    {
+        "draft": "draft_node",
+        "end": END
+    }
+)
 
 
 # Checkpointer
