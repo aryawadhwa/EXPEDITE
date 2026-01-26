@@ -95,3 +95,88 @@ class UserAsset(Document):
 
     class Settings:
         name = "user_assets"
+
+class EmailEventType(str, Enum):
+    SENT = "sent"
+    REPLY_RECEIVED = "reply_received"
+    FOLLOW_UP = "follow_up"
+    OPENED = "opened"
+    CLICKED = "clicked"
+
+class EmailEvent(BaseModel):
+    """Individual email event in a thread"""
+    type: EmailEventType
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    email_id: str  # Gmail message ID
+    subject: Optional[str] = None
+    preview: Optional[str] = None  # First 100 chars of body
+    from_email: str
+    to_email: str
+    metadata: Dict = {}  # Additional data (opened_at, clicked_link, etc.)
+
+class ThreadStatus(str, Enum):
+    ACTIVE = "active"
+    WAITING_REPLY = "waiting_reply"
+    REPLIED = "replied"
+    CLOSED = "closed"
+
+class EmailThread(Document):
+    """Tracks complete email conversation timeline"""
+    user_id: str  # Link to User.clerk_id
+    mission_id: str  # Link to Mission.id
+    prospect_id: str  # Link to Prospect.id
+    thread_id: str  # Gmail thread ID
+    
+    # Timeline of all events
+    events: List[EmailEvent] = []
+    
+    # Current status
+    status: ThreadStatus = ThreadStatus.WAITING_REPLY
+    last_activity: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Quick access fields
+    first_sent_at: Optional[datetime] = None
+    last_reply_at: Optional[datetime] = None
+    reply_count: int = 0
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Settings:
+        name = "email_threads"
+
+
+class ContactHistory(Document):
+    """Track all email communications to prevent duplicates"""
+    user_id: str  # Link to User.clerk_id
+    prospect_email: str  # Email address (normalized/lowercase)
+    prospect_name: Optional[str] = None
+    
+    # First contact info
+    first_contacted_at: datetime = Field(default_factory=datetime.utcnow)
+    first_mission_id: str  # Mission that first contacted this person
+    
+    # Latest contact info
+    last_contacted_at: datetime = Field(default_factory=datetime.utcnow)
+    last_mission_id: str
+    
+    # Contact count
+    total_emails_sent: int = 1
+    
+    # Email thread tracking
+    thread_ids: List[str] = []  # All Gmail thread IDs
+    
+    # Response tracking
+    has_replied: bool = False
+    last_reply_at: Optional[datetime] = None
+    
+    # Status
+    status: str = "contacted"  # contacted, replied, bounced, unsubscribed
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Settings:
+        name = "contact_history"
+        indexes = [
+            [("user_id", 1), ("prospect_email", 1)],  # Unique per user+email
+        ]

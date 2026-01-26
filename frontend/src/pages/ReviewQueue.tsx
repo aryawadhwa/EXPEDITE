@@ -31,7 +31,7 @@ export default function ReviewQueue() {
 
   useEffect(() => {
     fetchDrafts();
-  }, []);
+  }, [api]);
 
   const currentDraft = drafts[currentIndex];
 
