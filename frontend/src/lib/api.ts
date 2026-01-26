@@ -119,6 +119,40 @@ export function useApi() {
             });
             return res.json();
         },
+
+        // Agents
+        getAgents: async () => {
+            const res = await fetchWithAuth("/agents/");
+            return res.json();
+        },
+
+        createAgent: async (agent: any) => {
+            const res = await fetchWithAuth("/agents/", {
+                method: "POST",
+                body: JSON.stringify(agent),
+            });
+            return res.json();
+        },
+
+        getAgent: async (id: string) => {
+            const res = await fetchWithAuth(`/agents/${id}`);
+            return res.json();
+        },
+
+        updateAgent: async (id: string, updates: any) => {
+            const res = await fetchWithAuth(`/agents/${id}`, {
+                method: "PATCH",
+                body: JSON.stringify(updates),
+            });
+            return res.json();
+        },
+
+        deleteAgent: async (id: string) => {
+            const res = await fetchWithAuth(`/agents/${id}`, {
+                method: "DELETE",
+            });
+            return res.json();
+        },
     };
 }
 
