@@ -9,6 +9,7 @@ import {
   ChevronRight,
   MessageSquare,
   Calendar,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ const navItems = [
   { icon: Calendar, label: "Calendar", path: "/calendar", id: "sidebar-calendar" },
   { icon: ClipboardCheck, label: "Review Queue", path: "/review", id: "sidebar-review-queue" },
   { icon: Bot, label: "Active Agents", path: "/agents", id: "sidebar-active-agents" },
+  { icon: Users, label: "Contacts", path: "/contacts", id: "sidebar-contacts" },
   { icon: Settings, label: "Settings", path: "/settings", id: "sidebar-settings" },
 ];
 

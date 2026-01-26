@@ -58,7 +58,7 @@ const Launchpad = () => {
       }
     };
     fetchMissions();
-  }, []);
+  }, [api]);
 
   const handleRecipeClick = async (query: string) => {
     try {

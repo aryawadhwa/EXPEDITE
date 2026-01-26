@@ -23,9 +23,10 @@ export default function Calendar() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [missionsData, draftsData] = await Promise.all([
+                const [missionsData, draftsData, emailTimeline] = await Promise.all([
                     api.listMissions(),
-                    api.getPendingDrafts()
+                    api.getPendingDrafts(),
+                    api.getEmailTimeline()
                 ]);
 
                 // Normalize items
@@ -41,7 +42,14 @@ export default function Calendar() {
                     date: d.due_date ? new Date(d.due_date) : new Date() // Default to today if no due date
                 }));
 
-                setItems([...normalizedMissions, ...normalizedDrafts]);
+                // Normalize email events
+                const normalizedEmails = (emailTimeline || []).map((event: any) => ({
+                    ...event,
+                    type: 'email',
+                    date: new Date(event.timestamp)
+                }));
+
+                setItems([...normalizedMissions, ...normalizedDrafts, ...normalizedEmails]);
             } catch (error) {
                 console.error("Failed to fetch calendar data:", error);
             } finally {
@@ -49,7 +57,7 @@ export default function Calendar() {
             }
         };
         fetchData();
-    }, []);
+    }, [api]);
 
     const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
     const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -89,6 +97,9 @@ export default function Calendar() {
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary"></span> Missions</span>
                         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-400"></span> Drafts</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Sent</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Reply</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500"></span> Follow-up</span>
                     </div>
                     <Button onClick={() => navigate("/dashboard")} className="gap-2">
                         <Plus className="w-4 h-4" />
@@ -138,52 +149,102 @@ export default function Calendar() {
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    {dayItems.map(item => (
-                                        item.type === 'mission' ? (
-                                            <div
-                                                key={item._id || item.id}
-                                                onClick={() => navigate(`/chat/${item._id || item.id}`)}
-                                                className={cn(
-                                                    "text-xs px-2 py-1.5 rounded-md cursor-pointer border truncate transition-all hover:scale-[1.02]",
-                                                    item.status === "running" ? "bg-primary/15 text-primary border-primary/20 hover:bg-primary/25" :
-                                                        item.status === "completed" ? "bg-success/15 text-success border-success/20 hover:bg-success/25" :
-                                                            "bg-muted text-muted-foreground border-border hover:bg-muted/80"
-                                                )}
-                                            >
-                                                {item.objective}
-                                            </div>
-                                        ) : (
-                                            <HoverCard key={item.id}>
-                                                <HoverCardTrigger asChild>
-                                                    <div
-                                                        className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-md cursor-pointer border border-cyan-500/20 bg-cyan-500/10 text-cyan-500 hover:bg-cyan-500/20 transition-all"
-                                                        onClick={() => navigate("/review")}
-                                                    >
-                                                        <Mail className="w-3 h-3 flex-shrink-0" />
-                                                        <span className="truncate">{item.subject || "Draft"}</span>
-                                                    </div>
-                                                </HoverCardTrigger>
-                                                <HoverCardContent className="w-80 p-0 border-border bg-popover z-50">
-                                                    <div className="p-4 space-y-3">
-                                                        <div className="flex justify-between items-start">
-                                                            <h4 className="text-sm font-semibold">{item.subject}</h4>
-                                                            <Badge variant="outline" className="text-[10px] border-cyan-500/50 text-cyan-500">Draft</Badge>
+                                    {dayItems.map((item, idx) => {
+                                        // Handle missions
+                                        if (item.type === 'mission') {
+                                            return (
+                                                <div
+                                                    key={item._id || item.id}
+                                                    onClick={() => navigate(`/chat/${item._id || item.id}`)}
+                                                    className={cn(
+                                                        "text-xs px-2 py-1.5 rounded-md cursor-pointer border truncate transition-all hover:scale-[1.02]",
+                                                        item.status === "running" ? "bg-primary/15 text-primary border-primary/20 hover:bg-primary/25" :
+                                                            item.status === "completed" ? "bg-success/15 text-success border-success/20 hover:bg-success/25" :
+                                                                "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                                                    )}
+                                                >
+                                                    {item.objective}
+                                                </div>
+                                            );
+                                        }
+
+                                        // Handle drafts
+                                        if (item.type === 'draft') {
+                                            return (
+                                                <HoverCard key={item.id || idx}>
+                                                    <HoverCardTrigger asChild>
+                                                        <div
+                                                            className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-md cursor-pointer border border-cyan-500/20 bg-cyan-500/10 text-cyan-500 hover:bg-cyan-500/20 transition-all"
+                                                            onClick={() => navigate("/review")}
+                                                        >
+                                                            <Mail className="w-3 h-3 flex-shrink-0" />
+                                                            <span className="truncate">{item.subject || "Draft"}</span>
                                                         </div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            <p>To: <span className="text-foreground font-medium">{item.name || "Unknown"}</span></p>
-                                                            <p className="mt-1">{item.company}</p>
+                                                    </HoverCardTrigger>
+                                                    <HoverCardContent className="w-80 p-0 border-border bg-popover z-50">
+                                                        <div className="p-4 space-y-3">
+                                                            <div className="flex justify-between items-start">
+                                                                <h4 className="text-sm font-semibold">{item.subject}</h4>
+                                                                <Badge variant="outline" className="text-[10px] border-cyan-500/50 text-cyan-500">Draft</Badge>
+                                                            </div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                <p>To: <span className="text-foreground font-medium">{item.name || "Unknown"}</span></p>
+                                                                <p className="mt-1">{item.company}</p>
+                                                            </div>
+                                                            <div className="bg-muted/50 p-2 rounded text-xs text-muted-foreground line-clamp-3">
+                                                                {item.body}
+                                                            </div>
+                                                            <Button size="sm" className="w-full h-7 text-xs" onClick={() => navigate("/review")}>
+                                                                Review Draft
+                                                            </Button>
                                                         </div>
-                                                        <div className="bg-muted/50 p-2 rounded text-xs text-muted-foreground line-clamp-3">
-                                                            {item.body}
-                                                        </div>
-                                                        <Button size="sm" className="w-full h-7 text-xs" onClick={() => navigate("/review")}>
-                                                            Review Draft
-                                                        </Button>
-                                                    </div>
-                                                </HoverCardContent>
-                                            </HoverCard>
-                                        )
-                                    ))}
+                                                    </HoverCardContent>
+                                                </HoverCard>
+                                            );
+                                        }
+
+                                        // Handle email events
+                                        if (item.type === 'email') {
+                                            let color = "bg-gray-500";
+                                            let icon = "📧";
+                                            let title = item.subject || "Email event";
+
+                                            if (item.event_type === "sent") {
+                                                color = "bg-green-500";
+                                                icon = "📧";
+                                                title = `Sent: ${item.subject || "Email"}`;
+                                            } else if (item.event_type === "reply_received") {
+                                                color = "bg-blue-500";
+                                                icon = "📬";
+                                                title = `Reply from ${item.from_email}`;
+                                            } else if (item.event_type === "follow_up") {
+                                                color = "bg-orange-500";
+                                                icon = "🔄";
+                                                title = `Follow-up: ${item.subject || ""}`;
+                                            } else if (item.event_type === "opened") {
+                                                color = "bg-purple-500";
+                                                icon = "👁️";
+                                                title = "Email opened";
+                                            } else if (item.event_type === "clicked") {
+                                                color = "bg-pink-500";
+                                                icon = "🖱️";
+                                                title = "Link clicked";
+                                            }
+
+                                            return (
+                                                <div
+                                                    key={item.id || idx}
+                                                    className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border ${color}/20 bg-${color.replace('bg-', '')}/10 cursor-pointer hover:opacity-80 transition-all`}
+                                                    title={title}
+                                                >
+                                                    <span className={`w-2 h-2 rounded-full ${color}`}></span>
+                                                    <span className="truncate text-muted-foreground">{icon} {item.preview?.substring(0, 20) || title}</span>
+                                                </div>
+                                            );
+                                        }
+
+                                        return null;
+                                    })}
                                 </div>
                             </div>
                         );

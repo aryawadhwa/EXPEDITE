@@ -22,16 +22,22 @@ export function useApi() {
                 method: "POST",
                 body: JSON.stringify({ objective }),
             });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.detail || 'Failed to create mission');
+            }
             return res.json();
         },
 
         listMissions: async () => {
             const res = await fetchWithAuth("/missions/");
+            if (!res.ok) throw new Error('Failed to fetch missions');
             return res.json();
         },
 
         getMissionLogs: async (missionId: string) => {
             const res = await fetchWithAuth(`/missions/${missionId}/logs`);
+            if (!res.ok) throw new Error('Failed to fetch mission logs');
             return res.json();
         },
 
@@ -40,6 +46,7 @@ export function useApi() {
                 method: "POST",
                 body: JSON.stringify({ message }),
             });
+            if (!res.ok) throw new Error('Failed to send message');
             return res.json();
         },
 
@@ -47,6 +54,7 @@ export function useApi() {
             const res = await fetchWithAuth(`/missions/${missionId}`, {
                 method: "DELETE",
             });
+            if (!res.ok) throw new Error('Failed to delete mission');
             return res.json();
         },
 
@@ -54,12 +62,14 @@ export function useApi() {
             const res = await fetchWithAuth(`/missions/${missionId}/stop`, {
                 method: "PATCH",
             });
+            if (!res.ok) throw new Error('Failed to stop mission');
             return res.json();
         },
 
         // Reviews
         getPendingDrafts: async () => {
             const res = await fetchWithAuth("/reviews/pending");
+            if (!res.ok) throw new Error('Failed to fetch pending drafts');
             return res.json();
         },
 
@@ -67,6 +77,7 @@ export function useApi() {
             const res = await fetchWithAuth("/reviews/pending", {
                 method: "DELETE",
             });
+            if (!res.ok) throw new Error('Failed to clear drafts');
             return res.json();
         },
 
@@ -84,6 +95,7 @@ export function useApi() {
             const res = await fetchWithAuth(`/reviews/${id}/reject?feedback=${encodeURIComponent(feedback)}`, {
                 method: "POST",
             });
+            if (!res.ok) throw new Error('Failed to reject draft');
             return res.json();
         },
 
@@ -91,6 +103,7 @@ export function useApi() {
             const res = await fetchWithAuth(`/reviews/${id}/regenerate`, {
                 method: "POST",
             });
+            if (!res.ok) throw new Error('Failed to regenerate draft');
             return res.json();
         },
 
@@ -110,6 +123,7 @@ export function useApi() {
 
         getIntegrations: async () => {
             const res = await fetchWithAuth("/integrations/");
+            if (!res.ok) throw new Error('Failed to fetch integrations');
             return res.json();
         },
 
@@ -117,12 +131,14 @@ export function useApi() {
             const res = await fetchWithAuth(`/integrations/${tool}`, {
                 method: "DELETE",
             });
+            if (!res.ok) throw new Error('Failed to disconnect tool');
             return res.json();
         },
 
         // Agents
         getAgents: async () => {
             const res = await fetchWithAuth("/agents/");
+            if (!res.ok) throw new Error('Failed to fetch agents');
             return res.json();
         },
 
@@ -131,11 +147,13 @@ export function useApi() {
                 method: "POST",
                 body: JSON.stringify(agent),
             });
+            if (!res.ok) throw new Error('Failed to create agent');
             return res.json();
         },
 
         getAgent: async (id: string) => {
             const res = await fetchWithAuth(`/agents/${id}`);
+            if (!res.ok) throw new Error('Failed to fetch agent');
             return res.json();
         },
 
@@ -144,6 +162,7 @@ export function useApi() {
                 method: "PATCH",
                 body: JSON.stringify(updates),
             });
+            if (!res.ok) throw new Error('Failed to update agent');
             return res.json();
         },
 
@@ -151,6 +170,7 @@ export function useApi() {
             const res = await fetchWithAuth(`/agents/${id}`, {
                 method: "DELETE",
             });
+            if (!res.ok) throw new Error('Failed to delete agent');
             return res.json();
         },
         // Assets
@@ -185,6 +205,66 @@ export function useApi() {
             const res = await fetchWithAuth(`/assets/${id}`, {
                 method: "DELETE",
             });
+            if (!res.ok) throw new Error('Failed to delete asset');
+            return res.json();
+        },
+
+        // Email Timeline
+        getEmailTimeline: async (startDate?: string, endDate?: string) => {
+            try {
+                const params = new URLSearchParams();
+                if (startDate) params.append('start_date', startDate);
+                if (endDate) params.append('end_date', endDate);
+
+                const res = await fetchWithAuth(`/timeline?${params}`);
+                if (!res.ok) {
+                    // Return empty array if no timeline data yet
+                    if (res.status === 404) return [];
+                    throw new Error('Failed to fetch email timeline');
+                }
+                return res.json();
+            } catch (error) {
+                console.error('Email timeline fetch error:', error);
+                return []; // Return empty array on error
+            }
+        },
+
+        getThreadDetails: async (threadId: string) => {
+            const res = await fetchWithAuth(`/timeline/threads/${threadId}`);
+            if (!res.ok) throw new Error('Failed to fetch thread details');
+            return res.json();
+        },
+
+        // Contact History
+        getContactHistory: async (skip = 0, limit = 50) => {
+            const res = await fetchWithAuth(`/contacts/history?skip=${skip}&limit=${limit}`);
+            if (!res.ok) throw new Error('Failed to fetch contact history');
+            return res.json();
+        },
+
+        checkDuplicates: async (emails: string[]) => {
+            const res = await fetchWithAuth('/contacts/check-duplicates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emails })
+            });
+            if (!res.ok) throw new Error('Failed to check duplicates');
+            return res.json();
+        },
+
+        recordContact: async (contactData: { email: string, name?: string, mission_id: string, thread_id?: string }) => {
+            const res = await fetchWithAuth('/contacts/record', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(contactData)
+            });
+            if (!res.ok) throw new Error('Failed to record contact');
+            return res.json();
+        },
+
+        getContactStats: async () => {
+            const res = await fetchWithAuth('/contacts/stats');
+            if (!res.ok) throw new Error('Failed to fetch contact stats');
             return res.json();
         },
     };

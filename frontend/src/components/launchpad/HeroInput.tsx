@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sparkles, ArrowRight, Loader2, Paperclip } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, Paperclip, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/lib/api";
@@ -10,6 +10,7 @@ export function HeroInput() {
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const api = useApi();
   const navigate = useNavigate();
 
@@ -21,6 +22,17 @@ export function HeroInput() {
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setQuery(value);
+
+    // Trigger workflow display when user types
+    if (value.trim().length > 0) {
+      window.dispatchEvent(new CustomEvent('showWorkflow', {
+        detail: { show: true, objective: value }
+      }));
+    } else {
+      window.dispatchEvent(new CustomEvent('showWorkflow', {
+        detail: { show: false }
+      }));
+    }
 
     if (value.endsWith('#')) {
       try {
@@ -76,6 +88,28 @@ export function HeroInput() {
     }
   };
 
+  // Minimized state
+  if (isMinimized) {
+    return (
+      <div className="relative w-full max-w-2xl mx-auto">
+        <div className="flex items-center justify-between p-3 bg-card/80 backdrop-blur-md rounded-xl border border-border">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Sparkles className="w-4 h-4" />
+            <span>Mission Input</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setIsMinimized(false)}
+          >
+            <ChevronUp className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full max-w-2xl mx-auto">
       {/* Glow effect */}
@@ -88,6 +122,16 @@ export function HeroInput() {
           background: "linear-gradient(135deg, hsl(239 84% 67% / 0.3) 0%, hsl(280 84% 60% / 0.2) 100%)",
         }}
       />
+
+      {/* Minimize Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute -top-3 -right-3 h-7 w-7 rounded-full bg-card border border-border z-20 hover:bg-muted shadow-lg"
+        onClick={() => setIsMinimized(true)}
+      >
+        <ChevronDown className="w-3.5 h-3.5" />
+      </Button>
 
       {/* Selected Attachments */}
       {selectedAttachments.length > 0 && (
@@ -181,10 +225,22 @@ export function HeroInput() {
       {/* Suggestions */}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
         <span>Try:</span>
-        <button className="px-2 py-1 rounded-md bg-secondary hover:bg-secondary/80 transition-colors">
+        <button
+          onClick={() => {
+            setQuery("Find CTOs at Series A startups");
+            handleInputChange({ target: { value: "Find CTOs at Series A startups" } } as any);
+          }}
+          className="px-2 py-1 rounded-md bg-secondary hover:bg-secondary/80 transition-colors"
+        >
           "Find CTOs at Series A startups"
         </button>
-        <button className="px-2 py-1 rounded-md bg-secondary hover:bg-secondary/80 transition-colors">
+        <button
+          onClick={() => {
+            setQuery("Target SaaS companies hiring engineers");
+            handleInputChange({ target: { value: "Target SaaS companies hiring engineers" } } as any);
+          }}
+          className="px-2 py-1 rounded-md bg-secondary hover:bg-secondary/80 transition-colors"
+        >
           "Target SaaS companies hiring engineers"
         </button>
       </div>
