@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useApi } from "@/lib/api";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -13,11 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  Key, 
-  Bell, 
-  Shield, 
-  Zap, 
+import {
+  Key,
+  Bell,
+  Shield,
+  Zap,
   ExternalLink,
   Check
 } from "lucide-react";
@@ -25,6 +27,37 @@ import {
 export default function Settings() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [autoApprove, setAutoApprove] = useState(false);
+  const [connectedTools, setConnectedTools] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const api = useApi();
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    fetchIntegrations();
+  }, []);
+
+  const fetchIntegrations = async () => {
+    try {
+      const data = await api.getIntegrations();
+      setConnectedTools(data.integrations || []);
+    } catch (e) {
+      console.error("Failed to fetch integrations", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDisconnect = async (tool: string) => {
+    if (!confirm(`Are you sure you want to disconnect ${tool}?`)) return;
+    try {
+      await api.disconnectTool(tool);
+      setConnectedTools(prev => prev.filter(i => i.name.toLowerCase() !== tool.toLowerCase()));
+    } catch (e) {
+      console.error("Failed to disconnect", e);
+    }
+  };
+
+
 
   return (
     <div className="h-full p-6 lg:p-8 overflow-auto max-w-4xl">
@@ -41,51 +74,47 @@ export default function Settings() {
           API Integrations
         </h2>
         <Card className="p-5 bg-card border-border space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#0A66C2]/20 flex items-center justify-center">
-                <span className="text-sm font-bold text-[#0A66C2]">in</span>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">LinkedIn Sales Navigator</p>
-                <p className="text-sm text-muted-foreground">Prospect discovery and enrichment</p>
-              </div>
+
+
+          {/* Dynamic Connected Integrations */}
+          {isLoading ? (
+            <div className="py-4 text-center text-sm text-muted-foreground">Loading integrations...</div>
+          ) : connectedTools.length > 0 ? (
+            <div className="space-y-4">
+              <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Your Connected Integrations</div>
+              {connectedTools.map((tool) => (
+                <div key={tool.name} className="flex items-center justify-between border border-border p-3 rounded-xl bg-secondary/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center border border-border">
+                      <span className="text-sm font-bold uppercase text-foreground">
+                        {tool.name.slice(0, 2)}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground capitalize">{tool.name}</p>
+                      <p className="text-xs text-muted-foreground">ID: {tool.connection_id.slice(0, 8)}...</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-success/10 text-success hover:bg-success/20 transition-colors">Active</Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDisconnect(tool.name)}
+                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
-            <Badge className="bg-success/10 text-success">Connected</Badge>
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                <span className="text-sm font-bold text-purple-400">Ap</span>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Apollo.io</p>
-                <p className="text-sm text-muted-foreground">Contact data enrichment</p>
-              </div>
+          ) : (
+            <div className="py-6 text-center border-2 border-dashed border-border rounded-xl">
+              <p className="text-sm text-muted-foreground">No custom integrations connected.</p>
+              <p className="text-xs text-muted-foreground mt-1">Ask the Agent in a mission chat to "Connect [Tool]" to add it here.</p>
             </div>
-            <Badge className="bg-success/10 text-success">Connected</Badge>
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                <span className="text-sm font-bold text-orange-400">Hu</span>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">HubSpot CRM</p>
-                <p className="text-sm text-muted-foreground">Sync prospects and activities</p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" className="gap-2">
-              <ExternalLink className="w-3.5 h-3.5" />
-              Connect
-            </Button>
-          </div>
+          )}
         </Card>
       </section>
 

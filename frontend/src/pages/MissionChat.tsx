@@ -3,6 +3,16 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { useApi } from "@/lib/api";
 import { useAuth } from "@clerk/clerk-react";
 import {
@@ -23,6 +33,7 @@ interface Message {
     content: string;
     timestamp: Date;
     status?: "thinking" | "complete" | "error";
+    metadata?: any;
 }
 
 export default function MissionChat() {
@@ -37,6 +48,12 @@ export default function MissionChat() {
     const [mission, setMission] = useState<any>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const wsRef = useRef<WebSocket | null>(null);
+
+    // Connect Param State
+    const [showConnectDialog, setShowConnectDialog] = useState(false);
+    const [missingFields, setMissingFields] = useState<string[]>([]);
+    const [connectParams, setConnectParams] = useState<Record<string, string>>({});
+    const [targetTool, setTargetTool] = useState<string>("");
 
     // Scroll to bottom when messages change
     useEffect(() => {
@@ -58,7 +75,8 @@ export default function MissionChat() {
                     role: "agent",
                     content: data.message || event.data,
                     timestamp: new Date(),
-                    status: data.type === "success" ? "complete" : data.type === "error" ? "error" : "thinking"
+                    status: data.type === "success" ? "complete" : data.type === "error" ? "error" : "thinking",
+                    metadata: data.metadata
                 }]);
             } catch {
                 setMessages(prev => [...prev, {
@@ -96,7 +114,8 @@ export default function MissionChat() {
                                 status: log.type === "success" ? "complete"
                                     : log.type === "error" ? "error"
                                         : log.type === "thinking" ? "thinking"
-                                            : "complete"
+                                            : "complete",
+                                metadata: log.metadata
                             }));
                             setMessages(historyMessages);
                         } catch (e) {
@@ -116,6 +135,34 @@ export default function MissionChat() {
         };
         loadMission();
     }, [missionId]);
+
+    const handleConnect = async (tool: string, params?: Record<string, string>) => {
+        try {
+            const res = await api.connectTool(tool, params);
+            if (res.redirect_url) {
+                window.location.href = res.redirect_url;
+            }
+            setShowConnectDialog(false);
+        } catch (e: any) {
+            console.error("Connect failed", e);
+            const msg = e.message || String(e);
+
+            // Check for missing fields error from Composio
+            if (msg.includes("Missing required fields")) {
+                const match = msg.match(/Missing required fields: ([^(]+)/);
+                if (match) {
+                    const fields = match[1].split(',').map((f: string) => f.trim());
+                    setMissingFields(fields);
+                    setTargetTool(tool);
+                    setConnectParams({});
+                    setShowConnectDialog(true);
+                    return;
+                }
+            }
+            // Fallback
+            alert(`Connection failed: ${msg}`);
+        }
+    };
 
     const handleSend = async () => {
         if (!input.trim() || isLoading) return;
@@ -236,6 +283,34 @@ export default function MissionChat() {
                                         : "bg-card border border-border"
                             )}>
                                 <p className="text-sm">{message.content}</p>
+                                {(() => {
+                                    let toolMatch = message.metadata?.tool;
+
+                                    if (!toolMatch) {
+                                        const match = message.content.match(/I need (Telegram|Discord|Slack|GitHub|Reddit|Perplexity|Google Sheets) access/i);
+                                        if (match) {
+                                            toolMatch = match[1].toLowerCase().replace(" ", "_");
+                                        }
+                                    }
+
+                                    if (toolMatch) {
+                                        const displayName = toolMatch.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                                        return (
+                                            <div className="mt-3">
+                                                <Button
+                                                    variant="default"
+                                                    size="sm"
+                                                    className="w-full gap-2 animate-in fade-in zoom-in duration-300 shadow-md"
+                                                    onClick={() => handleConnect(toolMatch)}
+                                                >
+                                                    <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                                    Connect {displayName}
+                                                </Button>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className="text-[10px] opacity-60">
                                         {message.timestamp.toLocaleTimeString()}
@@ -304,6 +379,33 @@ export default function MissionChat() {
                     </Button>
                 </div>
             </div>
+
+            <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Connect {targetTool.charAt(0).toUpperCase() + targetTool.slice(1)}</DialogTitle>
+                        <DialogDescription>
+                            Please provide the following details to connect.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        {missingFields.map((field) => (
+                            <div key={field} className="space-y-2">
+                                <Label>{field}</Label>
+                                <Input
+                                    placeholder={`Enter ${field}`}
+                                    value={connectParams[field] || ""}
+                                    onChange={(e) => setConnectParams(prev => ({ ...prev, [field]: e.target.value }))}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowConnectDialog(false)}>Cancel</Button>
+                        <Button onClick={() => handleConnect(targetTool, connectParams)}>Connect</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

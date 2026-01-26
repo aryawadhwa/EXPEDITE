@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ProspectCard } from "@/components/review/ProspectCard";
 import { EmailEditor } from "@/components/review/EmailEditor";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ export default function ReviewQueue() {
   const [isActioning, setIsActioning] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const api = useApi();
+  const navigate = useNavigate();
 
   const fetchDrafts = async () => {
     try {
@@ -49,7 +51,14 @@ export default function ReviewQueue() {
     if (!currentDraft) return;
     setIsActioning(true);
     try {
-      await api.approveDraft(currentDraft.id || currentDraft._id);
+      const res = await api.approveDraft(currentDraft.id || currentDraft._id);
+
+      if (res.workflow_created) {
+        toast.success("Workflow Started", { description: "Redirecting to active agents..." });
+        navigate("/agents");
+        return;
+      }
+
       toast.success("Draft Approved", { description: "Email has been queued for sending." });
       // Remove from local list
       const newDrafts = drafts.filter((_, i) => i !== currentIndex);
@@ -187,6 +196,28 @@ export default function ReviewQueue() {
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={async () => {
+              if (confirm("Are you sure you want to clear all pending drafts?")) {
+                setIsActioning(true);
+                try {
+                  await api.clearAllDrafts();
+                  toast.success("All drafts cleared");
+                  setDrafts([]);
+                } catch (e) {
+                  toast.error("Failed to clear drafts");
+                } finally {
+                  setIsActioning(false);
+                }
+              }
+            }}
+          >
+            Clear All
+          </Button>
+          <div className="w-px h-4 bg-border mx-2" />
+          <Button
+            variant="ghost"
             size="icon"
             onClick={handlePrev}
             disabled={currentIndex === 0}
@@ -210,13 +241,13 @@ export default function ReviewQueue() {
         <div className="w-1/2 border-r border-border overflow-auto bg-card/30">
           <ProspectCard
             name={currentDraft?.name || "Unknown"}
-            title=""
+            title={currentDraft?.context_source || "Web Search"}
             company={currentDraft?.company || "Unknown"}
-            location=""
-            linkedinUrl=""
+            location={currentDraft?.public_contact || ""}
+            linkedinUrl={currentDraft?.linkedin || ""}
             recentNews={[]}
-            aiReasoning={currentDraft?.ai_reasoning || "No reasoning provided."}
-            tags={[]}
+            aiReasoning={currentDraft?.relevance_reason || currentDraft?.ai_reasoning || "Matched based on mission criteria."}
+            tags={currentDraft?.relevance_score ? [`Relevance: ${Math.round(currentDraft.relevance_score * 100)}%`] : []}
           />
         </div>
 

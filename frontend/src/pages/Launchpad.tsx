@@ -61,17 +61,13 @@ export default function Launchpad() {
 
   const handleRecipeClick = async (query: string) => {
     try {
-      await api.createMission(query);
-      toast.success("Recipe Launched!", {
-        description: "AI agent is working on your request.",
-        action: {
-          label: "Go to Review",
-          onClick: () => navigate("/review"),
-        },
+      const mission = await api.createMission(query); // Ensure api.createMission returns the mission object
+      toast.success("Mission Launched!", {
+        description: "Redirecting to mission control...",
       });
-      // Refresh missions
-      const missions = await api.listMissions();
-      setActiveMissions(missions || []);
+      // Redirect immediately to Mission Chat
+      navigate(`/chat/${mission._id || mission.id}`);
+
     } catch (error) {
       console.error("Failed to launch recipe:", error);
       toast.error("Failed to launch recipe");

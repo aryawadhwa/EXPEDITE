@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     CLERK_SECRET_KEY: Optional[str] = None # If using SDK
     GROQ_API_KEY: Optional[str] = None
     FIRECRAWL_API_KEY: Optional[str] = None
+    COMPOSIO_API_KEY: Optional[str] = None
+    COMPOSIO_AUTH_CONFIG_ID: Optional[str] = None
 
     class Config:
         env_file = ".env"

@@ -28,6 +28,35 @@ async def get_pending_drafts(user: User = Depends(get_current_user)):
     
     return result
 
+@router.delete("/pending")
+async def clear_all_pending_drafts(user: User = Depends(get_current_user)):
+    """Delete all pending drafts for the user"""
+    from app.models import Mission, Prospect
+    from beanie.operators import In
+    
+    # 1. Get all missions for this user
+    missions = await Mission.find(Mission.user_id == user.clerk_id).to_list()
+    mission_ids = [str(m.id) for m in missions]
+    
+    if not mission_ids:
+        print(f"Clear All: No missions found for user {user.clerk_id}")
+        return {"status": "cleared", "count": 0}
+        
+    # 2. Get all prospects for these missions
+    prospects = await Prospect.find(In(Prospect.mission_id, mission_ids)).to_list()
+    prospect_ids = [str(p.id) for p in prospects]
+    
+    if not prospect_ids:
+        print(f"Clear All: No prospects found for missions {mission_ids}")
+        return {"status": "cleared", "count": 0}
+         
+    # 3. Delete pending drafts for these prospects
+    result = await Draft.find(In(Draft.prospect_id, prospect_ids), Draft.status == DraftStatus.PENDING).delete()
+    
+    count = result.deleted_count if result else 0
+    print(f"Clear All: Deleted {count} drafts for user {user.clerk_id}")
+    return {"status": "cleared", "count": count}
+
 @router.post("/{id}/approve")
 async def approve_draft(id: str, subject: str = None, body: str = None, user: User = Depends(get_current_user)):
     draft = await Draft.get(id)
@@ -39,11 +68,47 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
     if body:
         draft.body = body
         
-    draft.status = DraftStatus.APPROVED
+    draft.status = DraftStatus.APPROVED 
     await draft.save()
     
-    # Draft is approved - in a real app, this would trigger email sending
-    return {"status": "approved", "message": "Draft approved and ready to send"}
+    # 1. Create Active Agent (Workflow)
+    from app.models import Agent
+    new_agent = Agent(
+        user_id=user.clerk_id,
+        name=f"Lead: {subject[:20] if subject else 'New Lead'}...",
+        description=f"Active engagement workflow for draft {id}",
+        status="active",
+        workflow={
+            "nodes": [
+                {"id": "1", "type": "trigger", "data": {"label": "Draft Approved"}, "position": {"x": 50, "y": 50}},
+                {"id": "2", "type": "action", "data": {"label": "Email Sent"}, "position": {"x": 50, "y": 150}},
+                {"id": "3", "type": "wait", "data": {"label": "Wait for Reply"}, "position": {"x": 50, "y": 250}}
+            ], 
+            "edges": [
+                {"id": "e1-2", "source": "1", "target": "2"},
+                {"id": "e2-3", "source": "2", "target": "3"}
+            ]
+        }
+    )
+    await new_agent.insert()
+
+    # 2. Attempt to Send Email via Composio (if connected)
+    if user.gmail_connection_id:
+        try:
+             # Placeholder for actual Composio Action execution
+             # In a full implementation, we would POST to /actions/execute with "GMAIL_SEND_EMAIL"
+             # For now, we log it.
+             print(f"Approved: Ready to send email via connection {user.gmail_connection_id}")
+             # FUTURE: await execute_composio_action("GMAIL_SEND_EMAIL", params={...})
+        except Exception as e:
+            print(f"Failed to trigger email send: {e}")
+
+    return {
+        "status": "approved", 
+        "message": "Draft approved. Workflow started.",
+        "workflow_created": True,
+        "agent_id": str(new_agent.id)
+    }
 
 @router.post("/{id}/reject")
 async def reject_draft(id: str, feedback: str, user: User = Depends(get_current_user)):
