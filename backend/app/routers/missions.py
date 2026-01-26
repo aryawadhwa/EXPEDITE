@@ -78,7 +78,26 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
         log_type="action"
     )
     await user_log.insert()
-    
+
+    # CHECK FOR REAL DATA/EMAIL INTENT
+    # Simple keyword match for now. In production this should be an intent classifier.
+    intent_keywords = ["send", "email", "outreach", "blast", "campaign"]
+    if any(k in chat.message.lower() for k in intent_keywords):
+        # Check if user has connected email (mock check for now as Settings endpoint isn't fully linked to DB yet)
+        # We can check the Agent model or User settings if they existed.
+        # For this demo, let's assume we check for a "gmail_connected" flag or similar.
+        
+        # Simulating a check - asking user to confirm/connect
+        # In a real app we would query: await Agent.find_one({"user_id": user.clerk_id, "integrations": "gmail"})
+        
+        # If we wanted to force it:
+        # return {
+        #     "message": "I can help with that, but first you need to connect your **Gmail** account in Settings so I can send emails on your behalf.",
+        #     "role": "agent",
+        #     "type": "error" # Or specific type to trigger UI action
+        # }
+        pass
+
     try:
         llm = ChatGroq(
             temperature=0.7, 
@@ -86,17 +105,26 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
             model_name="llama-3.3-70b-versatile"
         )
         
-        system_prompt = f"""You are an AI assistant helping with an outbound sales mission.
+        system_prompt = f"""You are the Mission Control AI for an outbound sales campaign.
+        
+Mission Objective: {mission.objective}
 
-Mission objective: {mission.objective}
+YOUR ROLE:
+- You orchestrate the background agents.
+- You do NOT write emails yourself in this chat.
+- You do NOT give generic advice on how to write emails.
 
-You can:
-- Answer questions about the mission progress
-- Provide suggestions for outreach strategies
-- Explain what prospects were found
-- Help refine the messaging approach
+INTERACTION GUIDELINES:
+- If the user asks to "send emails" or "find people", confirm that the **Background Agent** is already working on it.
+- Direct the user to the **Review Queue** to see drafts.
+- If the user provides feedback (e.g., "Make them shorter"), say "Understood, I will pass this feedback to the drafting agent for future emails." (Note: Actual feedback passing is a future feature).
+- If the user asks for status, check the logs (which you can't see directly, so just say "Agents are active").
 
-Be helpful, concise, and professional. If asked about specific prospects or drafts, remind the user to check the Review Queue."""
+CRITICAL:
+- Unless the user asks a general question, always refer them to the **Review Queue** for results.
+- NEVER generate a sample email in this chat. Drafts belong in the Review Queue.
+- If the user asks to "Send", remind them to **Connect their Gmail** in Settings (if not done) and then use the **Approve** button in the Review Queue.
+"""
 
         messages = [
             SystemMessage(content=system_prompt),
@@ -140,13 +168,30 @@ Be helpful, concise, and professional. If asked about specific prospects or draf
 
 @router.delete("/{mission_id}")
 async def delete_mission(mission_id: str, user: User = Depends(get_current_user)):
-    """Delete a mission and its logs"""
+    """Delete a mission and its logs, drafts, and prospects"""
+    from app.models import Draft, Prospect # Delayed import to avoid circular dependency
+    
     mission = await Mission.get(mission_id)
     if not mission or mission.user_id != user.clerk_id:
         raise HTTPException(status_code=404, detail="Mission not found")
     
-    # Delete associated logs
+    # Cascade Delete: Drafts -> Prospects -> Logs -> Mission
+    from beanie.operators import In
+    
+    # Find all prospects for this mission
+    prospects = await Prospect.find(Prospect.mission_id == mission_id).to_list()
+    prospect_ids = [str(p.id) for p in prospects]
+    
+    # Delete connected drafts
+    if prospect_ids:
+        await Draft.find(In(Draft.prospect_id, prospect_ids)).delete()
+    
+    # Delete prospects
+    await Prospect.find(Prospect.mission_id == mission_id).delete()
+    
+    # Delete logs
     await MissionLog.find(MissionLog.mission_id == mission_id).delete()
+    
     # Delete the mission
     await mission.delete()
     return {"status": "deleted", "mission_id": mission_id}

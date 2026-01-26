@@ -20,9 +20,10 @@ import {
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
+import { useApi } from "@/lib/api";
 
-// Mock Agent Type - to be replaced with shared type
-interface Agent {
+// Agent Type for UI
+interface AgentUI {
   id: string;
   name: string;
   type: "scout" | "writer" | "enricher" | "custom";
@@ -36,9 +37,6 @@ interface Agent {
   };
   uptime: string;
 }
-
-// TODO: Fetch from API
-const agents: Agent[] = [];
 
 const typeConfig: Record<string, { label: string; color: string }> = {
   scout: { label: "Scout", color: "bg-info/20 text-info" },
@@ -54,16 +52,41 @@ const statusConfig: Record<string, { label: string; dotClass: string }> = {
 };
 
 export default function ActiveAgents() {
+  const [agents, setAgents] = useState<AgentUI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { user } = useUser();
+  const { getAgents } = useApi();
 
   console.log("Active User:", user?.id);
 
   useEffect(() => {
-    // Simulate API call
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
+    const fetchAgents = async () => {
+      try {
+        const data = await getAgents();
+        const mappedAgents: AgentUI[] = data.map((items: any) => ({
+          id: items._id || items.id,
+          name: items.name,
+          type: "custom", // Default to custom as backend doesn't have type yet
+          status: items.status || "idle",
+          mission: items.description || "No mission assigned",
+          progress: 0, // Not tracked in backend yet
+          stats: {
+            processed: 0,
+            queued: 0,
+            errors: 0
+          },
+          uptime: "0h 0m" // Placeholder
+        }));
+        setAgents(mappedAgents);
+      } catch (error) {
+        console.error("Failed to fetch agents:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAgents();
   }, []);
 
   return (
@@ -229,7 +252,8 @@ export default function ActiveAgents() {
                 )}
               </div>
             </Card>
-          )))}
+          ))
+        )}
       </div>
     </div>
   );

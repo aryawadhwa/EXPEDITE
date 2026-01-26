@@ -63,6 +63,13 @@ export function useApi() {
             return res.json();
         },
 
+        clearAllDrafts: async () => {
+            const res = await fetchWithAuth("/reviews/pending", {
+                method: "DELETE",
+            });
+            return res.json();
+        },
+
         approveDraft: async (id: string, subject?: string, body?: string) => {
             const params = new URLSearchParams();
             if (subject) params.append("subject", subject);
@@ -83,6 +90,66 @@ export function useApi() {
         regenerateDraft: async (id: string) => {
             const res = await fetchWithAuth(`/reviews/${id}/regenerate`, {
                 method: "POST",
+            });
+            return res.json();
+        },
+
+        // Integrations
+        connectTool: async (tool: string, params?: Record<string, string>) => {
+            const res = await fetchWithAuth("/integrations/connect", {
+                method: "POST",
+                body: JSON.stringify({ tool, params }),
+            });
+            // Handle error status by throwing, so it can be caught
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || "Connect failed");
+            }
+            return res.json();
+        },
+
+        getIntegrations: async () => {
+            const res = await fetchWithAuth("/integrations/");
+            return res.json();
+        },
+
+        disconnectTool: async (tool: string) => {
+            const res = await fetchWithAuth(`/integrations/${tool}`, {
+                method: "DELETE",
+            });
+            return res.json();
+        },
+
+        // Agents
+        getAgents: async () => {
+            const res = await fetchWithAuth("/agents/");
+            return res.json();
+        },
+
+        createAgent: async (agent: any) => {
+            const res = await fetchWithAuth("/agents/", {
+                method: "POST",
+                body: JSON.stringify(agent),
+            });
+            return res.json();
+        },
+
+        getAgent: async (id: string) => {
+            const res = await fetchWithAuth(`/agents/${id}`);
+            return res.json();
+        },
+
+        updateAgent: async (id: string, updates: any) => {
+            const res = await fetchWithAuth(`/agents/${id}`, {
+                method: "PATCH",
+                body: JSON.stringify(updates),
+            });
+            return res.json();
+        },
+
+        deleteAgent: async (id: string) => {
+            const res = await fetchWithAuth(`/agents/${id}`, {
+                method: "DELETE",
             });
             return res.json();
         },

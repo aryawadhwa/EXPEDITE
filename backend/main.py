@@ -22,7 +22,7 @@ app = FastAPI(title="OutboundAI", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8080", "http://localhost:8081", "http://127.0.0.1:8080", "http://127.0.0.1:8081"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,6 +31,8 @@ app.add_middleware(
 app.include_router(missions.router, prefix="/api/v1/missions", tags=["missions"])
 app.include_router(reviews.router, prefix="/api/v1/reviews", tags=["reviews"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
+from app.routers import integrations
+app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["integrations"])
 
 
 from fastapi import WebSocket, WebSocketDisconnect

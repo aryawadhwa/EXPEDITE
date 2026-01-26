@@ -14,6 +14,9 @@ class User(Document):
     clerk_id: Indexed(str, unique=True)
     email: str
     credits: int = 10 
+    gmail_connection_id: Optional[str] = None 
+    slack_connection_id: Optional[str] = None 
+    other_connections: Dict[str, str] = {} # Map tool_name -> connection_id 
 
     class Settings:
         name = "users"
@@ -31,7 +34,17 @@ class Prospect(Document):
     mission_id: str # Link to Mission.id
     name: str
     company: str
-    scraped_data: Dict = {}
+    # Layer 1: Public Discovery
+    context_source: Optional[str] = None # e.g. "Careers Page", "About Us"
+    public_contact: Optional[str] = None # e.g. "careers@company.com"
+    original_data: Dict = {} # Store raw firecrawl data
+    
+    # Layer 2: User-Driven Matching
+    relevance_score: float = 0.0
+    relevance_reason: Optional[str] = None # Why this person/contact appears relevant
+    
+    # Layer 3 is Draft/Outreach (separate model)
+    scraped_data: Dict = {} # Legacy field, keeping for compatibility
 
     class Settings:
         name = "prospects"
@@ -50,6 +63,7 @@ class MissionLog(Document):
     mission_id: str
     role: str  # "user", "agent", "system"
     content: str
+    metadata: Dict = {} # For structured actions like "connect_tool"
     log_type: str = "action"  # "thinking", "action", "success", "error"
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 

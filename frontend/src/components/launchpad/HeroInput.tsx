@@ -18,15 +18,13 @@ export function HeroInput() {
     if (query.trim() && !isLoading) {
       setIsLoading(true);
       try {
-        await api.createMission(query);
+        const mission = await api.createMission(query);
         setQuery("");
         toast.success("Mission Launched!", {
-          description: "AI agent is working. Check Review Queue for drafts awaiting approval.",
-          action: {
-            label: "Go to Review",
-            onClick: () => navigate("/review"),
-          },
+          description: "Redirecting to mission control...",
         });
+        // Redirect immediately to Mission Chat
+        navigate(`/chat/${mission._id || mission.id}`);
       } catch (error) {
         console.error("Failed to create mission:", error);
         toast.error("Mission launch failed", {
