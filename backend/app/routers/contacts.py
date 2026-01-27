@@ -5,7 +5,7 @@ from beanie.operators import In
 from pydantic import BaseModel
 
 from app.models import ContactHistory, User
-from app.core.auth import get_current_user
+from app.api.deps import get_current_user
 
 router = APIRouter()
 

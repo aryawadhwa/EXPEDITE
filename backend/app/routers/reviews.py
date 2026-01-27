@@ -1,7 +1,8 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
-from app.models import Draft, DraftStatus, User, Prospect
+from app.models import Draft, DraftStatus, User, Prospect, ContactHistory
+from datetime import datetime
 from app.api.deps import get_current_user
 
 router = APIRouter()
@@ -91,6 +92,34 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
         }
     )
     await new_agent.insert()
+
+
+    # 2.5 Record in Contact History (The "Fix" for missing contacts)
+    if draft.prospect_id:
+        prospect = await Prospect.get(draft.prospect_id)
+        if prospect and prospect.public_contact:
+            # Check for existing contact
+            email = prospect.public_contact.lower().strip()
+            existing_contact = await ContactHistory.find_one(
+                ContactHistory.user_id == user.clerk_id,
+                ContactHistory.prospect_email == email
+            )
+            
+            if existing_contact:
+                existing_contact.last_contacted_at = datetime.utcnow()
+                existing_contact.last_mission_id = prospect.mission_id
+                existing_contact.total_emails_sent += 1
+                await existing_contact.save()
+            else:
+                new_contact = ContactHistory(
+                    user_id=user.clerk_id,
+                    prospect_email=email,
+                    prospect_name=prospect.name,
+                    first_mission_id=prospect.mission_id,
+                    last_mission_id=prospect.mission_id,
+                    total_emails_sent=1
+                )
+                await new_contact.insert()
 
     # 2. Attempt to Send Email via Composio (if connected)
     if user.gmail_connection_id:
