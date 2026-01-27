@@ -259,3 +259,39 @@ async def disconnect_integration(tool: str, user: User = Depends(get_current_use
         
     await user.save()
     return {"status": "disconnected", "tool": tool}
+
+@router.get("/{tool}/status")
+async def get_tool_status(tool: str, user: User = Depends(get_current_user)):
+    """Check the status of any integration"""
+    tool = tool.lower()
+    
+    # Get connection ID for the tool
+    connection_id = None
+    if tool == "gmail":
+        connection_id = user.gmail_connection_id
+    elif tool == "slack":
+        connection_id = user.slack_connection_id
+    elif user.other_connections:
+        connection_id = user.other_connections.get(tool)
+    
+    if not connection_id:
+        return {"status": "INACTIVE", "tool": tool}
+    
+    # Verify connection status with Composio
+    if settings.COMPOSIO_API_KEY:
+        url = f"https://backend.composio.dev/api/v3/connected_accounts/{connection_id}"
+        headers = {"x-api-key": settings.COMPOSIO_API_KEY}
+        
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.get(url, headers=headers, timeout=10.0)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    status = data.get("status", "UNKNOWN")
+                    if status in ["ACTIVE", "CONNECTED"]:
+                        return {"status": "ACTIVE", "tool": tool, "connection_id": connection_id}
+            except Exception as e:
+                print(f"Error checking {tool} status: {e}")
+    
+    # If we have a connection_id stored, assume it's connected
+    return {"status": "ACTIVE", "tool": tool, "connection_id": connection_id}

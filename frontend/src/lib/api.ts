@@ -135,6 +135,12 @@ export function useApi() {
             return res.json();
         },
 
+        getToolStatus: async (tool: string) => {
+            const res = await fetchWithAuth(`/integrations/${tool}/status`);
+            if (!res.ok) return { status: "INACTIVE" };
+            return res.json();
+        },
+
         // Agents
         getAgents: async () => {
             const res = await fetchWithAuth("/agents/");
