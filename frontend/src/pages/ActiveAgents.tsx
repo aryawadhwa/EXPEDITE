@@ -3,7 +3,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Card } from "@/components/ui/card";
+import { SpatialCard } from "@/components/ui/SpatialCard";
+import { MagnetLines } from "@/components/ui/MagnetLines";
 import {
   Bot,
   Play,
@@ -82,20 +83,19 @@ export default function ActiveAgents() {
   const fetchAgents = async () => {
     try {
       const data = await getAgents();
-      const mappedAgents: AgentUI[] = data.map((items: any) => ({
-        id: items._id || items.id,
-        name: items.name,
-        type: "custom",
-        status: items.status || "idle",
-        mission: items.description || "No mission assigned",
-        progress: 0,
+      const mappedAgents: AgentUI[] = data.map((item: any) => ({
+        id: item._id || item.id,
+        name: item.name,
+        type: item.agent_type || "custom",
+        status: item.status || "idle",
+        mission: item.description || "No mission assigned",
+        progress: item.status === "active" ? 50 : 0,
         stats: {
-          processed: 0,
-          queued: 0,
-          errors: 0
+          processed: item.stats?.processed ?? 0,
+          queued: item.stats?.queued ?? 0,
+          errors: item.stats?.errors ?? 0
         },
-        uptime: "0h 0m",
-        workflow: items.workflow // Keep workflow data
+        uptime: item.uptime || "0h 0m"
       }));
       setAgents(mappedAgents);
     } catch (error) {
@@ -107,7 +107,7 @@ export default function ActiveAgents() {
 
   useEffect(() => {
     fetchAgents();
-  }, []);
+  }, [getAgents]);
 
   const handleToggleStatus = async (agent: AgentUI) => {
     const newStatus = agent.status === "active" ? "idle" : "active";
@@ -166,16 +166,28 @@ export default function ActiveAgents() {
             </div>
           ))
         ) : agents.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            <Bot className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p>No active agents deployed.</p>
-            <Button variant="outline" className="mt-4" onClick={() => navigate('/agents/deploy')}>
-              Deploy your first agent
-            </Button>
+          <div className="col-span-full relative overflow-hidden rounded-xl border border-dashed border-muted-foreground/25 min-h-[400px] flex items-center justify-center bg-card/50">
+            <MagnetLines
+              rows={9}
+              columns={9}
+              containerSize="100%"
+              lineColor="hsl(var(--primary) / 0.2)"
+              lineWidth="2px"
+              lineHeight="20px"
+              baseAngle={0}
+              className="absolute inset-0 z-0"
+            />
+            <div className="relative z-10 text-center py-12 text-muted-foreground">
+              <Bot className="w-12 h-12 mx-auto mb-3 opacity-20" />
+              <p>No active agents deployed.</p>
+              <Button variant="outline" className="mt-4 bg-background/80 backdrop-blur-sm" onClick={() => navigate('/agents/deploy')}>
+                Deploy your first agent
+              </Button>
+            </div>
           </div>
         ) : (
           agents.map((agent) => (
-            <Card key={agent.id} className="p-5 bg-card border-border">
+            <div key={agent.id} className="p-5 bg-card border border-border rounded-xl hover:border-primary/50 transition-colors">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className={cn(
@@ -230,6 +242,20 @@ export default function ActiveAgents() {
               {/* Mission */}
               <div className="mb-4 p-3 rounded-lg bg-secondary/50">
                 <p className="text-sm text-foreground">{agent.mission}</p>
+              </div>
+
+              {/* Time and Date Information */}
+              <div className="mb-4 flex items-center gap-4 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>Created: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Activity className="w-3 h-3" />
+                  <span>Last Active: {agent.uptime} ago</span>
+                </div>
               </div>
 
               {/* Progress */}
@@ -287,9 +313,9 @@ export default function ActiveAgents() {
                   </Button>
                 )}
               </div>
-            </Card>
-          ))
-        )}
+            </div>
+          )))
+        }
       </div>
 
       {/* Workflow Dialog */}

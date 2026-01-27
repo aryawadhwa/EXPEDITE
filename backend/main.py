@@ -7,14 +7,18 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import json
 
 from app.core.config import settings
-from app.models import User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset
-from app.routers import missions, reviews, agents
+from app.models import User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory
+from app.routers import missions, reviews, agents, contacts
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    client = AsyncIOMotorClient(settings.MONGODB_URI)
-    await init_beanie(database=client.outbound_ai, document_models=[User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset])
+    # Validate required environment variables
+    if not settings.MONGODB_URI:
+        raise ValueError("MONGODB_URI environment variable is required")
+    
+    client = AsyncIOMotorClient(settings.MONGODB_URI, tlsAllowInvalidCertificates=True)
+    await init_beanie(database=client.outbound_ai, document_models=[User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory])
     yield
     # Shutdown
 
@@ -31,6 +35,7 @@ app.add_middleware(
 app.include_router(missions.router, prefix="/api/v1/missions", tags=["missions"])
 app.include_router(reviews.router, prefix="/api/v1/reviews", tags=["reviews"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
+app.include_router(contacts.router, prefix="/api/v1/contacts", tags=["contacts"])
 from app.routers import integrations
 app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["integrations"])
 from app.routers import users
@@ -39,6 +44,10 @@ from app.routers import assets
 app.include_router(assets.router, prefix="/api/v1/assets", tags=["assets"])
 from app.routers import health
 app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
+from app.routers import timeline
+app.include_router(timeline.router, prefix="/api/v1", tags=["timeline"])
+from app.routers import settings as settings_router
+app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["settings"])
 
 
 from fastapi import WebSocket, WebSocketDisconnect

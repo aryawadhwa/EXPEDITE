@@ -34,9 +34,41 @@ async def create_mission(mission_in: MissionCreate, user: User = Depends(get_cur
     
     return mission
 
-@router.get("/", response_model=List[Mission])
+@router.get("/")
 async def list_missions(user: User = Depends(get_current_user)):
-    return await Mission.find(Mission.user_id == user.clerk_id).to_list()
+    from app.models import Prospect, Draft, DraftStatus
+    
+    missions = await Mission.find(Mission.user_id == user.clerk_id).to_list()
+    
+    # Enrich with counts
+    result = []
+    for mission in missions:
+        mission_id = str(mission.id)
+        
+        # Count prospects for this mission
+        prospects_count = await Prospect.find(Prospect.mission_id == mission_id).count()
+        
+        # Count pending drafts for this mission (via prospect_id lookup)
+        prospects = await Prospect.find(Prospect.mission_id == mission_id).to_list()
+        prospect_ids = [str(p.id) for p in prospects]
+        drafts_count = 0
+        if prospect_ids:
+            drafts_count = await Draft.find(
+                {"prospect_id": {"$in": prospect_ids}, "status": DraftStatus.PENDING}
+            ).count()
+        
+        result.append({
+            "_id": str(mission.id),
+            "id": str(mission.id),
+            "user_id": mission.user_id,
+            "objective": mission.objective,
+            "status": mission.status,
+            "created_at": mission.created_at.isoformat(),
+            "prospects_count": prospects_count,
+            "drafts_count": drafts_count,
+        })
+    
+    return result
 
 @router.get("/{mission_id}/logs")
 async def get_mission_logs(mission_id: str, user: User = Depends(get_current_user)):

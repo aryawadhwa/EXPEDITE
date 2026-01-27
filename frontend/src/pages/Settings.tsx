@@ -21,24 +21,214 @@ import {
   Shield,
   Zap,
   ExternalLink,
-  Check
+  Check,
+  Loader2,
+  Mail,
+  MessageSquare,
+  Github,
+  FileSpreadsheet,
+  Send,
+  Bot,
+  Search
 } from "lucide-react";
+
+// =============================================================================
+// AVAILABLE INTEGRATIONS CONFIG
+// =============================================================================
+
+interface Integration {
+  key: string;
+  name: string;
+  icon: React.ReactNode;
+  color: string;
+  description: string;
+}
+
+const AVAILABLE_INTEGRATIONS: Integration[] = [
+  {
+    key: "gmail",
+    name: "Gmail",
+    icon: <Mail className="w-5 h-5" />,
+    color: "bg-red-500/20 text-red-400 border-red-500/30",
+    description: "Send emails via Gmail"
+  },
+  {
+    key: "slack",
+    name: "Slack",
+    icon: <MessageSquare className="w-5 h-5" />,
+    color: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    description: "Send Slack messages"
+  },
+  {
+    key: "discord",
+    name: "Discord",
+    icon: <Bot className="w-5 h-5" />,
+    color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
+    description: "Connect Discord"
+  },
+  {
+    key: "telegram",
+    name: "Telegram",
+    icon: <Send className="w-5 h-5" />,
+    color: "bg-sky-500/20 text-sky-400 border-sky-500/30",
+    description: "Send Telegram messages"
+  },
+  {
+    key: "github",
+    name: "GitHub",
+    icon: <Github className="w-5 h-5" />,
+    color: "bg-gray-500/20 text-gray-300 border-gray-500/30",
+    description: "Access GitHub repos"
+  },
+  {
+    key: "google_sheets",
+    name: "Sheets",
+    icon: <FileSpreadsheet className="w-5 h-5" />,
+    color: "bg-green-500/20 text-green-400 border-green-500/30",
+    description: "Read/write spreadsheets"
+  },
+  {
+    key: "perplexity",
+    name: "Perplexity",
+    icon: <Search className="w-5 h-5" />,
+    color: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    description: "AI search"
+  }
+];
+
+// =============================================================================
+// INTEGRATION CARD COMPONENT
+// =============================================================================
+
+interface IntegrationCardProps {
+  integration: Integration;
+  isConnected: boolean;
+  isConnecting: boolean;
+  onConnect: (key: string) => void;
+}
+
+function IntegrationCard({ integration, isConnected, isConnecting, onConnect }: IntegrationCardProps) {
+  return (
+    <button
+      onClick={() => !isConnected && !isConnecting && onConnect(integration.key)}
+      disabled={isConnected || isConnecting}
+      className={`
+        relative flex flex-col items-center justify-center p-4 rounded-xl border transition-all duration-200
+        ${isConnected
+          ? "bg-success/10 border-success/30 cursor-default"
+          : "bg-secondary/30 border-border hover:bg-secondary/60 hover:border-primary/50 hover:scale-105 cursor-pointer"
+        }
+        ${isConnecting ? "opacity-70 cursor-wait" : ""}
+      `}
+      title={isConnected ? `${integration.name} connected` : `Connect ${integration.name}`}
+    >
+      {/* Connected Badge */}
+      {isConnected && (
+        <div className="absolute -top-1 -right-1 w-5 h-5 bg-success rounded-full flex items-center justify-center">
+          <Check className="w-3 h-3 text-white" />
+        </div>
+      )}
+
+      {/* Icon */}
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${integration.color}`}>
+        {isConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : integration.icon}
+      </div>
+
+      {/* Name */}
+      <span className={`text-xs font-medium ${isConnected ? "text-success" : "text-foreground"}`}>
+        {integration.name}
+      </span>
+
+      {/* Status */}
+      {isConnected && (
+        <span className="text-[10px] text-success/80 mt-0.5">Connected</span>
+      )}
+    </button>
+  );
+}
+
 
 export default function Settings() {
   const [emailNotifications, setEmailNotifications] = useState(true);
+  const [dailyDigestTime, setDailyDigestTime] = useState("9am");
   const [autoApprove, setAutoApprove] = useState(false);
+  const [personalizationThreshold, setPersonalizationThreshold] = useState(80);
+  const [dailySendingLimit, setDailySendingLimit] = useState(50);
   const [connectedTools, setConnectedTools] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [connectingTool, setConnectingTool] = useState<string | null>(null);
   const api = useApi();
   const { getToken } = useAuth();
 
   const [assets, setAssets] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Fetch settings on load
+  const fetchSettings = async () => {
+    try {
+      const data = await api.getSettings();
+      setEmailNotifications(data.email_notifications ?? true);
+      setDailyDigestTime(data.daily_digest_time ?? "9am");
+      setAutoApprove(data.auto_approve_low_risk ?? false);
+      setPersonalizationThreshold(data.personalization_threshold ?? 80);
+      setDailySendingLimit(data.daily_sending_limit ?? 50);
+    } catch (e) {
+      console.error("Failed to fetch settings", e);
+    }
+  };
+
+  // Save settings to backend
+  const saveSettings = async (updates: Record<string, any>) => {
+    setIsSaving(true);
+    try {
+      await api.updateSettings(updates);
+    } catch (e) {
+      console.error("Failed to save settings", e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   useEffect(() => {
     fetchIntegrations();
     fetchAssets();
+    fetchSettings();
+
+    // Check if returning from OAuth callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const connected = urlParams.get('connected');
+    if (connected) {
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => fetchIntegrations(), 500);
+    }
   }, []);
+
+  // ==========================================================================
+  // INTEGRATION CONNECTION HANDLER
+  // ==========================================================================
+
+  const handleConnect = async (toolKey: string) => {
+    setConnectingTool(toolKey);
+
+    try {
+      // Call backend to initiate OAuth
+      const response = await api.connectTool(toolKey);
+
+      if (response.redirect_url) {
+        // Open OAuth in same window (will redirect back after auth)
+        window.location.href = response.redirect_url;
+      } else {
+        // If no redirect needed (API key based), refresh list
+        await fetchIntegrations();
+        setConnectingTool(null);
+      }
+    } catch (error: any) {
+      console.error(`Failed to connect ${toolKey}:`, error);
+      alert(`Failed to connect ${toolKey}: ${error.message || 'Unknown error'}`);
+      setConnectingTool(null);
+    }
+  };
 
   const fetchAssets = async () => {
     try {
@@ -116,10 +306,34 @@ export default function Settings() {
           <Key className="w-5 h-5 text-primary" />
           API Integrations
         </h2>
-        <Card className="p-5 bg-card border-border space-y-4">
+        <Card className="p-5 bg-card border-border space-y-6">
 
+          {/* Available Integrations Grid */}
+          <div>
+            <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
+              Available Integrations
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+              {AVAILABLE_INTEGRATIONS.map((integration) => {
+                const isConnected = connectedTools.some(
+                  (t) => t.name.toLowerCase() === integration.key.toLowerCase()
+                );
+                return (
+                  <IntegrationCard
+                    key={integration.key}
+                    integration={integration}
+                    isConnected={isConnected}
+                    onConnect={handleConnect}
+                    isConnecting={connectingTool === integration.key}
+                  />
+                );
+              })}
+            </div>
+          </div>
 
-          {/* Dynamic Connected Integrations */}
+          <Separator />
+
+          {/* Connected Integrations List */}
           {isLoading ? (
             <div className="py-4 text-center text-sm text-muted-foreground">Loading integrations...</div>
           ) : connectedTools.length > 0 ? (
@@ -154,8 +368,8 @@ export default function Settings() {
             </div>
           ) : (
             <div className="py-6 text-center border-2 border-dashed border-border rounded-xl">
-              <p className="text-sm text-muted-foreground">No custom integrations connected.</p>
-              <p className="text-xs text-muted-foreground mt-1">Ask the Agent in a mission chat to "Connect [Tool]" to add it here.</p>
+              <p className="text-sm text-muted-foreground">No integrations connected yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">Click an icon above to connect an app.</p>
             </div>
           )}
         </Card>
@@ -237,7 +451,10 @@ export default function Settings() {
             </div>
             <Switch
               checked={emailNotifications}
-              onCheckedChange={setEmailNotifications}
+              onCheckedChange={(checked) => {
+                setEmailNotifications(checked);
+                saveSettings({ email_notifications: checked });
+              }}
             />
           </div>
 
@@ -248,7 +465,13 @@ export default function Settings() {
               <p className="font-medium text-foreground">Daily Digest</p>
               <p className="text-sm text-muted-foreground">Summary of agent activities</p>
             </div>
-            <Select defaultValue="9am">
+            <Select
+              value={dailyDigestTime}
+              onValueChange={(value) => {
+                setDailyDigestTime(value);
+                saveSettings({ daily_digest_time: value });
+              }}
+            >
               <SelectTrigger className="w-32 bg-secondary">
                 <SelectValue />
               </SelectTrigger>
@@ -276,7 +499,10 @@ export default function Settings() {
             </div>
             <Switch
               checked={autoApprove}
-              onCheckedChange={setAutoApprove}
+              onCheckedChange={(checked) => {
+                setAutoApprove(checked);
+                saveSettings({ auto_approve_low_risk: checked });
+              }}
             />
           </div>
 
@@ -287,7 +513,14 @@ export default function Settings() {
             <p className="text-sm text-muted-foreground mb-2">
               Minimum personalization score required
             </p>
-            <Select defaultValue="80">
+            <Select
+              value={String(personalizationThreshold)}
+              onValueChange={(value) => {
+                const num = parseInt(value);
+                setPersonalizationThreshold(num);
+                saveSettings({ personalization_threshold: num });
+              }}
+            >
               <SelectTrigger className="w-full bg-secondary">
                 <SelectValue />
               </SelectTrigger>
@@ -308,7 +541,9 @@ export default function Settings() {
             </p>
             <Input
               type="number"
-              defaultValue={50}
+              value={dailySendingLimit}
+              onChange={(e) => setDailySendingLimit(parseInt(e.target.value) || 50)}
+              onBlur={() => saveSettings({ daily_sending_limit: dailySendingLimit })}
               className="bg-secondary border-transparent"
             />
           </div>
