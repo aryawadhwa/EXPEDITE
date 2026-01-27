@@ -22,10 +22,44 @@ class AgentUpdate(BaseModel):
     integrations: Optional[List[str]] = None
     api_keys: Optional[Dict[str, str]] = None
 
-@router.get("/", response_model=List[Agent])
+@router.get("/")
 async def get_agents(user: User = Depends(get_current_user)):
-    """Get all agents for the current user"""
-    return await Agent.find(Agent.user_id == user.clerk_id).to_list()
+    """Get all agents for the current user with stats"""
+    agents = await Agent.find(Agent.user_id == user.clerk_id).to_list()
+    
+    result = []
+    now = datetime.utcnow()
+    
+    for agent in agents:
+        # Calculate uptime
+        uptime_delta = now - agent.created_at
+        hours = int(uptime_delta.total_seconds() // 3600)
+        minutes = int((uptime_delta.total_seconds() % 3600) // 60)
+        uptime_str = f"{hours}h {minutes}m"
+        
+        # Get stats from model or defaults
+        stats = agent.stats if hasattr(agent, 'stats') and agent.stats else {}
+        
+        result.append({
+            "_id": str(agent.id),
+            "id": str(agent.id),
+            "name": agent.name,
+            "description": agent.description,
+            "agent_type": getattr(agent, 'agent_type', 'custom'),
+            "status": agent.status,
+            "workflow": agent.workflow,
+            "integrations": agent.integrations,
+            "stats": {
+                "processed": getattr(stats, 'processed', 0) if hasattr(stats, 'processed') else stats.get('processed', 0),
+                "queued": getattr(stats, 'queued', 0) if hasattr(stats, 'queued') else stats.get('queued', 0),
+                "errors": getattr(stats, 'errors', 0) if hasattr(stats, 'errors') else stats.get('errors', 0),
+            },
+            "uptime": uptime_str,
+            "created_at": agent.created_at.isoformat(),
+            "updated_at": agent.updated_at.isoformat(),
+        })
+    
+    return result
 
 @router.post("/", response_model=Agent)
 async def create_agent(agent_data: AgentCreate, user: User = Depends(get_current_user)):

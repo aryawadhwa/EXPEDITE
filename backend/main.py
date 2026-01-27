@@ -44,6 +44,8 @@ from app.routers import health
 app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
 from app.routers import timeline
 app.include_router(timeline.router, prefix="/api/v1", tags=["timeline"])
+from app.routers import settings as settings_router
+app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["settings"])
 
 
 from fastapi import WebSocket, WebSocketDisconnect

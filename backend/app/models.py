@@ -10,13 +10,22 @@ class DraftStatus(str, Enum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
 
+class UserSettings(BaseModel):
+    """User preferences that persist"""
+    email_notifications: bool = True
+    daily_digest_time: str = "9am"
+    auto_approve_low_risk: bool = False
+    personalization_threshold: int = 80
+    daily_sending_limit: int = 50
+
 class User(Document):
     clerk_id: Indexed(str, unique=True)
     email: str
     credits: int = 10 
     gmail_connection_id: Optional[str] = None 
     slack_connection_id: Optional[str] = None 
-    other_connections: Dict[str, str] = {} # Map tool_name -> connection_id 
+    other_connections: Dict[str, str] = {} # Map tool_name -> connection_id
+    settings: UserSettings = Field(default_factory=UserSettings)
 
     class Settings:
         name = "users"
@@ -71,14 +80,23 @@ class MissionLog(Document):
         name = "mission_logs"
 
 
+class AgentStats(BaseModel):
+    """Real-time agent statistics"""
+    processed: int = 0
+    queued: int = 0
+    errors: int = 0
+    last_run_at: Optional[datetime] = None
+
 class Agent(Document):
     user_id: str
     name: str
     description: Optional[str] = None
-    status: str = "active" # active, paused, error
-    workflow: Dict = {} # Stores the React Flow nodes and edges
-    integrations: List[str] = [] # List of enabled integration IDs
-    api_keys: Dict[str, str] = {} # Map of integration_id -> api_key
+    agent_type: str = "custom"  # scout, writer, enricher, custom
+    status: str = "idle"  # active, idle, paused, error
+    workflow: Dict = {}  # Stores the React Flow nodes and edges
+    integrations: List[str] = []  # List of enabled integration IDs
+    api_keys: Dict[str, str] = {}  # Map of integration_id -> api_key
+    stats: AgentStats = Field(default_factory=AgentStats)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

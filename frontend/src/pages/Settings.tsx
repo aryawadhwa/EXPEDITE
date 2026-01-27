@@ -150,9 +150,13 @@ function IntegrationCard({ integration, isConnected, isConnecting, onConnect }: 
 
 export default function Settings() {
   const [emailNotifications, setEmailNotifications] = useState(true);
+  const [dailyDigestTime, setDailyDigestTime] = useState("9am");
   const [autoApprove, setAutoApprove] = useState(false);
+  const [personalizationThreshold, setPersonalizationThreshold] = useState(80);
+  const [dailySendingLimit, setDailySendingLimit] = useState(50);
   const [connectedTools, setConnectedTools] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [connectingTool, setConnectingTool] = useState<string | null>(null);
   const api = useApi();
   const { getToken } = useAuth();
@@ -160,17 +164,42 @@ export default function Settings() {
   const [assets, setAssets] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Fetch settings on load
+  const fetchSettings = async () => {
+    try {
+      const data = await api.getSettings();
+      setEmailNotifications(data.email_notifications ?? true);
+      setDailyDigestTime(data.daily_digest_time ?? "9am");
+      setAutoApprove(data.auto_approve_low_risk ?? false);
+      setPersonalizationThreshold(data.personalization_threshold ?? 80);
+      setDailySendingLimit(data.daily_sending_limit ?? 50);
+    } catch (e) {
+      console.error("Failed to fetch settings", e);
+    }
+  };
+
+  // Save settings to backend
+  const saveSettings = async (updates: Record<string, any>) => {
+    setIsSaving(true);
+    try {
+      await api.updateSettings(updates);
+    } catch (e) {
+      console.error("Failed to save settings", e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   useEffect(() => {
     fetchIntegrations();
     fetchAssets();
+    fetchSettings();
 
     // Check if returning from OAuth callback
     const urlParams = new URLSearchParams(window.location.search);
     const connected = urlParams.get('connected');
     if (connected) {
-      // Clear the URL params
       window.history.replaceState({}, '', window.location.pathname);
-      // Refresh integrations to show newly connected tool
       setTimeout(() => fetchIntegrations(), 500);
     }
   }, []);
@@ -422,7 +451,10 @@ export default function Settings() {
             </div>
             <Switch
               checked={emailNotifications}
-              onCheckedChange={setEmailNotifications}
+              onCheckedChange={(checked) => {
+                setEmailNotifications(checked);
+                saveSettings({ email_notifications: checked });
+              }}
             />
           </div>
 
@@ -433,7 +465,13 @@ export default function Settings() {
               <p className="font-medium text-foreground">Daily Digest</p>
               <p className="text-sm text-muted-foreground">Summary of agent activities</p>
             </div>
-            <Select defaultValue="9am">
+            <Select
+              value={dailyDigestTime}
+              onValueChange={(value) => {
+                setDailyDigestTime(value);
+                saveSettings({ daily_digest_time: value });
+              }}
+            >
               <SelectTrigger className="w-32 bg-secondary">
                 <SelectValue />
               </SelectTrigger>
@@ -461,7 +499,10 @@ export default function Settings() {
             </div>
             <Switch
               checked={autoApprove}
-              onCheckedChange={setAutoApprove}
+              onCheckedChange={(checked) => {
+                setAutoApprove(checked);
+                saveSettings({ auto_approve_low_risk: checked });
+              }}
             />
           </div>
 
@@ -472,7 +513,14 @@ export default function Settings() {
             <p className="text-sm text-muted-foreground mb-2">
               Minimum personalization score required
             </p>
-            <Select defaultValue="80">
+            <Select
+              value={String(personalizationThreshold)}
+              onValueChange={(value) => {
+                const num = parseInt(value);
+                setPersonalizationThreshold(num);
+                saveSettings({ personalization_threshold: num });
+              }}
+            >
               <SelectTrigger className="w-full bg-secondary">
                 <SelectValue />
               </SelectTrigger>
@@ -493,7 +541,9 @@ export default function Settings() {
             </p>
             <Input
               type="number"
-              defaultValue={50}
+              value={dailySendingLimit}
+              onChange={(e) => setDailySendingLimit(parseInt(e.target.value) || 50)}
+              onBlur={() => saveSettings({ daily_sending_limit: dailySendingLimit })}
               className="bg-secondary border-transparent"
             />
           </div>

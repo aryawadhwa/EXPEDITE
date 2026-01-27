@@ -65,19 +65,19 @@ export default function ActiveAgents() {
     const fetchAgents = async () => {
       try {
         const data = await getAgents();
-        const mappedAgents: AgentUI[] = data.map((items: any) => ({
-          id: items._id || items.id,
-          name: items.name,
-          type: "custom", // Default to custom as backend doesn't have type yet
-          status: items.status || "idle",
-          mission: items.description || "No mission assigned",
-          progress: 0, // Not tracked in backend yet
+        const mappedAgents: AgentUI[] = data.map((item: any) => ({
+          id: item._id || item.id,
+          name: item.name,
+          type: item.agent_type || "custom",
+          status: item.status || "idle",
+          mission: item.description || "No mission assigned",
+          progress: item.status === "active" ? 50 : 0,
           stats: {
-            processed: 0,
-            queued: 0,
-            errors: 0
+            processed: item.stats?.processed ?? 0,
+            queued: item.stats?.queued ?? 0,
+            errors: item.stats?.errors ?? 0
           },
-          uptime: "0h 0m" // Placeholder
+          uptime: item.uptime || "0h 0m"
         }));
         setAgents(mappedAgents);
       } catch (error) {

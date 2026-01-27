@@ -21,6 +21,50 @@ class AgentState(TypedDict):
 # Real Tools
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
+from app.models import Agent
+
+async def update_agent_stats(user_id: str, processed=0, queued=0, errors=0):
+    """Update stats for the user's active agents and broadcast to frontend"""
+    try:
+        # Find all active agents for this user
+        agents = await Agent.find(Agent.user_id == user_id, Agent.status == "active").to_list()
+        
+        # If no active agents, just find any agent to log stats to
+        if not agents:
+            agents = await Agent.find(Agent.user_id == user_id).limit(1).to_list()
+            
+        now = datetime.utcnow()
+        for agent in agents:
+            if not agent.stats:
+                from app.models import AgentStats
+                agent.stats = AgentStats()
+            
+            agent.stats.processed += processed
+            agent.stats.queued += queued
+            agent.stats.errors += errors
+            agent.stats.last_run_at = now
+            await agent.save()
+            
+        # Calculate aggregates for broadcast
+        all_agents = await Agent.find(Agent.user_id == user_id).to_list()
+        total_active = sum(1 for a in all_agents if a.status == "active")
+        total_processed = sum(a.stats.processed for a in all_agents if a.stats)
+        total_queued = sum(a.stats.queued for a in all_agents if a.stats)
+        
+        # Broadcast via WebSocket
+        from main import get_connection_manager
+        manager = get_connection_manager()
+        await manager.send_to_user(user_id, {
+            "type": "stats_update",
+            "stats": {
+                "active": total_active,
+                "processed": total_processed,
+                "queue": total_queued
+            }
+        })
+            
+    except Exception as e:
+        print(f"Failed to update agent stats: {e}")
 
 async def log_event(mission_id: str, user_id: str, content: str, log_type: str = "action", role: str = "agent", metadata: Dict = {}):
     """Log an event to DB and broadcast via WebSocket"""
@@ -98,6 +142,7 @@ async def scout_prospects(state: AgentState):
                 
                 if raw_prospects:
                     await log_event(state["mission_id"], state["user_id"], f"Found {len(raw_prospects)} potential contact points.", "success")
+                    await update_agent_stats(state["user_id"], processed=len(raw_prospects))
                     return {"prospects": raw_prospects}
             
             await log_event(state["mission_id"], state["user_id"], f"Firecrawl returned status {response.status_code}", "error")
@@ -262,6 +307,7 @@ Attachments Available: {[a['filename'] for a in prospect.get('attachments', [])]
         # attachments=prospect.get('attachments', [])
     )
     await d_doc.insert()
+    await update_agent_stats(state["user_id"], queued=1)
     
     return {"draft_id": str(d_doc.id)}
 

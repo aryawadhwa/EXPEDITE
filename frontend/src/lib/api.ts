@@ -273,6 +273,28 @@ export function useApi() {
             if (!res.ok) throw new Error('Failed to fetch contact stats');
             return res.json();
         },
+
+        // Settings
+        getSettings: async () => {
+            const res = await fetchWithAuth('/settings/');
+            if (!res.ok) throw new Error('Failed to fetch settings');
+            return res.json();
+        },
+
+        updateSettings: async (settings: {
+            email_notifications?: boolean;
+            daily_digest_time?: string;
+            auto_approve_low_risk?: boolean;
+            personalization_threshold?: number;
+            daily_sending_limit?: number;
+        }) => {
+            const res = await fetchWithAuth('/settings/', {
+                method: 'PATCH',
+                body: JSON.stringify(settings),
+            });
+            if (!res.ok) throw new Error('Failed to update settings');
+            return res.json();
+        },
     };
 }
 
