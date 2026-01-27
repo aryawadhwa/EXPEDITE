@@ -21,6 +21,24 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { useApi } from "@/lib/api";
+import { ReactFlow, Background, Controls, Handle, Position } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+
+// Custom node component with dark theme styling
+const CustomNode = ({ data }: { data: { label: string } }) => (
+  <div className="px-4 py-2 rounded-lg bg-card border border-border shadow-md min-w-[120px] text-center">
+    <Handle type="target" position={Position.Top} className="!bg-primary" />
+    <span className="text-foreground text-sm font-medium">{data.label}</span>
+    <Handle type="source" position={Position.Bottom} className="!bg-primary" />
+  </div>
+);
+
+const nodeTypes = {
+  trigger: CustomNode,
+  action: CustomNode,
+  wait: CustomNode,
+  default: CustomNode,
+};
 
 // Agent Type for UI
 interface AgentUI {
@@ -56,38 +74,68 @@ export default function ActiveAgents() {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { user } = useUser();
-  const { getAgents } = useApi();
+  const { getAgents, updateAgent, deleteAgent } = useApi();
+  const [selectedAgent, setSelectedAgent] = useState<AgentUI | null>(null);
 
   console.log("Active User:", user?.id);
 
-  useEffect(() => {
-    const fetchAgents = async () => {
-      try {
-        const data = await getAgents();
-        const mappedAgents: AgentUI[] = data.map((items: any) => ({
-          id: items._id || items.id,
-          name: items.name,
-          type: "custom", // Default to custom as backend doesn't have type yet
-          status: items.status || "idle",
-          mission: items.description || "No mission assigned",
-          progress: 0, // Not tracked in backend yet
-          stats: {
-            processed: 0,
-            queued: 0,
-            errors: 0
-          },
-          uptime: "0h 0m" // Placeholder
-        }));
-        setAgents(mappedAgents);
-      } catch (error) {
-        console.error("Failed to fetch agents:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchAgents = async () => {
+    try {
+      const data = await getAgents();
+      const mappedAgents: AgentUI[] = data.map((items: any) => ({
+        id: items._id || items.id,
+        name: items.name,
+        type: "custom",
+        status: items.status || "idle",
+        mission: items.description || "No mission assigned",
+        progress: 0,
+        stats: {
+          processed: 0,
+          queued: 0,
+          errors: 0
+        },
+        uptime: "0h 0m",
+        workflow: items.workflow // Keep workflow data
+      }));
+      setAgents(mappedAgents);
+    } catch (error) {
+      console.error("Failed to fetch agents:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchAgents();
   }, []);
+
+  const handleToggleStatus = async (agent: AgentUI) => {
+    const newStatus = agent.status === "active" ? "idle" : "active";
+    // Optimistic update
+    setAgents(prev => prev.map(a => a.id === agent.id ? { ...a, status: newStatus as any } : a));
+
+    try {
+      await updateAgent(agent.id, { status: newStatus });
+    } catch (e) {
+      console.error("Failed to update status", e);
+      // Revert on error
+      fetchAgents();
+    }
+  };
+
+  const handleDelete = async (agentId: string) => {
+    if (!confirm("Are you sure you want to terminate this agent?")) return;
+
+    // Optimistic remove
+    setAgents(prev => prev.filter(a => a.id !== agentId));
+
+    try {
+      await deleteAgent(agentId);
+    } catch (e) {
+      console.error("Failed to delete agent", e);
+      fetchAgents();
+    }
+  };
 
   return (
     <div className="h-full p-6 lg:p-8 overflow-auto">
@@ -114,36 +162,7 @@ export default function ActiveAgents() {
         {isLoading ? (
           Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="p-5 bg-card border border-border rounded-xl">
-              <div className="flex justify-between mb-4">
-                <div className="flex gap-3">
-                  <Skeleton className="w-10 h-10 rounded-lg" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-3 w-16" />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Skeleton className="h-5 w-16" />
-                  <Skeleton className="h-8 w-8 rounded-md" />
-                </div>
-              </div>
-              <Skeleton className="h-10 w-full mb-4 rounded-lg" />
-              <div className="mb-4 space-y-2">
-                <div className="flex justify-between">
-                  <Skeleton className="h-3 w-12" />
-                  <Skeleton className="h-3 w-8" />
-                </div>
-                <Skeleton className="h-1.5 w-full" />
-              </div>
-              <div className="grid grid-cols-4 gap-3 pt-4 border-t border-border">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-              </div>
-              <div className="mt-4">
-                <Skeleton className="h-9 w-full" />
-              </div>
+              <Skeleton className="h-40 w-full" />
             </div>
           ))
         ) : agents.length === 0 ? (
@@ -193,9 +212,16 @@ export default function ActiveAgents() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-popover">
-                      <DropdownMenuItem>View Logs</DropdownMenuItem>
-                      <DropdownMenuItem>Edit Configuration</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">Terminate</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSelectedAgent(agent)}>
+                        View Workflow
+                      </DropdownMenuItem>
+                      <DropdownMenuItem disabled>Edit Configuration</DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => handleDelete(agent.id)}
+                      >
+                        Terminate
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -240,12 +266,22 @@ export default function ActiveAgents() {
               {/* Actions */}
               <div className="flex gap-2 mt-4">
                 {agent.status === "active" ? (
-                  <Button variant="secondary" size="sm" className="flex-1 gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1 gap-2"
+                    onClick={() => handleToggleStatus(agent)}
+                  >
                     <Pause className="w-3.5 h-3.5" />
                     Pause
                   </Button>
                 ) : (
-                  <Button variant="secondary" size="sm" className="flex-1 gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1 gap-2"
+                    onClick={() => handleToggleStatus(agent)}
+                  >
                     <Play className="w-3.5 h-3.5" />
                     Resume
                   </Button>
@@ -255,6 +291,33 @@ export default function ActiveAgents() {
           ))
         )}
       </div>
+
+      {/* Workflow Dialog */}
+      {selectedAgent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-4xl bg-card border border-border rounded-xl shadow-lg p-6 h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold">Agent Workflow: {selectedAgent.name}</h2>
+              <Button variant="ghost" size="icon" onClick={() => setSelectedAgent(null)}>X</Button>
+            </div>
+            <div className="flex-1 border rounded-md overflow-hidden bg-background">
+              {/* @ts-ignore */}
+              <ReactFlow
+                nodes={(selectedAgent as any).workflow?.nodes || []}
+                edges={(selectedAgent as any).workflow?.edges || []}
+                nodeTypes={nodeTypes}
+                fitView
+              >
+                <Background />
+                <Controls />
+              </ReactFlow>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button onClick={() => setSelectedAgent(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

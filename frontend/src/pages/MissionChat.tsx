@@ -231,14 +231,20 @@ export default function MissionChat() {
                     status: response.type === "error" ? "error" : "complete"
                 }]);
             } else {
-                // Create new mission from input
-                const newMission = await api.createMission(input);
+                // Create new mission from input with attachments
+                const attachmentData = selectedAttachments.map(a => ({
+                    asset_id: a.id || a._id,
+                    filename: a.filename,
+                    content_type: a.content_type
+                }));
+                const newMission = await api.createMission(input, attachmentData);
                 setMission(newMission);
+                setSelectedAttachments([]); // Clear after sending
 
                 setMessages(prev => [...prev, {
                     id: `agent-${Date.now()}`,
                     role: "agent",
-                    content: "Mission launched! I'm scouting for prospects and will draft personalized emails. Check the Review Queue for drafts awaiting your approval.",
+                    content: `Mission launched${attachmentData.length > 0 ? ` with ${attachmentData.length} attachment(s)` : ''}! I'm scouting for prospects and will draft personalized emails. Check the Review Queue for drafts awaiting your approval.`,
                     timestamp: new Date(),
                     status: "complete"
                 }]);
@@ -259,6 +265,29 @@ export default function MissionChat() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // Poll user profile for connection status
+    const [userProfile, setUserProfile] = useState<any>(null);
+    useEffect(() => {
+        const fetchUser = async () => {
+            try {
+                const u = await api.getUser();
+                setUserProfile(u);
+            } catch (e) {
+                console.error("Failed to fetch user", e);
+            }
+        };
+        fetchUser();
+        const interval = setInterval(fetchUser, 3000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const isConnected = (tool: string) => {
+        if (!userProfile) return false;
+        if (tool === "gmail" || tool === "email") return !!userProfile.gmail_connection_id;
+        if (tool === "slack") return !!userProfile.slack_connection_id;
+        return !!(userProfile.other_connections && userProfile.other_connections[tool]);
     };
 
     return (
@@ -336,17 +365,31 @@ export default function MissionChat() {
 
                                     if (toolMatch) {
                                         const displayName = toolMatch.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                                        const connected = isConnected(toolMatch);
+
                                         return (
                                             <div className="mt-3">
-                                                <Button
-                                                    variant="default"
-                                                    size="sm"
-                                                    className="w-full gap-2 animate-in fade-in zoom-in duration-300 shadow-md"
-                                                    onClick={() => handleConnect(toolMatch)}
-                                                >
-                                                    <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                                                    Connect {displayName}
-                                                </Button>
+                                                {connected ? (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="w-full gap-2 border-emerald-500/50 text-emerald-500 bg-emerald-500/10 cursor-default hover:bg-emerald-500/10 hover:text-emerald-500"
+                                                        disabled
+                                                    >
+                                                        <CheckCircle className="w-4 h-4" />
+                                                        {displayName} Connected
+                                                    </Button>
+                                                ) : (
+                                                    <Button
+                                                        variant="default"
+                                                        size="sm"
+                                                        className="w-full gap-2 animate-in fade-in zoom-in duration-300 shadow-md"
+                                                        onClick={() => handleConnect(toolMatch)}
+                                                    >
+                                                        <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                                        Connect {displayName}
+                                                    </Button>
+                                                )}
                                             </div>
                                         );
                                     }

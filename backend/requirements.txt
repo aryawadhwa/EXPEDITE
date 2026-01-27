@@ -13,3 +13,4 @@ firecrawl-py
 websockets
 boto3
 python-multipart
+composio

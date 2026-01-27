@@ -8,21 +8,33 @@ router = APIRouter()
 
 @router.get("/pending")
 async def get_pending_drafts(user: User = Depends(get_current_user)):
-    # Fetch pending drafts and enrich with prospect info
-    drafts = await Draft.find(Draft.status == DraftStatus.PENDING).to_list()
+    from app.models import Mission, Prospect
+    from beanie.operators import In
+
+    # 1. Get all missions for this user
+    missions = await Mission.find(Mission.user_id == user.clerk_id).to_list()
+    mission_ids = [str(m.id) for m in missions]
+    
+    # 2. Get all prospects for these missions
+    prospects = await Prospect.find(In(Prospect.mission_id, mission_ids)).to_list()
+    prospect_ids = [str(p.id) for p in prospects]
+    
+    # 3. Fetch pending drafts for these prospects ONLY
+    drafts = await Draft.find(In(Draft.prospect_id, prospect_ids), Draft.status == DraftStatus.PENDING).to_list()
     
     result = []
     for draft in drafts:
         draft_dict = draft.model_dump()
         draft_dict["id"] = str(draft.id)
         
-        # Fetch associated prospect
-        if draft.prospect_id:
-            prospect = await Prospect.get(draft.prospect_id)
-            if prospect:
-                draft_dict["name"] = prospect.name
-                draft_dict["company"] = prospect.company
-                draft_dict["scraped_data"] = prospect.scraped_data
+        # Fetch associated prospect (optimize to use pre-fetched list if possible, but safe to query or lookup)
+        # Simple lookup map
+        prospect = next((p for p in prospects if str(p.id) == draft.prospect_id), None)
+        
+        if prospect:
+            draft_dict["name"] = prospect.name
+            draft_dict["company"] = prospect.company
+            draft_dict["scraped_data"] = prospect.scraped_data
         
         result.append(draft_dict)
     
@@ -37,24 +49,30 @@ async def clear_all_pending_drafts(user: User = Depends(get_current_user)):
     # 1. Get all missions for this user
     missions = await Mission.find(Mission.user_id == user.clerk_id).to_list()
     mission_ids = [str(m.id) for m in missions]
+    print(f"DEBUG: Found {len(missions)} missions for user {user.clerk_id}: {mission_ids}")
     
     if not mission_ids:
-        print(f"Clear All: No missions found for user {user.clerk_id}")
+        print("DEBUG: No missions found. Returning 0.")
         return {"status": "cleared", "count": 0}
         
     # 2. Get all prospects for these missions
     prospects = await Prospect.find(In(Prospect.mission_id, mission_ids)).to_list()
     prospect_ids = [str(p.id) for p in prospects]
+    print(f"DEBUG: Found {len(prospects)} prospects for {len(missions)} missions. IDs sample: {prospect_ids[:5]}")
     
     if not prospect_ids:
-        print(f"Clear All: No prospects found for missions {mission_ids}")
+        print("DEBUG: No prospects found. Returning 0.")
         return {"status": "cleared", "count": 0}
+    
+    # Check if ANY drafts exist for these prospects before deleting
+    existing_drafts = await Draft.find(In(Draft.prospect_id, prospect_ids), Draft.status == DraftStatus.PENDING).count()
+    print(f"DEBUG: Found {existing_drafts} PENDING drafts matching these prospects.")
          
     # 3. Delete pending drafts for these prospects
     result = await Draft.find(In(Draft.prospect_id, prospect_ids), Draft.status == DraftStatus.PENDING).delete()
     
     count = result.deleted_count if result else 0
-    print(f"Clear All: Deleted {count} drafts for user {user.clerk_id}")
+    print(f"DEBUG: Delete operation returned count: {count}")
     return {"status": "cleared", "count": count}
 
 @router.post("/{id}/approve")
@@ -93,15 +111,34 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
     await new_agent.insert()
 
     # 2. Attempt to Send Email via Composio (if connected)
+    # 2. Attempt to Send Email via Composio (if connected)
     if user.gmail_connection_id:
-        try:
-             # Placeholder for actual Composio Action execution
-             # In a full implementation, we would POST to /actions/execute with "GMAIL_SEND_EMAIL"
-             # For now, we log it.
-             print(f"Approved: Ready to send email via connection {user.gmail_connection_id}")
-             # FUTURE: await execute_composio_action("GMAIL_SEND_EMAIL", params={...})
-        except Exception as e:
-            print(f"Failed to trigger email send: {e}")
+        from app.models import Prospect
+        from app.core.sender import send_email_via_composio
+        
+        recipient = None
+        if draft.prospect_id:
+            prospect = await Prospect.get(draft.prospect_id)
+            if prospect:
+                recipient = prospect.public_contact
+                
+        if recipient:
+            try:
+                 print(f"Approved: Sending email to {recipient} via connection {user.gmail_connection_id}")
+                 # Get attachments from draft
+                 attachments = getattr(draft, 'attachments', []) or []
+                 await send_email_via_composio(
+                     user.clerk_id,
+                     recipient,
+                     draft.subject,
+                     draft.body,
+                     attachments
+                  )
+                 print("Email sent successfully.")
+            except Exception as e:
+                print(f"Failed to trigger email send: {e}")
+        else:
+            print("Approved: No recipient email found for this prospect.")
 
     return {
         "status": "approved", 

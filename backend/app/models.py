@@ -55,6 +55,7 @@ class Draft(Document):
     body: str
     ai_reasoning: str
     status: DraftStatus = DraftStatus.PENDING
+    attachments: List[Dict] = []  # List of {"filename": str, "content_type": str, "asset_id": str}
 
     class Settings:
         name = "drafts"

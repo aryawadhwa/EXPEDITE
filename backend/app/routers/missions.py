@@ -1,6 +1,5 @@
-
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from typing import List, Optional, Dict
 from app.models import Mission, User, MissionLog
 from app.api.deps import get_current_user
 from app.core.agent import run_mission_agent
@@ -11,6 +10,7 @@ router = APIRouter()
 
 class MissionCreate(BaseModel):
     objective: str
+    attachments: Optional[List[Dict]] = []  # List of {asset_id, filename, content_type}
 
 @router.post("/", response_model=Mission)
 async def create_mission(mission_in: MissionCreate, user: User = Depends(get_current_user)):
@@ -18,16 +18,19 @@ async def create_mission(mission_in: MissionCreate, user: User = Depends(get_cur
     await mission.insert()
     
     # Save initial log entry
+    attachment_msg = ""
+    if mission_in.attachments:
+        attachment_msg = f" with {len(mission_in.attachments)} attachment(s)"
     initial_log = MissionLog(
         mission_id=str(mission.id),
         role="system",
-        content=f"Mission started: {mission_in.objective}",
+        content=f"Mission started: {mission_in.objective}{attachment_msg}",
         log_type="success"
     )
     await initial_log.insert()
     
-    # Trigger background agent
-    asyncio.create_task(run_mission_agent(str(mission.id), mission_in.objective, user.clerk_id))
+    # Trigger background agent with attachments
+    asyncio.create_task(run_mission_agent(str(mission.id), mission_in.objective, user.clerk_id, mission_in.attachments or []))
     
     return mission
 
@@ -65,6 +68,8 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
     from app.core.config import settings
     from langchain_groq import ChatGroq
     from langchain_core.messages import SystemMessage, HumanMessage
+    from app.models import Draft, DraftStatus, Prospect, Agent
+    from beanie.operators import In
     
     # Verify mission belongs to user
     mission = await Mission.get(mission_id)
@@ -80,24 +85,132 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
     )
     await user_log.insert()
 
-    # CHECK FOR REAL DATA/EMAIL INTENT
-    # Simple keyword match for now. In production this should be an intent classifier.
-    intent_keywords = ["send", "email", "outreach", "blast", "campaign"]
-    if any(k in chat.message.lower() for k in intent_keywords):
-        # Check if user has connected email (mock check for now as Settings endpoint isn't fully linked to DB yet)
-        # We can check the Agent model or User settings if they existed.
-        # For this demo, let's assume we check for a "gmail_connected" flag or similar.
+    msg_lower = chat.message.lower()
+    
+    # CHECK FOR INTEGRATION REQUEST (Slack, Gmail, etc.)
+    integration_keywords = {
+        "slack": ["slack", "notify me on slack", "integrate slack"],
+        "gmail": ["gmail", "connect email", "connect gmail"],
+    }
+    
+    for tool, keywords in integration_keywords.items():
+        if any(k in msg_lower for k in keywords):
+            # Check if already connected
+            is_connected = False
+            if tool == "slack":
+                is_connected = bool(user.slack_connection_id)
+            elif tool == "gmail":
+                is_connected = bool(user.gmail_connection_id)
+            
+            if not is_connected:
+                tool_label = tool.title()
+                prompt_msg = f"To proceed with {tool_label} integration, please connect your {tool_label} account."
+                await MissionLog(
+                    mission_id=mission_id, 
+                    role="agent", 
+                    content=prompt_msg, 
+                    log_type="action",
+                    metadata={"action": "connect_tool", "tool": tool}
+                ).insert()
+                return {
+                    "message": prompt_msg,
+                    "role": "agent",
+                    "type": "action",
+                    "metadata": {"action": "connect_tool", "tool": tool}
+                }
+            else:
+                # Already connected
+                tool_label = tool.title()
+                success_msg = f"Your {tool_label} is already connected! I'll use it for notifications."
+                await MissionLog(mission_id=mission_id, role="agent", content=success_msg, log_type="success").insert()
+                return {"message": success_msg, "role": "agent", "type": "success"}
+    
+    # CHECK FOR APPROVAL INTENT
+    approval_keywords = ["approve", "send it", "send the mail", "looks good", "proceed"]
+    if any(k in msg_lower for k in approval_keywords):
+        # Find pending draft for this mission
+        # 1. Get prospects for mission
+        prospects = await Prospect.find(Prospect.mission_id == mission_id).to_list()
+        prospect_ids = [str(p.id) for p in prospects]
         
-        # Simulating a check - asking user to confirm/connect
-        # In a real app we would query: await Agent.find_one({"user_id": user.clerk_id, "integrations": "gmail"})
-        
-        # If we wanted to force it:
-        # return {
-        #     "message": "I can help with that, but first you need to connect your **Gmail** account in Settings so I can send emails on your behalf.",
-        #     "role": "agent",
-        #     "type": "error" # Or specific type to trigger UI action
-        # }
-        pass
+        # 2. Find pending draft
+        if prospect_ids:
+            draft = await Draft.find_one(In(Draft.prospect_id, prospect_ids), Draft.status == DraftStatus.PENDING)
+            
+            if draft:
+                # APPROVE IT
+                draft.status = DraftStatus.APPROVED
+                await draft.save()
+                
+                # Create Active Agent (Workflow)
+                new_agent = Agent(
+                    user_id=user.clerk_id,
+                    name=f"Lead Workflow: {draft.subject[:20]}...",
+                    description=f"Active engagement for mission {mission_id}",
+                    status="active",
+                    workflow={
+                        "nodes": [
+                            {"id": "1", "type": "trigger", "data": {"label": "Draft Approved"}, "position": {"x": 50, "y": 50}},
+                            {"id": "2", "type": "action", "data": {"label": "Email Sent"}, "position": {"x": 50, "y": 150}},
+                            {"id": "3", "type": "wait", "data": {"label": "Wait for Reply"}, "position": {"x": 50, "y": 250}}
+                        ], 
+                        "edges": [
+                            {"id": "e1-2", "source": "1", "target": "2"},
+                            {"id": "e2-3", "source": "2", "target": "3"}
+                        ]
+                    }
+                )
+                await new_agent.insert()
+                
+                # ATTEMPT TO SEND EMAIL
+                from app.core.sender import send_email_via_composio
+                send_status = "queued (no connection)"
+                
+                # Find prospect for email address
+                prospect_map = {str(p.id): p for p in prospects}
+                target_prospect = prospect_map.get(draft.prospect_id)
+                recipient = target_prospect.public_contact if target_prospect else None
+                
+                if user.gmail_connection_id and recipient:
+                    try:
+                        attachments = getattr(draft, 'attachments', []) or []
+                        await send_email_via_composio(
+                            user.clerk_id,
+                            recipient,
+                            draft.subject,
+                            draft.body,
+                            attachments
+                        )
+                        send_status = "sent successfully"
+                        start_msg = f"Draft approved and email sent to {recipient}!"
+                    except Exception as e:
+                        print(f"Send Failed: {e}")
+                        send_status = f"failed to send ({str(e)})"
+                        start_msg = f"Draft approved but sending failed: {str(e)}"
+                else:
+                    if not recipient:
+                        start_msg = "Draft approved, but I couldn't find an email address for this prospect."
+                    else:
+                        start_msg = f"Draft approved! However, your Gmail is not connected so I couldn't send data to {recipient}."
+                
+                # Log success
+                await MissionLog(mission_id=mission_id, role="agent", content=start_msg, log_type="success").insert()
+                
+                return {
+                    "message": start_msg,
+                    "role": "agent",
+                    "type": "success"
+                }
+            else:
+                 # Check if recently approved
+                 recent = await Draft.find_one(In(Draft.prospect_id, prospect_ids), Draft.status == DraftStatus.APPROVED)
+                 if recent:
+                     return {"message": "The draft was already approved and is being processed.", "role": "agent", "type": "success"}
+
+        # No draft found
+        fail_msg = "I don't see a pending draft to send yet. The background agent works on one prospect at a time. Please wait a moment or check the Review Queue."
+        await MissionLog(mission_id=mission_id, role="agent", content=fail_msg, log_type="error").insert()
+        return {"message": fail_msg, "role": "agent", "type": "error"}
 
     try:
         llm = ChatGroq(
@@ -106,25 +219,14 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
             model_name="llama-3.3-70b-versatile"
         )
         
-        system_prompt = f"""You are the Mission Control AI for an outbound sales campaign.
-        
+        system_prompt = f"""You are the Mission Control AI.
 Mission Objective: {mission.objective}
 
-YOUR ROLE:
-- You orchestrate the background agents.
-- You do NOT write emails yourself in this chat.
-- You do NOT give generic advice on how to write emails.
-
-INTERACTION GUIDELINES:
-- If the user asks to "send emails" or "find people", confirm that the **Background Agent** is already working on it.
-- Direct the user to the **Review Queue** to see drafts.
-- If the user provides feedback (e.g., "Make them shorter"), say "Understood, I will pass this feedback to the drafting agent for future emails." (Note: Actual feedback passing is a future feature).
-- If the user asks for status, check the logs (which you can't see directly, so just say "Agents are active").
-
-CRITICAL:
-- Unless the user asks a general question, always refer them to the **Review Queue** for results.
-- NEVER generate a sample email in this chat. Drafts belong in the Review Queue.
-- If the user asks to "Send", remind them to **Connect their Gmail** in Settings (if not done) and then use the **Approve** button in the Review Queue.
+GUIDELINES:
+- Address the user's question about the mission.
+- If they ask for status, say "Agents are active".
+- Do NOT generate sample emails here.
+- If they want to change the strategy, acknowledge it (but actual config update is manual for now).
 """
 
         messages = [

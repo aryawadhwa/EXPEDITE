@@ -33,6 +33,8 @@ app.include_router(reviews.router, prefix="/api/v1/reviews", tags=["reviews"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 from app.routers import integrations
 app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["integrations"])
+from app.routers import users
+app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 from app.routers import assets
 app.include_router(assets.router, prefix="/api/v1/assets", tags=["assets"])
 from app.routers import health

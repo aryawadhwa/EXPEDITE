@@ -16,11 +16,17 @@ export function useApi() {
     };
 
     return {
+        // User
+        getUser: async () => {
+            const res = await fetchWithAuth("/users/me");
+            return res.json();
+        },
+
         // Missions
-        createMission: async (objective: string) => {
+        createMission: async (objective: string, attachments: any[] = []) => {
             const res = await fetchWithAuth("/missions/", {
                 method: "POST",
-                body: JSON.stringify({ objective }),
+                body: JSON.stringify({ objective, attachments }),
             });
             return res.json();
         },
