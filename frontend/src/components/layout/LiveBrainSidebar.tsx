@@ -55,6 +55,13 @@ export function LiveBrainSidebar({ isOpen, onToggle }: LiveBrainSidebarProps) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // Handle stats update without adding to logs
+        if (data.type === 'stats_update' && data.stats) {
+          setStats(data.stats);
+          return;
+        }
+
         setLogs((prev) =>
           [
             ...prev,
@@ -67,9 +74,6 @@ export function LiveBrainSidebar({ isOpen, onToggle }: LiveBrainSidebarProps) {
             },
           ].slice(-30)
         );
-        if (data.stats) {
-          setStats(data.stats);
-        }
       } catch {
         // Plain text message
         setLogs((prev) =>

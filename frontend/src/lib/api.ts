@@ -1,11 +1,12 @@
 import { useAuth } from "@clerk/clerk-react";
+import { useMemo, useCallback } from "react";
 
 const API_BASE_URL = "http://localhost:8000/api/v1";
 
 export function useApi() {
     const { getToken } = useAuth();
 
-    const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
         const token = await getToken();
         const headers = {
             "Content-Type": "application/json",
@@ -13,14 +14,20 @@ export function useApi() {
             ...options.headers,
         };
         return fetch(`${API_BASE_URL}${url}`, { ...options, headers });
-    };
+    }, [getToken]);
 
-    return {
+    return useMemo(() => ({
+        // User
+        getUser: async () => {
+            const res = await fetchWithAuth("/users/me");
+            return res.json();
+        },
+
         // Missions
-        createMission: async (objective: string) => {
+        createMission: async (objective: string, attachments: any[] = []) => {
             const res = await fetchWithAuth("/missions/", {
                 method: "POST",
-                body: JSON.stringify({ objective }),
+                body: JSON.stringify({ objective, attachments }),
             });
             if (!res.ok) {
                 const error = await res.json();
@@ -67,8 +74,9 @@ export function useApi() {
         },
 
         // Reviews
-        getPendingDrafts: async () => {
-            const res = await fetchWithAuth("/reviews/pending");
+        getPendingDrafts: async (missionId?: string) => {
+            const params = missionId ? `?mission_id=${missionId}` : '';
+            const res = await fetchWithAuth(`/reviews/pending${params}`);
             if (!res.ok) throw new Error('Failed to fetch pending drafts');
             return res.json();
         },
@@ -132,6 +140,12 @@ export function useApi() {
                 method: "DELETE",
             });
             if (!res.ok) throw new Error('Failed to disconnect tool');
+            return res.json();
+        },
+
+        getToolStatus: async (tool: string) => {
+            const res = await fetchWithAuth(`/integrations/${tool}/status`);
+            if (!res.ok) return { status: "INACTIVE" };
             return res.json();
         },
 
@@ -267,6 +281,27 @@ export function useApi() {
             if (!res.ok) throw new Error('Failed to fetch contact stats');
             return res.json();
         },
-    };
-}
 
+        // Settings
+        getSettings: async () => {
+            const res = await fetchWithAuth('/settings/');
+            if (!res.ok) throw new Error('Failed to fetch settings');
+            return res.json();
+        },
+
+        updateSettings: async (settings: {
+            email_notifications?: boolean;
+            daily_digest_time?: string;
+            auto_approve_low_risk?: boolean;
+            personalization_threshold?: number;
+            daily_sending_limit?: number;
+        }) => {
+            const res = await fetchWithAuth('/settings/', {
+                method: 'PATCH',
+                body: JSON.stringify(settings),
+            });
+            if (!res.ok) throw new Error('Failed to update settings');
+            return res.json();
+        },
+    }), [fetchWithAuth]);
+}

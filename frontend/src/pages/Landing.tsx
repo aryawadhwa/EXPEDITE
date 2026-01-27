@@ -22,11 +22,9 @@ const Landing = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 py-0 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-              OutboundAI
-            </span>
+            <img src="/logo.png" alt="ExpediteAI" className="h-[100px] w-auto object-contain" />
           </div>
           <div className="flex items-center gap-4">
             <SignedIn>
@@ -214,7 +212,7 @@ const Landing = () => {
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Why Teams Choose OutboundAI
+                Why Teams Choose ExpediteAI
               </h2>
               <div className="space-y-6">
                 {[
@@ -304,10 +302,10 @@ const Landing = () => {
       <footer className="py-8 px-6 border-t border-border/50">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <span className="text-lg font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-            OutboundAI
+            ExpediteAI
           </span>
           <p className="text-sm text-muted-foreground">
-            © 2024 OutboundAI. All rights reserved.
+            © 2024 ExpediteAI. All rights reserved.
           </p>
         </div>
       </footer>

@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Key,
   Bell,
   Shield,
   Zap,
@@ -24,21 +23,57 @@ import {
   Check
 } from "lucide-react";
 
+
+
+
+
+
 export default function Settings() {
   const [emailNotifications, setEmailNotifications] = useState(true);
+  const [dailyDigestTime, setDailyDigestTime] = useState("9am");
   const [autoApprove, setAutoApprove] = useState(false);
-  const [connectedTools, setConnectedTools] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [personalizationThreshold, setPersonalizationThreshold] = useState(80);
+  const [dailySendingLimit, setDailySendingLimit] = useState(50);
+  const [isSaving, setIsSaving] = useState(false);
+
   const api = useApi();
   const { getToken } = useAuth();
 
   const [assets, setAssets] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Fetch settings on load
+  const fetchSettings = async () => {
+    try {
+      const data = await api.getSettings();
+      setEmailNotifications(data.email_notifications ?? true);
+      setDailyDigestTime(data.daily_digest_time ?? "9am");
+      setAutoApprove(data.auto_approve_low_risk ?? false);
+      setPersonalizationThreshold(data.personalization_threshold ?? 80);
+      setDailySendingLimit(data.daily_sending_limit ?? 50);
+    } catch (e) {
+      console.error("Failed to fetch settings", e);
+    }
+  };
+
+  // Save settings to backend
+  const saveSettings = async (updates: Record<string, any>) => {
+    setIsSaving(true);
+    try {
+      await api.updateSettings(updates);
+    } catch (e) {
+      console.error("Failed to save settings", e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   useEffect(() => {
-    fetchIntegrations();
     fetchAssets();
+    fetchSettings();
   }, []);
+
+
 
   const fetchAssets = async () => {
     try {
@@ -79,26 +114,9 @@ export default function Settings() {
     }
   };
 
-  const fetchIntegrations = async () => {
-    try {
-      const data = await api.getIntegrations();
-      setConnectedTools(data.integrations || []);
-    } catch (e) {
-      console.error("Failed to fetch integrations", e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  const handleDisconnect = async (tool: string) => {
-    if (!confirm(`Are you sure you want to disconnect ${tool}?`)) return;
-    try {
-      await api.disconnectTool(tool);
-      setConnectedTools(prev => prev.filter(i => i.name.toLowerCase() !== tool.toLowerCase()));
-    } catch (e) {
-      console.error("Failed to disconnect", e);
-    }
-  };
+
+
 
 
 
@@ -110,56 +128,7 @@ export default function Settings() {
         <p className="text-muted-foreground mt-1">Configure your AI outbound machine</p>
       </div>
 
-      {/* API Integrations */}
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Key className="w-5 h-5 text-primary" />
-          API Integrations
-        </h2>
-        <Card className="p-5 bg-card border-border space-y-4">
 
-
-          {/* Dynamic Connected Integrations */}
-          {isLoading ? (
-            <div className="py-4 text-center text-sm text-muted-foreground">Loading integrations...</div>
-          ) : connectedTools.length > 0 ? (
-            <div className="space-y-4">
-              <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Your Connected Integrations</div>
-              {connectedTools.map((tool) => (
-                <div key={tool.name} className="flex items-center justify-between border border-border p-3 rounded-xl bg-secondary/20">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center border border-border">
-                      <span className="text-sm font-bold uppercase text-foreground">
-                        {tool.name.slice(0, 2)}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground capitalize">{tool.name}</p>
-                      <p className="text-xs text-muted-foreground">ID: {tool.connection_id.slice(0, 8)}...</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-success/10 text-success hover:bg-success/20 transition-colors">Active</Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDisconnect(tool.name)}
-                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    >
-                      Disconnect
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="py-6 text-center border-2 border-dashed border-border rounded-xl">
-              <p className="text-sm text-muted-foreground">No custom integrations connected.</p>
-              <p className="text-xs text-muted-foreground mt-1">Ask the Agent in a mission chat to "Connect [Tool]" to add it here.</p>
-            </div>
-          )}
-        </Card>
-      </section>
 
       {/* My Files */}
       <section className="mb-8">
@@ -237,7 +206,10 @@ export default function Settings() {
             </div>
             <Switch
               checked={emailNotifications}
-              onCheckedChange={setEmailNotifications}
+              onCheckedChange={(checked) => {
+                setEmailNotifications(checked);
+                saveSettings({ email_notifications: checked });
+              }}
             />
           </div>
 
@@ -248,7 +220,13 @@ export default function Settings() {
               <p className="font-medium text-foreground">Daily Digest</p>
               <p className="text-sm text-muted-foreground">Summary of agent activities</p>
             </div>
-            <Select defaultValue="9am">
+            <Select
+              value={dailyDigestTime}
+              onValueChange={(value) => {
+                setDailyDigestTime(value);
+                saveSettings({ daily_digest_time: value });
+              }}
+            >
               <SelectTrigger className="w-32 bg-secondary">
                 <SelectValue />
               </SelectTrigger>
@@ -276,7 +254,10 @@ export default function Settings() {
             </div>
             <Switch
               checked={autoApprove}
-              onCheckedChange={setAutoApprove}
+              onCheckedChange={(checked) => {
+                setAutoApprove(checked);
+                saveSettings({ auto_approve_low_risk: checked });
+              }}
             />
           </div>
 
@@ -287,7 +268,14 @@ export default function Settings() {
             <p className="text-sm text-muted-foreground mb-2">
               Minimum personalization score required
             </p>
-            <Select defaultValue="80">
+            <Select
+              value={String(personalizationThreshold)}
+              onValueChange={(value) => {
+                const num = parseInt(value);
+                setPersonalizationThreshold(num);
+                saveSettings({ personalization_threshold: num });
+              }}
+            >
               <SelectTrigger className="w-full bg-secondary">
                 <SelectValue />
               </SelectTrigger>
@@ -308,7 +296,9 @@ export default function Settings() {
             </p>
             <Input
               type="number"
-              defaultValue={50}
+              value={dailySendingLimit}
+              onChange={(e) => setDailySendingLimit(parseInt(e.target.value) || 50)}
+              onBlur={() => saveSettings({ daily_sending_limit: dailySendingLimit })}
               className="bg-secondary border-transparent"
             />
           </div>

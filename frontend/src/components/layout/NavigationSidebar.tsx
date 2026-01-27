@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Calendar,
   Users,
+  Puzzle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,7 @@ const navItems = [
   { icon: ClipboardCheck, label: "Review Queue", path: "/review", id: "sidebar-review-queue" },
   { icon: Bot, label: "Active Agents", path: "/agents", id: "sidebar-active-agents" },
   { icon: Users, label: "Contacts", path: "/contacts", id: "sidebar-contacts" },
+  { icon: Puzzle, label: "Integrations", path: "/integrations", id: "sidebar-integrations" },
   { icon: Settings, label: "Settings", path: "/settings", id: "sidebar-settings" },
 ];
 
@@ -44,14 +46,13 @@ export function NavigationSidebar({ isCollapsed, onToggle }: NavigationSidebarPr
       )}
     >
       {/* Logo */}
-      <div className="flex items-center h-14 px-4 border-b border-sidebar-border">
-        <Link to="/landing" className="flex items-center gap-2">
-          <span className={cn(
-            "font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent",
-            isCollapsed ? "text-lg" : "text-xl"
-          )}>
-            {isCollapsed ? "O" : "OutboundAI"}
-          </span>
+      <div className="flex items-center h-14 px-4 border-b border-sidebar-border overflow-hidden">
+        <Link to="/" className="flex items-center gap-2">
+          {isCollapsed ? (
+            <span className="font-bold text-xl bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">EA</span>
+          ) : (
+            <img src="/logo.png" alt="ExpediteAI" className="h-18 w-auto object-contain" />
+          )}
         </Link>
       </div>
 

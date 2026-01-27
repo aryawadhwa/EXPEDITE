@@ -13,6 +13,7 @@ class AgentState(TypedDict):
     mission_id: str
     objective: str
     user_id: str
+    attachments: List[Dict]  # Attachments from launchpad
     prospects: List[Dict] # List of prospect data found
     current_prospect: Dict # Valid prospect being processed
     draft_id: str
@@ -21,6 +22,50 @@ class AgentState(TypedDict):
 # Real Tools
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
+from app.models import Agent
+
+async def update_agent_stats(user_id: str, processed=0, queued=0, errors=0):
+    """Update stats for the user's active agents and broadcast to frontend"""
+    try:
+        # Find all active agents for this user
+        agents = await Agent.find(Agent.user_id == user_id, Agent.status == "active").to_list()
+        
+        # If no active agents, just find any agent to log stats to
+        if not agents:
+            agents = await Agent.find(Agent.user_id == user_id).limit(1).to_list()
+            
+        now = datetime.utcnow()
+        for agent in agents:
+            if not agent.stats:
+                from app.models import AgentStats
+                agent.stats = AgentStats()
+            
+            agent.stats.processed += processed
+            agent.stats.queued += queued
+            agent.stats.errors += errors
+            agent.stats.last_run_at = now
+            await agent.save()
+            
+        # Calculate aggregates for broadcast
+        all_agents = await Agent.find(Agent.user_id == user_id).to_list()
+        total_active = sum(1 for a in all_agents if a.status == "active")
+        total_processed = sum(a.stats.processed for a in all_agents if a.stats)
+        total_queued = sum(a.stats.queued for a in all_agents if a.stats)
+        
+        # Broadcast via WebSocket
+        from main import get_connection_manager
+        manager = get_connection_manager()
+        await manager.send_to_user(user_id, {
+            "type": "stats_update",
+            "stats": {
+                "active": total_active,
+                "processed": total_processed,
+                "queue": total_queued
+            }
+        })
+            
+    except Exception as e:
+        print(f"Failed to update agent stats: {e}")
 
 async def log_event(mission_id: str, user_id: str, content: str, log_type: str = "action", role: str = "agent", metadata: Dict = {}):
     """Log an event to DB and broadcast via WebSocket"""
@@ -98,6 +143,7 @@ async def scout_prospects(state: AgentState):
                 
                 if raw_prospects:
                     await log_event(state["mission_id"], state["user_id"], f"Found {len(raw_prospects)} potential contact points.", "success")
+                    await update_agent_stats(state["user_id"], processed=len(raw_prospects))
                     return {"prospects": raw_prospects}
             
             await log_event(state["mission_id"], state["user_id"], f"Firecrawl returned status {response.status_code}", "error")
@@ -137,23 +183,21 @@ async def analyze_relevance(state: AgentState):
         "enriched": True # Mark as processed
     }
     
-    # Attachment Logic (New)
-    from app.models import UserAsset
-    attachments = []
+    # Attachment Logic
+    # Use attachments passed from launchpad if available
+    attachments = state.get("attachments", []) or []
     
-    # Simple heuristic: If objective mentions "attach" or file keywords, fetch user assets
-    # In production, use semantic search or RAG to pick best file.
-    if any(k in state['objective'].lower() for k in ["attach", "file", "pdf", "deck", "case study"]):
-        user_assets = await UserAsset.find(UserAsset.user_id == state['user_id']).to_list()
+    # Fallback: Simple heuristic if none passed/explicitly requested but keywords exist
+    if not attachments and any(k in state['objective'].lower() for k in ["attach", "file", "pdf", "deck", "case study"]):
+        from app.models import UserAsset
+        user_assets = await UserAsset.find(UserAsset.user_id == state['user_id']).sort("-created_at").to_list()
         
-        # Taking the first/most recent one for demo. 
-        # A smart agent would pick based on filename match (e.g. "pricing" -> "pricing.pdf")
         if user_assets:
              best_match = user_assets[0] 
              attachments.append({
                  "filename": best_match.filename,
-                 "id": str(best_match.id),
-                 "size": best_match.size_bytes
+                 "asset_id": str(best_match.id),
+                 "content_type": best_match.content_type
              })
              await log_event(state["mission_id"], state["user_id"], f"Found relevant attachment: {best_match.filename}", "success")
     
@@ -189,8 +233,19 @@ async def write_draft(state: AgentState):
             model_name="llama-3.3-70b-versatile"
         )
         
-        system_prompt = """You are an expert outreach specialist.
+        attachments_list = [a['filename'] for a in prospect.get('attachments', [])]
+        attachment_context = ""
+        if attachments_list:
+            attachment_context = f"""
+IMPORTANT: You have the following files attached to this email: {', '.join(attachments_list)}.
+- You cannot read the file content, but you should write the email as if the recipient will see it.
+- Do NOT say "refer to the image" or "I cannot see the file".
+- Instead say things like "I've attached [Filename] for your review" or "Please see the attached case study".
+"""
+
+        system_prompt = f"""You are an expert outreach specialist.
 Write a personalized email based on the publicly available context.
+{attachment_context}
 Format:
 SUBJECT: [Subject]
 EMAIL: [Body]
@@ -201,7 +256,7 @@ Source: {prospect.get('context_source')}
 Snippet: {prospect.get('snippet')}
 Relevance: {prospect.get('relevance_reason')}
 Mission: {state.get('objective')}
-Attachments Available: {[a['filename'] for a in prospect.get('attachments', [])]}
+Attachments: {', '.join(attachments_list) if attachments_list else 'None'}
 """
         messages = [
             SystemMessage(content=system_prompt),
@@ -224,6 +279,10 @@ Attachments Available: {[a['filename'] for a in prospect.get('attachments', [])]
                     reasoning = bps[1].strip() if len(bps) > 1 else ""
                 else:
                     body = rem.strip()
+        
+        # Clean up any markdown code blocks if present
+        subject = subject.replace("`", "").strip()
+        body = body.replace("```", "").strip()
 
         await log_event(state["mission_id"], state["user_id"], f"Draft generated. Sending to Review Queue.", "success")
 
@@ -231,7 +290,7 @@ Attachments Available: {[a['filename'] for a in prospect.get('attachments', [])]
         print(f"LLM Error: {e}")
         subject = "Hello"
         body = "I saw your profile and wanted to reach out."
-        reasoning = "Fallback."
+        reasoning = f"Fallback due to error: {str(e)}"
 
     # Data Persistence
     # 1. Save Prospect (Layer 1 & 2 data)
@@ -254,14 +313,10 @@ Attachments Available: {[a['filename'] for a in prospect.get('attachments', [])]
         body=body,
         ai_reasoning=reasoning,
         status=DraftStatus.PENDING,
-        # We need to add 'attachments' field to Draft model later for full support
-        # For now, we just let the agent write about it in body.
-        # But we can store it in metadata if Draft allowed it.
-        # Let's assume we update the Draft Logic to pull from Prospect.scraped_data or similar if needed.
-        # Or ideally:
-        # attachments=prospect.get('attachments', [])
+        attachments=prospect.get('attachments', [])
     )
     await d_doc.insert()
+    await update_agent_stats(state["user_id"], queued=1)
     
     return {"draft_id": str(d_doc.id)}
 
@@ -388,12 +443,29 @@ workflow.add_edge("human_approval", END)
 app = workflow.compile(checkpointer=memory, interrupt_before=["human_approval"])
 
 # Helper runners
-async def run_mission_agent(mission_id: str, objective: str, user_id: str):
+async def run_mission_agent(mission_id: str, objective: str, user_id: str, attachments: List[Dict] = []):
+    print(f"DEBUG: Starting mission agent for {mission_id} with {len(attachments)} attachment(s)")
     config = {"configurable": {"thread_id": mission_id}}
-    inputs = {"mission_id": mission_id, "objective": objective, "user_id": user_id}
+    inputs = {
+        "mission_id": mission_id, 
+        "objective": objective, 
+        "user_id": user_id,
+        "attachments": attachments  # Pass attachments to agent state
+    }
     
-    async for event in app.astream(inputs, config=config):
-        pass # Stream logs to websocket here later
+    try:
+        async for event in app.astream(inputs, config=config):
+            # print(f"DEBUG: Agent event: {event}") # Optional verbose logging
+            pass 
+    except Exception as e:
+        import traceback
+        err = traceback.format_exc()
+        print(f"ERROR: Agent failed: {err}")
+        # Log to DB so user sees it
+        try:
+             await log_event(mission_id, user_id, f"Agent crashed: {str(e)}", "error")
+        except:
+            pass
 
 async def resume_mission_agent(draft_prospect_id_or_thread: str, feedback: str = None):
     # Depending on how we mapped thread_id (mission_id vs draft_id)

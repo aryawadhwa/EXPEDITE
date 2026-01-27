@@ -30,7 +30,7 @@ async def upload_asset(file: UploadFile = File(...), user: User = Depends(get_cu
         size_bytes=size
     )
     await asset.insert()
-    print(f"[DEBUG] Uploaded asset {asset.id} for user {user.clerk_id}")
+
     
     return {
         "status": "success", 
@@ -46,12 +46,12 @@ async def options_list():
 
 @router.get("/")
 async def list_assets(user: User = Depends(get_current_user)):
-    print(f"[DEBUG] list_assets for user: {user.clerk_id}")
+
     
     try:
         # Fetch assets without projection (simpler, works reliably)
         assets = await UserAsset.find(UserAsset.user_id == user.clerk_id).to_list()
-        print(f"[DEBUG] Found {len(assets)} assets")
+
         
         return [
             {
@@ -64,7 +64,7 @@ async def list_assets(user: User = Depends(get_current_user)):
             for a in assets
         ]
     except Exception as e:
-        print(f"[ERROR] list_assets failed: {e}")
+
         return []
 
 @router.get("/{asset_id}")
