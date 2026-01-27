@@ -8,10 +8,11 @@ import httpx
 router = APIRouter()
 
 @router.post("/gmail/connect")
-async def connect_gmail(user: User = Depends(get_current_user)):
+async def connect_gmail(redirect_url: str = None, user: User = Depends(get_current_user)):
     """
     Initiate Gmail connection via Composio.
     Returns the redirect URL for the user to authenticate.
+    Optional redirect_url param allows returning to a specific page after OAuth.
     """
     # Using v1/connected_accounts which is the current standard (often called v2/v3 in SDKs but v1 in generic API paths sometimes, OR it is v1/connected_accounts)
     # The deprecated one was v1/connections.
@@ -26,18 +27,22 @@ async def connect_gmail(user: User = Depends(get_current_user)):
         "connection": {"user_id": user.clerk_id}
     }
     
+    # Add custom redirect if provided (Composio may support this in some integrations)
+    if redirect_url:
+        payload["redirect_url"] = redirect_url
+    
     async with httpx.AsyncClient() as client:
-        print(f"Sending payload to {url}: {payload}") # Debug log
+
         resp = await client.post(url, json=payload, headers=headers)
         if resp.status_code not in [200, 201, 202]:
-             print(f"Composio Error: {resp.text}") # Log error to terminal
+
              raise HTTPException(status_code=400, detail=f"Composio Error: {resp.text}")
         
         data = resp.json()
-        print(f"Composio Response: {data}") # Debug log
+
         
         connection_id = data.get("id") or data.get("connection_id")
-        redirect_url = data.get("redirectUrl") or data.get("redirect_url")
+        composio_redirect = data.get("redirectUrl") or data.get("redirect_url")
         
         if not connection_id:
             raise HTTPException(status_code=500, detail="No connection_id returned from Composio")
@@ -46,7 +51,14 @@ async def connect_gmail(user: User = Depends(get_current_user)):
         user.gmail_connection_id = connection_id
         await user.save()
         
-        return {"redirect_url": redirect_url}
+        # If user provided a redirect_url, append it as a query param so frontend can redirect after OAuth
+        final_redirect = composio_redirect
+        if redirect_url and composio_redirect:
+            # Append our redirect as a query param (some OAuth flows support this)
+            separator = "&" if "?" in composio_redirect else "?"
+            final_redirect = f"{composio_redirect}{separator}return_to={redirect_url}"
+        
+        return {"redirect_url": final_redirect, "return_to": redirect_url}
 
 @router.get("/gmail/status")
 async def get_gmail_status(user: User = Depends(get_current_user)):
@@ -98,7 +110,7 @@ async def connect_slack(user: User = Depends(get_current_user)):
     async with httpx.AsyncClient() as client:
         resp = await client.post(url, json=payload, headers=headers)
         if resp.status_code not in [200, 201, 202]:
-             print(f"Composio Error: {resp.text}") 
+ 
              raise HTTPException(status_code=400, detail=f"Composio Error: {resp.text}")
         
         data = resp.json()
@@ -169,22 +181,23 @@ async def connect_tool(req: ConnectRequest, user: User = Depends(get_current_use
         "connection": {"user_id": user.clerk_id}
     }
     
+    redirect_url = None
+    if req.params and "redirect_url" in req.params:
+        redirect_url = req.params.pop("redirect_url")
+
     if req.params:
         # Pass user inputs as top-level 'data' (common for Composio inputs)
         payload["data"] = req.params
+
+    if redirect_url:
+        # Try both common variations for V3 API
+        payload["redirectUrl"] = redirect_url
+        payload["redirect_uri"] = redirect_url
 
     if auth_config_id:
         payload["auth_config"] = {"id": auth_config_id}
         auth_mode = "auth_config"
     else:
-         # Try identifying by integrationId directly
-         # v3 supports creating via integrationId if no auth config needed or default available ?
-         # Actually, better to default to 'integrationId' logic if we strictly don't have auth config
-         # But usually Composio needs auth config.
-         # For this specific user request, I will assume we might fallback or error.
-         # I will use 'integrationId' as key. 
-         # Note: v3 connected_accounts usually takes auth_config.
-         # For simplicity, if unknown, I'll error gracefully or try integrationId
          payload["integrationId"] = tool 
          auth_mode = "integrationId"
     
@@ -192,16 +205,15 @@ async def connect_tool(req: ConnectRequest, user: User = Depends(get_current_use
     headers = {"x-api-key": settings.COMPOSIO_API_KEY}
     
     async with httpx.AsyncClient() as client:
-        print(f"Connecting {tool} (mode={auth_mode}): {payload}")
+
         resp = await client.post(url, json=payload, headers=headers)
         
         if resp.status_code not in [200, 201, 202]:
-             print(f"Composio Error: {resp.text}")
              raise HTTPException(status_code=400, detail=f"Composio Error: {resp.text}")
         
         data = resp.json()
         connection_id = data.get("id") or data.get("connection_id")
-        redirect_url = data.get("redirectUrl") or data.get("redirect_url")
+        composio_redirect = data.get("redirectUrl") or data.get("redirect_url")
         
         if not connection_id:
             raise HTTPException(status_code=500, detail="No connection_id returned")
@@ -218,7 +230,9 @@ async def connect_tool(req: ConnectRequest, user: User = Depends(get_current_use
             
         await user.save()
         
-        return {"redirect_url": redirect_url, "connection_id": connection_id}
+        # Return the Composio URL directly. 
+        # If payload['redirectUrl'] works, Composio will handle the final redirect.
+        return {"redirect_url": composio_redirect, "connection_id": connection_id}
 
 @router.get("/")
 async def list_integrations(user: User = Depends(get_current_user)):
@@ -291,7 +305,8 @@ async def get_tool_status(tool: str, user: User = Depends(get_current_user)):
                     if status in ["ACTIVE", "CONNECTED"]:
                         return {"status": "ACTIVE", "tool": tool, "connection_id": connection_id}
             except Exception as e:
-                print(f"Error checking {tool} status: {e}")
+                pass
+
     
     # If we have a connection_id stored, assume it's connected
     return {"status": "ACTIVE", "tool": tool, "connection_id": connection_id}

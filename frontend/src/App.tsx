@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import MissionChat from "./pages/MissionChat";
 import Calendar from "./pages/Calendar";
 import ContactHistory from "./pages/ContactHistory";
+import { Integrations } from "./pages/Integrations";
 
 import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/clerk-react";
 import SignIn from "./pages/SignIn";
@@ -125,6 +126,18 @@ const App = () => (
                 <SignedIn>
                   <AppLayout>
                     <Settings />
+                  </AppLayout>
+                </SignedIn>
+                <SignedOut>
+                  <RedirectToSignIn />
+                </SignedOut>
+              </>
+            } />
+            <Route path="/integrations" element={
+              <>
+                <SignedIn>
+                  <AppLayout>
+                    <Integrations />
                   </AppLayout>
                 </SignedIn>
                 <SignedOut>

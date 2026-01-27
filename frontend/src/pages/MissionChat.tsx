@@ -23,9 +23,20 @@ import {
     Loader2,
     CheckCircle,
     XCircle,
-    Clock
+    Clock,
+    Mic,
+    MicOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+
+// SpeechRecognition types for Web Speech API
+declare global {
+    interface Window {
+        SpeechRecognition: any;
+        webkitSpeechRecognition: any;
+    }
+}
 
 interface Message {
     id: string;
@@ -59,6 +70,114 @@ export default function MissionChat() {
     const [showAssetPicker, setShowAssetPicker] = useState(false);
     const [availableAssets, setAvailableAssets] = useState<any[]>([]);
     const [selectedAttachments, setSelectedAttachments] = useState<any[]>([]);
+
+    // Voice input state
+    const [isListening, setIsListening] = useState(false);
+    const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const shouldListenRef = useRef(false);
+    const transcriptRef = useRef(""); // Persist final text across restarts
+
+    // Initialize Speech Recognition
+    useEffect(() => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = "en-US";
+
+            recognition.onresult = (event) => {
+                let interimTranscript = "";
+                let finalTranscript = "";
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    if (result.isFinal) {
+                        finalTranscript += result[0].transcript;
+                    } else {
+                        interimTranscript += result[0].transcript;
+                    }
+                }
+
+                // Add final transcript to ref
+                transcriptRef.current += finalTranscript;
+
+                // Update input with stored final + current interim
+                setInput(transcriptRef.current + interimTranscript);
+            };
+
+            recognition.onend = () => {
+                // Auto-restart if we should still be listening
+                if (shouldListenRef.current && recognitionRef.current) {
+                    try {
+                        recognitionRef.current.start();
+                    } catch (e) {
+                        console.log("Could not restart recognition:", e);
+                    }
+                } else {
+                    setIsListening(false);
+                    // Do NOT clear transcriptRef here
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech recognition error:", event.error);
+
+                // Stop on permission or network errors
+                if (
+                    event.error === "not-allowed" ||
+                    event.error === "audio-capture" ||
+                    event.error === "network"
+                ) {
+                    shouldListenRef.current = false;
+                    setIsListening(false);
+
+                    const errorMessage = event.error === "network"
+                        ? "Network error: Speech recognition requires internet connection."
+                        : "Microphone access denied. Please allow access in settings.";
+
+                    toast.error("Speech Recognition Failed", {
+                        description: errorMessage,
+                    });
+                }
+            };
+
+            recognitionRef.current = recognition;
+        }
+
+        return () => {
+            shouldListenRef.current = false;
+            if (recognitionRef.current) {
+                recognitionRef.current.abort();
+            }
+        };
+    }, []);
+
+    const toggleListening = () => {
+        if (!recognitionRef.current) {
+            toast.error("Speech recognition not supported", {
+                description: "Your browser does not support speech recognition.",
+            });
+            return;
+        }
+
+        if (isListening) {
+            // Manual stop
+            shouldListenRef.current = false;
+            // Small delay to allow final result to flush
+            setTimeout(() => {
+                recognitionRef.current?.stop();
+                setIsListening(false);
+            }, 150);
+        } else {
+            // Start fresh
+            setInput("");
+            transcriptRef.current = ""; // Clear previous recording
+            shouldListenRef.current = true;
+            recognitionRef.current.start();
+            setIsListening(true);
+        }
+    };
 
     // Scroll to bottom when messages change
     useEffect(() => {
@@ -395,6 +514,22 @@ export default function MissionChat() {
                                     }
                                     return null;
                                 })()}
+                                {/* View Draft Button */}
+                                {(message.metadata?.action === "draft_ready" ||
+                                    message.content.toLowerCase().includes("draft generated") ||
+                                    message.content.toLowerCase().includes("ready for review")) && (
+                                        <div className="mt-3">
+                                            <Button
+                                                variant="default"
+                                                size="sm"
+                                                className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
+                                                onClick={() => navigate(`/review?mission_id=${missionId}`)}
+                                            >
+                                                <CheckCircle className="w-4 h-4" />
+                                                View Draft
+                                            </Button>
+                                        </div>
+                                    )}
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className="text-[10px] opacity-60">
                                         {message.timestamp.toLocaleTimeString()}
@@ -476,13 +611,33 @@ export default function MissionChat() {
                             </div>
                         )}
 
+                        {/* Mic Button */}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={toggleListening}
+                            disabled={isLoading}
+                            className={cn(
+                                "rounded-xl transition-all shrink-0",
+                                isListening
+                                    ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse"
+                                    : "hover:bg-secondary text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                        </Button>
+
                         <input
                             type="text"
                             value={input}
                             onChange={handleInputChange}
                             onKeyDown={(e) => e.key === "Enter" && !showAssetPicker && handleSend()}
-                            placeholder="Describe your outbound mission..."
-                            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            placeholder={isListening ? "Listening..." : "Describe your outbound mission..."}
+                            className={cn(
+                                "flex-1 bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50",
+                                isListening && "border-red-500/50 placeholder:text-red-400"
+                            )}
                             disabled={isLoading}
                         />
                         <Button

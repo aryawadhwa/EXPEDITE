@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { HeroInput } from "@/components/launchpad/HeroInput";
 import { RecipeCard } from "@/components/launchpad/RecipeCard";
 import { LiveMissionCard } from "@/components/launchpad/LiveMissionCard";
-import { Target, TrendingUp, Building2, UserPlus } from "lucide-react";
+import { Target, TrendingUp, Building2, UserPlus, Zap } from "lucide-react";
 import { useApi } from "@/lib/api";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -38,8 +38,6 @@ const recipes = [
   },
 ];
 
-import MissionMap from "@/components/mission-control/MissionMap";
-
 const Launchpad = () => {
   const [activeMissions, setActiveMissions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,13 +60,11 @@ const Launchpad = () => {
 
   const handleRecipeClick = async (query: string) => {
     try {
-      const mission = await api.createMission(query); // Ensure api.createMission returns the mission object
+      const mission = await api.createMission(query);
       toast.success("Mission Launched!", {
         description: "Redirecting to mission control...",
       });
-      // Redirect immediately to Mission Chat
       navigate(`/chat/${mission._id || mission.id}`);
-
     } catch (error) {
       console.error("Failed to launch recipe:", error);
       toast.error("Failed to launch recipe");
@@ -79,7 +75,6 @@ const Launchpad = () => {
     try {
       await api.stopMission(missionId);
       toast.success("Mission stopped");
-      // Refresh missions
       const missions = await api.listMissions();
       setActiveMissions(missions || []);
     } catch (error) {
@@ -92,7 +87,6 @@ const Launchpad = () => {
     try {
       await api.deleteMission(missionId);
       toast.success("Mission deleted");
-      // Refresh missions
       const missions = await api.listMissions();
       setActiveMissions(missions || []);
     } catch (error) {
@@ -102,19 +96,22 @@ const Launchpad = () => {
   };
 
   return (
-    <div className="min-h-full p-6 lg:p-8 space-y-8">
-      {/* Hero Section - Spatial Map */}
-      <section className="relative h-[500px] w-full rounded-xl overflow-hidden border border-border bg-black/50 shadow-2xl">
-        <MissionMap />
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-10">
-          <div className="bg-background/80 backdrop-blur-md p-2 rounded-xl border border-border shadow-lg">
-            <HeroInput />
-          </div>
+    <div className="min-h-full p-6 lg:p-8 space-y-12">
+      {/* Hero Section - Clean Input */}
+      <section className="pt-8 pb-4">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl lg:text-5xl font-bold text-foreground mb-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+            Launch Your Mission
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+            Describe your target audience and let our AI agents find, enrich, and craft personalized outreach.
+          </p>
         </div>
+        <HeroInput />
       </section>
 
       {/* Quick Recipes */}
-      <section className="mb-10">
+      <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">Quick Recipes</h2>
           <button className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -137,12 +134,11 @@ const Launchpad = () => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">Active Missions</h2>
           <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded-md">
-            {activeMissions.filter(m => m.status === "running").length} running
+            {activeMissions.filter((m) => m.status === "running").length} running
           </span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {isLoading ? (
-            // Loading Skeletons
             Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="p-4 rounded-xl border border-border bg-card">
                 <div className="flex justify-between mb-3">
@@ -166,19 +162,27 @@ const Launchpad = () => {
               </div>
             ))
           ) : activeMissions.length === 0 ? (
-            <p className="text-muted-foreground text-sm col-span-full">No active missions. Launch one above!</p>
+            <p className="text-muted-foreground text-sm col-span-full">
+              No active missions. Launch one above!
+            </p>
           ) : (
             activeMissions.map((mission) => (
               <LiveMissionCard
                 key={mission._id || mission.id}
                 id={mission._id || mission.id}
                 name={mission.objective || "Untitled Mission"}
-                status={mission.status === "waiting_approval" ? "paused" : mission.status || "running"}
+                status={
+                  mission.status === "waiting_approval" ? "paused" : mission.status || "running"
+                }
                 stage={mission.status === "waiting_approval" ? 2 : 1}
                 totalStages={3}
                 prospectsFound={mission.prospects_count || 0}
                 emailsQueued={mission.drafts_count || 0}
-                startedAt={mission.created_at ? new Date(mission.created_at).toLocaleString() : "Just now"}
+                startedAt={
+                  mission.created_at
+                    ? new Date(mission.created_at).toLocaleString()
+                    : "Just now"
+                }
                 onStop={handleStopMission}
                 onDelete={handleDeleteMission}
               />
@@ -188,6 +192,6 @@ const Launchpad = () => {
       </section>
     </div>
   );
-}
+};
 
 export default Launchpad;

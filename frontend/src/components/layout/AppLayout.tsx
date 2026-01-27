@@ -35,7 +35,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             </SheetContent>
           </Sheet>
 
-          <span className="font-bold text-sm bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">OutboundAI</span>
+          <img src="/logo.png" alt="ExpediteAI" className="h-10 w-auto object-contain" />
 
           <Sheet>
             <SheetTrigger asChild>

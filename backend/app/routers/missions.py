@@ -157,6 +157,106 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
                 await MissionLog(mission_id=mission_id, role="agent", content=success_msg, log_type="success").insert()
                 return {"message": success_msg, "role": "agent", "type": "success"}
     
+    # CHECK FOR CREATE DRAFT COMMAND
+    create_draft_keywords = ["create draft", "regenerate draft", "generate draft", "new draft", "draft again", "make another draft"]
+    if any(k in msg_lower for k in create_draft_keywords):
+        # Find existing prospects for this mission
+        prospects = await Prospect.find(Prospect.mission_id == mission_id).to_list()
+        
+        if not prospects:
+            fail_msg = "No prospects found for this mission yet. The agent is still working on discovery. Please wait a moment."
+            await MissionLog(mission_id=mission_id, role="agent", content=fail_msg, log_type="error").insert()
+            return {"message": fail_msg, "role": "agent", "type": "error"}
+        
+        # Pick the first prospect (or could pick one without a pending draft)
+        prospect = prospects[0]
+        
+        await MissionLog(
+            mission_id=mission_id, 
+            role="agent", 
+            content=f"Regenerating draft for {prospect.name}...", 
+            log_type="thinking"
+        ).insert()
+        
+        try:
+            from langchain_groq import ChatGroq
+            from langchain_core.messages import SystemMessage, HumanMessage
+            
+            llm = ChatGroq(
+                temperature=0.7, 
+                groq_api_key=settings.GROQ_API_KEY, 
+                model_name="llama-3.3-70b-versatile"
+            )
+            
+            system_prompt = """You are an expert outreach specialist.
+Write a personalized email based on the publicly available context.
+Format:
+SUBJECT: [Subject]
+EMAIL: [Body]
+REASONING: [Reasoning]"""
+
+            human_prompt = f"""Target Context: {prospect.name} at {prospect.company}
+Source: {prospect.context_source}
+Relevance: {prospect.relevance_reason}
+Mission: {mission.objective}
+"""
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=human_prompt)
+            ]
+            
+            response = await llm.ainvoke(messages)
+            content = response.content
+            
+            # Parse response
+            subject, body, reasoning = "Hello", content, "AI Generated"
+            if "SUBJECT:" in content:
+                parts = content.split("EMAIL:")
+                subject = parts[0].replace("SUBJECT:", "").strip()
+                if len(parts) > 1:
+                    rem = parts[1]
+                    if "REASONING:" in rem:
+                        bps = rem.split("REASONING:")
+                        body = bps[0].strip()
+                        reasoning = bps[1].strip() if len(bps) > 1 else ""
+                    else:
+                        body = rem.strip()
+            
+            # Clean up markdown
+            subject = subject.replace("`", "").strip()
+            body = body.replace("```", "").strip()
+            
+            # Save new draft
+            new_draft = Draft(
+                prospect_id=str(prospect.id),
+                subject=subject,
+                body=body,
+                ai_reasoning=reasoning,
+                status=DraftStatus.PENDING
+            )
+            await new_draft.insert()
+            
+            success_msg = f"Draft generated for {prospect.name}! Ready for review."
+            await MissionLog(
+                mission_id=mission_id, 
+                role="agent", 
+                content=success_msg, 
+                log_type="success",
+                metadata={"action": "draft_ready", "draft_id": str(new_draft.id), "mission_id": mission_id}
+            ).insert()
+            
+            return {
+                "message": success_msg,
+                "role": "agent",
+                "type": "success",
+                "metadata": {"action": "draft_ready", "draft_id": str(new_draft.id), "mission_id": mission_id}
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to generate draft: {str(e)[:100]}"
+            await MissionLog(mission_id=mission_id, role="agent", content=error_msg, log_type="error").insert()
+            return {"message": error_msg, "role": "agent", "type": "error"}
+    
     # CHECK FOR APPROVAL INTENT
     approval_keywords = ["approve", "send it", "send the mail", "looks good", "proceed"]
     if any(k in msg_lower for k in approval_keywords):
@@ -216,7 +316,7 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
                         send_status = "sent successfully"
                         start_msg = f"Draft approved and email sent to {recipient}!"
                     except Exception as e:
-                        print(f"Send Failed: {e}")
+
                         send_status = f"failed to send ({str(e)})"
                         start_msg = f"Draft approved but sending failed: {str(e)}"
                 else:

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ProspectCard } from "@/components/review/ProspectCard";
 import { EmailEditor } from "@/components/review/EmailEditor";
 import { Button } from "@/components/ui/button";
@@ -47,9 +47,13 @@ export default function ReviewQueue() {
   const api = useApi();
   const navigate = useNavigate();
 
+  // Get mission_id from URL query params
+  const [searchParams] = useSearchParams();
+  const filterMissionId = searchParams.get("mission_id");
+
   const fetchDrafts = async () => {
     try {
-      const data = await api.getPendingDrafts();
+      const data = await api.getPendingDrafts(filterMissionId || undefined);
       setDrafts(data || []);
       // Initialize edits for all drafts
       const initialEdits: DraftEdits = {};
@@ -67,7 +71,7 @@ export default function ReviewQueue() {
 
   useEffect(() => {
     fetchDrafts();
-  }, [api]);
+  }, [api, filterMissionId]);
 
   const currentDraft = drafts[currentIndex];
   const currentDraftId = currentDraft?.id || currentDraft?._id;
@@ -445,8 +449,8 @@ export default function ReviewQueue() {
                     key={draftId}
                     onClick={() => toggleDraftSelection(draftId)}
                     className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all border ${isSelected
-                        ? "bg-primary/10 border-primary/50"
-                        : "bg-secondary/30 border-transparent hover:bg-secondary/50"
+                      ? "bg-primary/10 border-primary/50"
+                      : "bg-secondary/30 border-transparent hover:bg-secondary/50"
                       }`}
                   >
                     <Checkbox

@@ -1,11 +1,12 @@
 import { useAuth } from "@clerk/clerk-react";
+import { useMemo, useCallback } from "react";
 
 const API_BASE_URL = "http://localhost:8000/api/v1";
 
 export function useApi() {
     const { getToken } = useAuth();
 
-    const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
         const token = await getToken();
         const headers = {
             "Content-Type": "application/json",
@@ -13,9 +14,9 @@ export function useApi() {
             ...options.headers,
         };
         return fetch(`${API_BASE_URL}${url}`, { ...options, headers });
-    };
+    }, [getToken]);
 
-    return {
+    return useMemo(() => ({
         // User
         getUser: async () => {
             const res = await fetchWithAuth("/users/me");
@@ -73,8 +74,9 @@ export function useApi() {
         },
 
         // Reviews
-        getPendingDrafts: async () => {
-            const res = await fetchWithAuth("/reviews/pending");
+        getPendingDrafts: async (missionId?: string) => {
+            const params = missionId ? `?mission_id=${missionId}` : '';
+            const res = await fetchWithAuth(`/reviews/pending${params}`);
             if (!res.ok) throw new Error('Failed to fetch pending drafts');
             return res.json();
         },
@@ -301,6 +303,5 @@ export function useApi() {
             if (!res.ok) throw new Error('Failed to update settings');
             return res.json();
         },
-    };
+    }), [fetchWithAuth]);
 }
-

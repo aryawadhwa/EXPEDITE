@@ -8,17 +8,27 @@ from app.api.deps import get_current_user
 router = APIRouter()
 
 @router.get("/pending")
-async def get_pending_drafts(user: User = Depends(get_current_user)):
+async def get_pending_drafts(mission_id: str = None, user: User = Depends(get_current_user)):
     from app.models import Mission, Prospect
     from beanie.operators import In
 
-    # 1. Get all missions for this user
-    missions = await Mission.find(Mission.user_id == user.clerk_id).to_list()
+    # 1. Get missions for this user (optionally filtered)
+    if mission_id:
+        # Filter to specific mission
+        mission = await Mission.get(mission_id)
+        if not mission or mission.user_id != user.clerk_id:
+            return []  # No access or not found
+        missions = [mission]
+    else:
+        missions = await Mission.find(Mission.user_id == user.clerk_id).to_list()
+    
     mission_ids = [str(m.id) for m in missions]
+    mission_map = {str(m.id): m for m in missions}
     
     # 2. Get all prospects for these missions
     prospects = await Prospect.find(In(Prospect.mission_id, mission_ids)).to_list()
     prospect_ids = [str(p.id) for p in prospects]
+    prospect_map = {str(p.id): p for p in prospects}
     
     # 3. Fetch pending drafts for these prospects ONLY
     drafts = await Draft.find(In(Draft.prospect_id, prospect_ids), Draft.status == DraftStatus.PENDING).to_list()
@@ -28,14 +38,17 @@ async def get_pending_drafts(user: User = Depends(get_current_user)):
         draft_dict = draft.model_dump()
         draft_dict["id"] = str(draft.id)
         
-        # Fetch associated prospect (optimize to use pre-fetched list if possible, but safe to query or lookup)
-        # Simple lookup map
-        prospect = next((p for p in prospects if str(p.id) == draft.prospect_id), None)
+        # Fetch associated prospect
+        prospect = prospect_map.get(draft.prospect_id)
         
         if prospect:
             draft_dict["name"] = prospect.name
             draft_dict["company"] = prospect.company
             draft_dict["scraped_data"] = prospect.scraped_data
+            draft_dict["mission_id"] = prospect.mission_id
+            # Include mission objective for UI
+            mission_obj = mission_map.get(prospect.mission_id)
+            draft_dict["mission_objective"] = mission_obj.objective if mission_obj else None
         
         result.append(draft_dict)
     
@@ -50,30 +63,21 @@ async def clear_all_pending_drafts(user: User = Depends(get_current_user)):
     # 1. Get all missions for this user
     missions = await Mission.find(Mission.user_id == user.clerk_id).to_list()
     mission_ids = [str(m.id) for m in missions]
-    print(f"DEBUG: Found {len(missions)} missions for user {user.clerk_id}: {mission_ids}")
     
     if not mission_ids:
-        print("DEBUG: No missions found. Returning 0.")
         return {"status": "cleared", "count": 0}
         
     # 2. Get all prospects for these missions
     prospects = await Prospect.find(In(Prospect.mission_id, mission_ids)).to_list()
     prospect_ids = [str(p.id) for p in prospects]
-    print(f"DEBUG: Found {len(prospects)} prospects for {len(missions)} missions. IDs sample: {prospect_ids[:5]}")
     
     if not prospect_ids:
-        print("DEBUG: No prospects found. Returning 0.")
         return {"status": "cleared", "count": 0}
-    
-    # Check if ANY drafts exist for these prospects before deleting
-    existing_drafts = await Draft.find(In(Draft.prospect_id, prospect_ids), Draft.status == DraftStatus.PENDING).count()
-    print(f"DEBUG: Found {existing_drafts} PENDING drafts matching these prospects.")
          
     # 3. Delete pending drafts for these prospects
     result = await Draft.find(In(Draft.prospect_id, prospect_ids), Draft.status == DraftStatus.PENDING).delete()
     
     count = result.deleted_count if result else 0
-    print(f"DEBUG: Delete operation returned count: {count}")
     return {"status": "cleared", "count": count}
 
 @router.post("/{id}/approve")
@@ -91,7 +95,7 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
     await draft.save()
     
     # 1. Create Active Agent (Workflow)
-    from app.models import Agent
+    from app.models import Agent, Prospect
     new_agent = Agent(
         user_id=user.clerk_id,
         name=f"Lead: {subject[:20] if subject else 'New Lead'}...",
