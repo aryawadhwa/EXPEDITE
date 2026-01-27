@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { HeroInput } from "@/components/launchpad/HeroInput";
 import { RecipeCard } from "@/components/launchpad/RecipeCard";
-import { MissionCard } from "@/components/launchpad/MissionCard";
+import { LiveMissionCard } from "@/components/launchpad/LiveMissionCard";
 import { Target, TrendingUp, Building2, UserPlus } from "lucide-react";
 import { useApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -169,7 +169,7 @@ const Launchpad = () => {
             <p className="text-muted-foreground text-sm col-span-full">No active missions. Launch one above!</p>
           ) : (
             activeMissions.map((mission) => (
-              <MissionCard
+              <LiveMissionCard
                 key={mission._id || mission.id}
                 id={mission._id || mission.id}
                 name={mission.objective || "Untitled Mission"}

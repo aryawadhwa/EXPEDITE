@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { Sparkles, ArrowRight, Loader2, Paperclip, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Sparkles, ArrowRight, Loader2, Paperclip, ChevronDown, ChevronUp, Users, Search, PenTool, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 export function HeroInput() {
   const [query, setQuery] = useState("");
@@ -14,10 +15,27 @@ export function HeroInput() {
   const api = useApi();
   const navigate = useNavigate();
 
+  // Agent Squad State
+  const [selectedAgents, setSelectedAgents] = useState({
+    researcher: true,
+    enricher: true,
+    copywriter: true,
+  });
+
   // Asset picker state
   const [showAssetPicker, setShowAssetPicker] = useState(false);
   const [availableAssets, setAvailableAssets] = useState<any[]>([]);
   const [selectedAttachments, setSelectedAttachments] = useState<any[]>([]);
+
+  const toggleAgent = (agent: keyof typeof selectedAgents) => {
+    const newState = { ...selectedAgents, [agent]: !selectedAgents[agent] };
+    setSelectedAgents(newState);
+
+    // Dispatch event to update map immediately
+    window.dispatchEvent(new CustomEvent('updateAgentConfig', {
+      detail: newState
+    }));
+  };
 
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -26,7 +44,7 @@ export function HeroInput() {
     // Trigger workflow display when user types
     if (value.trim().length > 0) {
       window.dispatchEvent(new CustomEvent('showWorkflow', {
-        detail: { show: true, objective: value }
+        detail: { show: true, objective: value, agents: selectedAgents }
       }));
     } else {
       window.dispatchEvent(new CustomEvent('showWorkflow', {
@@ -70,7 +88,10 @@ export function HeroInput() {
           objective += ` [Attachments: ${selectedAttachments.map(a => a.filename).join(', ')}]`;
         }
 
-        const mission = await api.createMission(objective);
+        // Add active agents to metadata (backend support needed later, currently logic is inferred)
+        const agentConfig = `[Agents: ${Object.entries(selectedAgents).filter(([_, v]) => v).map(([k]) => k).join(', ')}]`;
+
+        const mission = await api.createMission(objective + " " + agentConfig);
         setQuery("");
         setSelectedAttachments([]);
         toast.success("Mission Launched!", {
@@ -145,6 +166,32 @@ export function HeroInput() {
           ))}
         </div>
       )}
+
+      {/* Agent Squad Selection */}
+      <div className="flex items-center justify-end gap-2 mb-2 px-1">
+        <span className="text-[10px] uppercase font-mono text-muted-foreground tracking-wider">Deploy Squad:</span>
+        <Badge
+          variant="outline"
+          className={cn("cursor-pointer transition-all gap-1", selectedAgents.researcher ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "opacity-50 grayscale")}
+          onClick={() => toggleAgent('researcher')}
+        >
+          <Search className="w-3 h-3" /> Research
+        </Badge>
+        <Badge
+          variant="outline"
+          className={cn("cursor-pointer transition-all gap-1", selectedAgents.enricher ? "bg-purple-500/10 text-purple-400 border-purple-500/30" : "opacity-50 grayscale")}
+          onClick={() => toggleAgent('enricher')}
+        >
+          <Database className="w-3 h-3" /> Data
+        </Badge>
+        <Badge
+          variant="outline"
+          className={cn("cursor-pointer transition-all gap-1", selectedAgents.copywriter ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "opacity-50 grayscale")}
+          onClick={() => toggleAgent('copywriter')}
+        >
+          <PenTool className="w-3 h-3" /> Copy
+        </Badge>
+      </div>
 
       <form onSubmit={handleSubmit} className="relative">
         {/* Asset Picker Dropdown */}

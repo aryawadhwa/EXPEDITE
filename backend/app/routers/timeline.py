@@ -3,7 +3,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 from beanie import PydanticObjectId
 
-from app.models import EmailThread, EmailEvent, User
+from app.models import EmailThread, EmailEvent, User, Mission, MissionLog
 from app.api.deps import get_current_user
 
 router = APIRouter()
@@ -12,17 +12,15 @@ router = APIRouter()
 async def get_email_timeline(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
+    limit: int = 100,
     user: User = Depends(get_current_user)
 ):
     """
-    Get all email events for calendar display
-    Returns email threads with events in the specified date range
+    Get all events for calendar display (Email + Agent Activity)
     """
     try:
-        # Build query
-        query = {"user_id": user.clerk_id}
-        
-        # Add date filtering if provided
+        # 1. Fetch Email Threads
+        email_query = {"user_id": user.clerk_id}
         if start_date or end_date:
             date_filter = {}
             if start_date:
@@ -30,12 +28,10 @@ async def get_email_timeline(
             if end_date:
                 date_filter["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
             if date_filter:
-                query["last_activity"] = date_filter
+                email_query["last_activity"] = date_filter
         
-        # Fetch threads
-        threads = await EmailThread.find(query).to_list()
+        threads = await EmailThread.find(email_query).to_list()
         
-        # Format for calendar
         calendar_events = []
         for thread in threads:
             for event in thread.events:
@@ -53,6 +49,39 @@ async def get_email_timeline(
                     "mission_id": thread.mission_id,
                     "prospect_id": thread.prospect_id
                 })
+
+        # 2. Fetch Mission Logs (Agent Activity)
+        # First get user missions
+        missions = await Mission.find({"user_id": user.clerk_id}).to_list()
+        mission_ids = [str(m.id) for m in missions]
+        
+        if mission_ids:
+            log_query = {"mission_id": {"$in": mission_ids}, "log_type": {"$in": ["action", "success", "error"]}}
+            if start_date or end_date:
+                 date_filter = {}
+                 if start_date:
+                     date_filter["$gte"] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                 if end_date:
+                     date_filter["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                 if date_filter:
+                     log_query["timestamp"] = date_filter
+
+            logs = await MissionLog.find(log_query).sort("-timestamp").limit(limit).to_list()
+            
+            for log in logs:
+                calendar_events.append({
+                    "id": str(log.id),
+                    "type": "agent_log",
+                    "timestamp": log.timestamp.isoformat(),
+                    "content": log.content,
+                    "role": log.role,
+                    "metadata": log.metadata,
+                    "mission_id": log.mission_id,
+                    "log_type": log.log_type
+                })
+        
+        # Sort combined events by timestamp desc
+        calendar_events.sort(key=lambda x: x["timestamp"], reverse=True)
         
         return calendar_events
         
