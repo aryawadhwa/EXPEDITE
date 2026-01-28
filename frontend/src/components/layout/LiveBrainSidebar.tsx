@@ -35,90 +35,103 @@ export function LiveBrainSidebar({ isOpen, onToggle }: LiveBrainSidebarProps) {
   useEffect(() => {
     if (!userId) return;
 
-    // Connect to WebSocket
-    const ws = new WebSocket(`ws://localhost:8000/ws/brain/${userId}`);
-    wsRef.current = ws;
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout;
 
-    ws.onopen = () => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: `sys-${Date.now()}`,
-          timestamp: new Date(),
-          type: "success",
-          message: "Connected to Live Brain",
-          agent: "System",
-        },
-      ]);
-    };
+    const connect = () => {
+      // Connect to WebSocket
+      ws = new WebSocket(`ws://localhost:8000/ws/brain/${userId}`);
+      wsRef.current = ws;
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
+      ws.onopen = () => {
+        setLogs((prev) => [
+          ...prev,
+          {
+            id: `sys-${Date.now()}`,
+            timestamp: new Date(),
+            type: "success",
+            message: "Connected to Live Brain",
+            agent: "System",
+          },
+        ]);
+      };
 
-        // Handle stats update without adding to logs
-        if (data.type === 'stats_update' && data.stats) {
-          setStats(data.stats);
-          return;
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          // Handle stats update without adding to logs
+          if (data.type === 'stats_update' && data.stats) {
+            setStats(data.stats);
+            return;
+          }
+
+          setLogs((prev) =>
+            [
+              ...prev,
+              {
+                id: `log-${Date.now()}`,
+                timestamp: new Date(),
+                type: (data.type || "action") as LogEntry["type"],
+                message: data.message || event.data,
+                agent: data.agent || "Agent",
+              },
+            ].slice(-30)
+          );
+        } catch {
+          // Plain text message
+          setLogs((prev) =>
+            [
+              ...prev,
+              {
+                id: `log-${Date.now()}`,
+                timestamp: new Date(),
+                type: "action" as LogEntry["type"],
+                message: event.data,
+                agent: "Agent",
+              },
+            ].slice(-30)
+          );
         }
+      };
 
-        setLogs((prev) =>
-          [
-            ...prev,
-            {
-              id: `log-${Date.now()}`,
-              timestamp: new Date(),
-              type: (data.type || "action") as LogEntry["type"],
-              message: data.message || event.data,
-              agent: data.agent || "Agent",
-            },
-          ].slice(-30)
-        );
-      } catch {
-        // Plain text message
-        setLogs((prev) =>
-          [
-            ...prev,
-            {
-              id: `log-${Date.now()}`,
-              timestamp: new Date(),
-              type: "action" as LogEntry["type"],
-              message: event.data,
-              agent: "Agent",
-            },
-          ].slice(-30)
-        );
-      }
+      ws.onerror = () => {
+        setLogs((prev) => [
+          ...prev,
+          {
+            id: `err-${Date.now()}`,
+            timestamp: new Date(),
+            type: "error",
+            message: "WebSocket connection error",
+            agent: "System",
+          },
+        ]);
+      };
+
+      ws.onclose = () => {
+        setLogs((prev) => [
+          ...prev,
+          {
+            id: `close-${Date.now()}`,
+            timestamp: new Date(),
+            type: "thinking",
+            message: "Disconnected. Reconnecting in 3s...",
+            agent: "System",
+          },
+        ]);
+
+        // Attempt reconnect after 3 seconds
+        reconnectTimeout = setTimeout(connect, 3000);
+      };
     };
 
-    ws.onerror = () => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: `err-${Date.now()}`,
-          timestamp: new Date(),
-          type: "error",
-          message: "WebSocket connection error",
-          agent: "System",
-        },
-      ]);
-    };
-
-    ws.onclose = () => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: `close-${Date.now()}`,
-          timestamp: new Date(),
-          type: "thinking",
-          message: "Disconnected from Live Brain",
-          agent: "System",
-        },
-      ]);
-    };
+    connect();
 
     return () => {
-      ws.close();
+      if (ws) {
+        ws.close();
+      }
+      clearTimeout(reconnectTimeout);
     };
   }, [userId]);
 

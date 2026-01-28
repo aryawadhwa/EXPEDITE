@@ -17,13 +17,31 @@ import {
 } from "lucide-react";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
 import FloatingLines from "@/components/ui/FloatingLines";
+import { motion } from "framer-motion";
 
 const Landing = () => {
+  const fadeInUp = {
+    initial: { opacity: 0, y: 20 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true, margin: "-50px" },
+    transition: { duration: 0.5 }
+  };
+
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Floating Pillbox Navigation */}
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
-        <div className="flex items-center justify-between gap-8 px-12 py-5 rounded-full border border-border/40 bg-card/60 backdrop-blur-2xl shadow-2xl min-w-[800px]">
+      <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
+        <div className="flex items-center justify-between gap-4 px-6 py-2 rounded-full border border-border/40 bg-card/60 backdrop-blur-2xl shadow-2xl min-w-[600px]">
           {/* Logo */}
           <div className="flex items-center gap-2">
             <img src="/logo.png" alt="ExpediteAI" className="h-20 w-auto object-contain" />
@@ -76,19 +94,34 @@ const Landing = () => {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.15),transparent_50%)]" />
 
         <div className="max-w-5xl mx-auto text-center relative z-10">
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="text-5xl md:text-7xl font-bold tracking-tight mb-6"
+          >
             Your AI-Powered
             <span className="block bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
               Outbound Team
             </span>
-          </h1>
+          </motion.h1>
 
-          <p className="text-xl text-white max-w-2xl mx-auto mb-10">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="text-xl text-white max-w-2xl mx-auto mb-10"
+          >
             Stop spending hours on manual prospecting. Let AI agents find, research,
             and craft personalized outreach while you focus on closing deals.
-          </p>
+          </motion.p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          >
             <SignedIn>
               <Link to="/dashboard">
                 <Button size="lg" className="bg-primary hover:bg-primary/90 text-lg px-8 py-6">
@@ -108,7 +141,7 @@ const Landing = () => {
             <Button size="lg" variant="outline" className="text-lg px-8 py-6">
               Watch Demo
             </Button>
-          </div>
+          </motion.div>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-8 mt-20 max-w-3xl mx-auto">
@@ -117,10 +150,16 @@ const Landing = () => {
               { value: "85%", label: "Open Rate Improvement" },
               { value: "3hrs", label: "Saved Daily" },
             ].map((stat, i) => (
-              <div key={i} className="text-center">
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.6 + (i * 0.1) }}
+                className="text-center"
+              >
                 <div className="text-3xl md:text-4xl font-bold text-primary">{stat.value}</div>
                 <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -129,14 +168,17 @@ const Landing = () => {
       {/* Features Section */}
       <section className="py-20 px-6 border-t border-border/50">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
+          <motion.div
+            {...fadeInUp}
+            className="text-center mb-16"
+          >
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Everything You Need to Scale Outbound
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Our AI agents handle the heavy lifting so you can focus on what matters most—building relationships.
             </p>
-          </div>
+          </motion.div>
 
           <div className="grid md:grid-cols-3 gap-6">
             {[
@@ -159,13 +201,21 @@ const Landing = () => {
                 color: "from-emerald-500 to-green-500"
               }
             ].map((feature, i) => (
-              <Card key={i} className="p-6 bg-card/50 border-border/50 hover:border-primary/30 transition-colors">
-                <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4`}>
-                  <feature.icon className="h-6 w-6 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                <p className="text-muted-foreground">{feature.description}</p>
-              </Card>
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.2 }}
+              >
+                <Card className="p-6 bg-card/50 border-border/50 hover:border-primary/30 transition-colors h-full">
+                  <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4`}>
+                    <feature.icon className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
+                  <p className="text-muted-foreground">{feature.description}</p>
+                </Card>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -174,14 +224,17 @@ const Landing = () => {
       {/* How It Works Section */}
       <section className="py-20 px-6 bg-card/30 border-t border-border/50">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
+          <motion.div
+            {...fadeInUp}
+            className="text-center mb-16"
+          >
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               How It Works
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               From mission brief to pipeline growth in four simple steps.
             </p>
-          </div>
+          </motion.div>
 
           <div className="grid md:grid-cols-4 gap-8">
             {[
@@ -210,7 +263,14 @@ const Landing = () => {
                 description: "Track opens, replies, and conversions. Iterate on what works best."
               }
             ].map((item, i) => (
-              <div key={i} className="relative">
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.2 }}
+                className="relative"
+              >
                 <div className="text-6xl font-bold text-primary/10 absolute -top-4 -left-2">
                   {item.step}
                 </div>
@@ -221,7 +281,7 @@ const Landing = () => {
                   <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
                   <p className="text-sm text-muted-foreground">{item.description}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -231,7 +291,12 @@ const Landing = () => {
       <section className="py-20 px-6 border-t border-border/50">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
                 Why Teams Choose ExpediteAI
               </h2>
@@ -258,7 +323,14 @@ const Landing = () => {
                     description: "Human approval on every message. Your reputation stays intact."
                   }
                 ].map((benefit, i) => (
-                  <div key={i} className="flex gap-4">
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: i * 0.1 }}
+                    className="flex gap-4"
+                  >
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <benefit.icon className="h-5 w-5 text-primary" />
                     </div>
@@ -266,11 +338,17 @@ const Landing = () => {
                       <h3 className="font-semibold mb-1">{benefit.title}</h3>
                       <p className="text-sm text-muted-foreground">{benefit.description}</p>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
-            </div>
-            <div className="relative">
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, rotate: 2 }}
+              whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="relative"
+            >
               <div className="aspect-video rounded-xl border border-border/50 bg-card/50 overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-purple-500/20" />
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -282,14 +360,20 @@ const Landing = () => {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
       <section className="py-20 px-6 border-t border-border/50">
-        <div className="max-w-3xl mx-auto text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="max-w-3xl mx-auto text-center"
+        >
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Ready to Supercharge Your Outbound?
           </h2>
@@ -316,7 +400,7 @@ const Landing = () => {
           <p className="text-sm text-muted-foreground mt-4">
             No credit card required • Free trial included
           </p>
-        </div>
+        </motion.div>
       </section>
 
       {/* Footer */}
