@@ -11,6 +11,7 @@ import {
   Calendar,
   Users,
   Puzzle,
+  Coins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useUser } from "@clerk/clerk-react";
 
 const navItems = [
   { icon: Rocket, label: "Launchpad", path: "/dashboard", id: "sidebar-launchpad" },
@@ -37,6 +39,7 @@ interface NavigationSidebarProps {
 
 export function NavigationSidebar({ isCollapsed, onToggle }: NavigationSidebarProps) {
   const location = useLocation();
+  const { user } = useUser();
 
   return (
     <aside
@@ -94,6 +97,37 @@ export function NavigationSidebar({ isCollapsed, onToggle }: NavigationSidebarPr
           );
         })}
       </nav>
+
+      {/* User Profile Section */}
+      <div className="p-2 border-t border-sidebar-border">
+        <Link to="/profile">
+          <div
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all hover:bg-sidebar-accent",
+              isCollapsed ? "justify-center" : ""
+            )}
+          >
+            {/* User Avatar */}
+            <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center flex-shrink-0">
+              <span className="text-xs font-semibold text-primary">
+                {user?.firstName?.charAt(0) || user?.emailAddresses[0]?.emailAddress?.charAt(0)?.toUpperCase() || "U"}
+              </span>
+            </div>
+
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-foreground truncate">
+                  {user?.firstName || user?.emailAddresses[0]?.emailAddress?.split('@')[0] || "User"}
+                </div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Coins className="w-3 h-3" />
+                  <span>500 credits</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </Link>
+      </div>
 
       {/* Collapse Toggle */}
       <div className="p-2 border-t border-sidebar-border">

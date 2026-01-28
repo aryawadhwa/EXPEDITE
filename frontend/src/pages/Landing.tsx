@@ -16,31 +16,40 @@ import {
   Clock
 } from "lucide-react";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
+import FloatingLines from "@/components/ui/FloatingLines";
 
 const Landing = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 py-0 flex items-center justify-between">
+      {/* Floating Pillbox Navigation */}
+      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
+        <div className="flex items-center justify-between gap-8 px-12 py-5 rounded-full border border-border/40 bg-card/60 backdrop-blur-2xl shadow-2xl min-w-[800px]">
+          {/* Logo */}
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="ExpediteAI" className="h-[100px] w-auto object-contain" />
+            <img src="/logo.png" alt="ExpediteAI" className="h-20 w-auto object-contain" />
           </div>
-          <div className="flex items-center gap-4">
+
+          {/* Navigation Links */}
+          <div className="flex items-center gap-6">
             <SignedIn>
               <Link to="/dashboard">
-                <Button variant="ghost" size="sm">Dashboard</Button>
+                <Button variant="ghost" size="lg" className="text-base text-muted-foreground hover:text-foreground">
+                  Dashboard
+                </Button>
               </Link>
-              <UserButton />
+              <div className="scale-125">
+                <UserButton />
+              </div>
             </SignedIn>
             <SignedOut>
               <SignInButton mode="modal">
-                <Button variant="ghost" size="sm">Sign In</Button>
+                <Button variant="ghost" size="lg" className="text-base text-muted-foreground hover:text-foreground">
+                  Sign In
+                </Button>
               </SignInButton>
               <SignInButton mode="modal">
-                <Button size="sm" className="bg-primary hover:bg-primary/90">
+                <Button size="lg" className="bg-primary hover:bg-primary/90 rounded-full px-6 text-base">
                   Get Started
-                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </SignInButton>
             </SignedOut>
@@ -49,10 +58,22 @@ const Landing = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6 relative overflow-hidden">
+      <section className="pt-40 pb-24 px-6 relative overflow-hidden min-h-screen">
+        {/* FloatingLines Background */}
+        <div className="absolute inset-0 w-full h-full">
+          <FloatingLines
+            enabledWaves={["top", "middle", "bottom"]}
+            lineCount={5}
+            lineDistance={5}
+            bendRadius={5}
+            bendStrength={-0.5}
+            interactive={true}
+            parallax={true}
+            linesGradient={["#6366f1", "#8b5cf6", "#a855f7"]}
+          />
+        </div>
         {/* Background Effects */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.15),transparent_50%)]" />
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-3xl" />
 
         <div className="max-w-5xl mx-auto text-center relative z-10">
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
@@ -62,7 +83,7 @@ const Landing = () => {
             </span>
           </h1>
 
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+          <p className="text-xl text-white max-w-2xl mx-auto mb-10">
             Stop spending hours on manual prospecting. Let AI agents find, research,
             and craft personalized outreach while you focus on closing deals.
           </p>
