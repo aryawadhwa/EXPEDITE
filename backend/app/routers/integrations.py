@@ -302,11 +302,15 @@ async def get_tool_status(tool: str, user: User = Depends(get_current_user)):
                 if resp.status_code == 200:
                     data = resp.json()
                     status = data.get("status", "UNKNOWN")
+                    # Only return ACTIVE if explicitly connected
                     if status in ["ACTIVE", "CONNECTED"]:
                         return {"status": "ACTIVE", "tool": tool, "connection_id": connection_id}
+                    else:
+                        return {"status": status, "tool": tool, "connection_id": connection_id}
             except Exception as e:
                 pass
-
     
-    # If we have a connection_id stored, assume it's connected
-    return {"status": "ACTIVE", "tool": tool, "connection_id": connection_id}
+    # Fallback: If we can't verify, we should probably be cautious. 
+    # But for UX, if we have an ID, typically we assume pending/inactive if check failed?
+    # Returning INACTIVE ensures we don't assume success erroneously.
+    return {"status": "INACTIVE", "tool": tool, "connection_id": connection_id}

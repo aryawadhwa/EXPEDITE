@@ -119,10 +119,159 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
 
     msg_lower = chat.message.lower()
     
+    # CHECK FOR EMAIL UPDATE
+    import re
+    email_regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+    found_emails = re.findall(email_regex, chat.message)
+    
+    force_draft = False
+    
+    if found_emails:
+        new_email = found_emails[0]
+        
+        # 0. SMART EXTRACTION (LLM)
+        # Try to extract the name associated with this email from the user's natural language message
+        extracted_name = None
+        try:
+             extract_llm = ChatGroq(
+                temperature=0.0, 
+                groq_api_key=settings.GROQ_API_KEY, 
+                model_name="llama-3.1-8b-instant"
+            )
+             extraction_prompt = [
+                SystemMessage(content="You are an Entity Extractor. Extract the PERSON NAME associated with the target email from the user text. Return valid JSON only: {'name': 'extracted name'}. If no name is found, return {'name': null}."),
+                HumanMessage(content=f"User Text: {chat.message}\nTarget Email: {new_email}")
+             ]
+             ex_res = await extract_llm.ainvoke(extraction_prompt)
+             import json
+             ex_data = {}
+             try:
+                 content_str = ex_res.content
+                 if "```json" in content_str:
+                     content_str = content_str.split("```json")[1].split("```")[0].strip()
+                 elif "```" in content_str:
+                     content_str = content_str.replace("```", "").strip()
+                 ex_data = json.loads(content_str)
+                 if ex_data.get("name") and ex_data["name"] not in ["null", "None", ""]:
+                     extracted_name = ex_data["name"]
+             except:
+                 pass
+        except Exception as e:
+            print(f"Extraction failed: {e}")
+
+        # 1. Check Global Contacts for Name (Fallback)
+        from app.models import ContactHistory
+        contact_record = await ContactHistory.find_one(
+            ContactHistory.user_id == user.clerk_id,
+            ContactHistory.prospect_email == new_email.lower()
+        )
+        
+        known_name = contact_record.prospect_name if contact_record and contact_record.prospect_name else None
+        
+        # FINAL NAME PRIORITY: Extracted > Known (History) > Email Handle
+        final_name = extracted_name or known_name or new_email.split("@")[0]
+        
+        # 2. Find Mission Prospects
+        prospects = await Prospect.find(Prospect.mission_id == mission_id).to_list()
+        
+        target_prospect = None
+        msg_content = ""
+        
+        if prospects:
+            # Update existing
+            target_prospect = prospects[0]
+            target_prospect.public_contact = new_email
+            target_prospect.name = final_name  # Always update name if we found a better one
+            await target_prospect.save()
+            
+            msg_content = f"Updated contact info for {target_prospect.name}: {new_email}"
+        else:
+            # Create New Prospect
+            target_prospect = Prospect(
+                mission_id=mission_id,
+                name=final_name,
+                company="Unknown",
+                context_source="Chat Input",
+                public_contact=new_email,
+                relevance_reason="User provided email directly",
+                relevance_score=1.0
+            )
+            await target_prospect.insert()
+            msg_content = f"Created new prospect for {target_prospect.name} ({new_email})"
+            
+        await MissionLog(
+            mission_id=mission_id, 
+            role="agent", 
+            content=msg_content, 
+            log_type="success"
+        ).insert()
+        
+        # Automatically trigger draft regeneration
+        force_draft = True
+        
+    else:
+        # No email found? Try looking up by NAME in ContactHistory
+        cleaned_msg = chat.message.lower()
+        
+        # Get user's contacts (optimistic fetch, or use text search if available)
+        # For now, fetching recent 100 contacts to check against
+        from app.models import ContactHistory
+        contacts = await ContactHistory.find(
+            ContactHistory.user_id == user.clerk_id
+        ).sort("-last_contacted_at").limit(100).to_list()
+        
+        found_contact = None
+        for c in contacts:
+            if c.prospect_name and c.prospect_name.lower() in cleaned_msg:
+                # Found a name match!
+                # Avoid single-word matches if they are common words (simple heuristic)
+                if len(c.prospect_name) < 3: continue 
+                found_contact = c
+                break
+        
+        if found_contact:
+            new_email = found_contact.prospect_email
+            known_name = found_contact.prospect_name
+            
+            # Find Mission Prospects
+            prospects = await Prospect.find(Prospect.mission_id == mission_id).to_list()
+            
+            target_prospect = None
+            msg_content = ""
+            
+            if prospects:
+                target_prospect = prospects[0]
+                target_prospect.public_contact = new_email
+                target_prospect.name = known_name
+                await target_prospect.save()
+                msg_content = f"Found {known_name} in your contacts. Updated info with email: {new_email}"
+            else:
+                target_prospect = Prospect(
+                    mission_id=mission_id,
+                    name=known_name,
+                    company="Unknown",
+                    context_source="Contact History",
+                    public_contact=new_email,
+                    relevance_reason="User referenced known contact",
+                    relevance_score=1.0
+                )
+                await target_prospect.insert()
+                msg_content = f"Found {known_name} in contacts. Created prospect with email: {new_email}"
+            
+            await MissionLog(
+                mission_id=mission_id, 
+                role="agent", 
+                content=msg_content, 
+                log_type="success"
+            ).insert()
+            
+            force_draft = True
+        
+    
     # CHECK FOR INTEGRATION REQUEST (Slack, Gmail, etc.)
     integration_keywords = {
         "slack": ["slack", "notify me on slack", "integrate slack"],
-        "gmail": ["gmail", "connect email", "connect gmail"],
+        "gmail": ["connect email", "connect gmail", "link gmail"],
     }
     
     for tool, keywords in integration_keywords.items():
@@ -159,7 +308,7 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
     
     # CHECK FOR CREATE DRAFT COMMAND
     create_draft_keywords = ["create draft", "regenerate draft", "generate draft", "new draft", "draft again", "make another draft"]
-    if any(k in msg_lower for k in create_draft_keywords):
+    if force_draft or any(k in msg_lower for k in create_draft_keywords):
         # Find existing prospects for this mission
         prospects = await Prospect.find(Prospect.mission_id == mission_id).to_list()
         
