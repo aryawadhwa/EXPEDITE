@@ -14,3 +14,4 @@ websockets
 boto3
 python-multipart
 composio
+neo4j~=5.28

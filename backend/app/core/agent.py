@@ -21,10 +21,10 @@ class AgentState(TypedDict):
     intents: List[str] # ["discovery", "outreach"]
     missing_info: List[str] # ["contact_info"]
 
-# Real Tools
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models import Agent
+from app.services.neo4j import neo4j_service
 
 async def classify_intent(objective: str, available_tools: List[str]) -> Dict:
     """
@@ -136,23 +136,49 @@ async def initial_triage(state: AgentState):
         
     # 4. Check Readiness (Outreach)
     missing_info = []
+    
+    # Identify Person of Interest (POI)
+    # Simple heuristic: Look for capitalized words or use NLP. 
+    # For now, let's assume the name is often the first capitalized word or passed in objective 'message X'
+    # We can use the classify_intent LLM to also extract entities, but let's try regex/simple first or leverage existing extraction.
+    
+    person_name = None
+    import re
+    # Extract "message [Name] on" or "email [Name]"
+    name_match = re.search(r"(?:message|email|send to|contact) ([A-Z][a-z]+(?: [A-Z][a-z]+)?)", obj, re.IGNORECASE)
+    if name_match:
+        person_name = name_match.group(1)
+        
     if "outreach" in intents:
-        # Do we have contact info?
-        # Check explicit email in objective
-        import re
-        email_regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-        has_email = bool(re.search(email_regex, obj))
+        # Check Channel Requirements
+        is_linkedin = "linkedin" in required_tools or "linkedin" in obj.lower()
         
-        # Or check if prospects (from previous step) have info - hard to check here as this is initial step.
-        # But if this is a resumed mission, prospects might exist. 
-        prospects = state.get("prospects", [])
-        has_prospect_email = any(p.get("public_contact") for p in prospects)
-        
-        # If strict outreach only (no discovery), we expect contact info.
-        if "discovery" not in intents and not has_email and not has_prospect_email:
-             # Assume single recipient for simple check
-             await log_event(mission_id, user_id, "I need an email address to send this message.", "action")
-             missing_info.append("contact_info")
+        if is_linkedin and person_name:
+            # Check Neo4j Protocol
+            contacts = neo4j_service.get_contact_methods(person_name)
+            linkedin_url = contacts.get("linkedin")
+            
+            if not linkedin_url:
+                await log_event(mission_id, user_id, f"I don't have {person_name}'s LinkedIn yet. Please share the profile URL.", "action")
+                missing_info.append("linkedin_url")
+            else:
+                await log_event(mission_id, user_id, f"found linkedin url for {person_name}: {linkedin_url}", "thinking")
+                # Inject into state for downstream
+                # We can't easily inject into 'prospects' here as state is immutable-ish in some contexts, but we return it.
+                # Actually LangGraph state update comes from return.
+                # We'll pass it via a temporary field or handle in direct_intake/analyze
+                pass
+
+        elif not is_linkedin:
+             # Email Check (Logic exists)
+             email_regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+             has_email = bool(re.search(email_regex, obj))
+             prospects = state.get("prospects", [])
+             has_prospect_email = any(p.get("public_contact") for p in prospects)
+             
+             if not has_email and not has_prospect_email and "discovery" not in intents:
+                 await log_event(mission_id, user_id, "I need an email address to send this message.", "action")
+                 missing_info.append("contact_info")
     
     return {
         "intents": intents, 
@@ -443,9 +469,15 @@ Attachments: {', '.join(attachments_list) if attachments_list else 'None'}
     )
     await p_doc.insert()
 
+    # Determine Channel
+    channel = "email"
+    if "linkedin" in state["objective"].lower():
+        channel = "linkedin"
+
     # 2. Save Draft (Layer 3)
     d_doc = Draft(
         prospect_id=str(p_doc.id),
+        channel=channel,
         subject=subject,
         body=body,
         ai_reasoning=reasoning,
@@ -480,6 +512,34 @@ async def direct_intake(state: AgentState):
                 "snippet": f"User provided email in objective: {email}",
                 "original_data": {}
             })
+            
+    # Neo4j Store Check (LinkedIn)
+    if "linkedin.com" in state["objective"]:
+        # Extract URL
+        # simple extraction
+        url_match = re.search(r"(https?://[a-z]{2,3}\.linkedin\.com/in/[^ \t\n\r\f\v]+)", state["objective"])
+        if url_match:
+            url = url_match.group(1)
+            # Try to associate with a name if present
+            # We assume the name of potential prospect was the one we asked about previously.
+            # But here we just extract name from objective if possible or URL.
+            # User says: "Here is Sriram's LinkedIn: ..."
+            name_match = re.search(r"([A-Z][a-z]+)'s LinkedIn", state["objective"])
+            target_name = name_match.group(1) if name_match else "Unknown"
+            
+            if target_name != "Unknown":
+                neo4j_service.add_contact_method(target_name, "linkedin", url)
+                await log_event(mission_id, user_id, f"Stored LinkedIn for {target_name} in Neo4j.", "success")
+                
+                # Add to contacts list
+                contacts.append({
+                    "name": target_name,
+                    "company": "Unknown",
+                    "context_source": "User Input (Neo4j)",
+                    "public_contact": url,
+                    "snippet": f"LinkedIn URL: {url}",
+                    "original_data": {"linkedin": url}
+                })
     else:
         # Generic fallback
         contacts.append({

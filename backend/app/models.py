@@ -60,6 +60,7 @@ class Prospect(Document):
 
 class Draft(Document):
     prospect_id: str # Link to Prospect.id
+    channel: str = "email" # email, linkedin, etc.
     subject: str
     body: str
     ai_reasoning: str

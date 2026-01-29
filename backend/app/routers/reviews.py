@@ -143,9 +143,29 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
                 )
                 await new_contact.insert()
 
-    # 2. Attempt to Send Email via Composio (if connected)
-    # 2. Attempt to Send Email via Composio (if connected)
-    if user.gmail_connection_id:
+    # 2.6 Neo4j Contact Graph Update (Identity & Channel Storage)
+    if draft.prospect_id:
+        try:
+            prospect = await Prospect.get(draft.prospect_id)
+            if prospect and prospect.name:
+                # 1. Resolve Person
+                from app.services.neo4j import neo4j_service
+                person_node = neo4j_service.resolve_person(prospect.name)
+                
+                # 2. Store Email Contact if available
+                contact_email = prospect.public_contact or (prospect.scraped_data and prospect.scraped_data.get('email'))
+                if contact_email:
+                    neo4j_service.add_contact_method(prospect.name, "email", contact_email)
+                    print(f"Neo4j: Linked {contact_email} to {prospect.name}")
+                    
+        except Exception as e:
+            print(f"Neo4j Update Failed: {e}")
+
+
+
+    # 2. Execute Outreach based on Channel
+    # Email (Composio / Gmail)
+    if draft.channel == "email" and user.gmail_connection_id:
         from app.models import Prospect
         from app.core.sender import send_email_via_composio
         
@@ -172,6 +192,40 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
                 print(f"Failed to trigger email send: {e}")
         else:
             print("Approved: No recipient email found for this prospect.")
+
+    # LinkedIn (Unipile)
+    elif draft.channel == "linkedin":
+        from app.services.unipile import unipile_service
+        
+        recipient_url = None
+        if draft.prospect_id:
+            prospect = await Prospect.get(draft.prospect_id)
+            if prospect:
+                # Check stored public contact or scraped data
+                recipient_url = prospect.public_contact
+                if not recipient_url and prospect.scraped_data:
+                    recipient_url = prospect.scraped_data.get("linkedin")
+        
+        if recipient_url:
+            try:
+                # 1. Get Account (Pick first available LinkedIn account)
+                accounts = await unipile_service.get_accounts()
+                linkedin_account = next((acc for acc in accounts if 'linkedin' in acc.get('type', '').lower() or 'linkedin' in acc.get('provider', '').lower()), None)
+                
+                if linkedin_account:
+                    print(f"Approved: Sending LinkedIn message to {recipient_url} via account {linkedin_account.get('id')}")
+                    res = await unipile_service.send_linkedin_message(
+                        linkedin_account.get('id'), 
+                        recipient_url, 
+                        draft.body
+                    )
+                    print(f"LinkedIn Result: {res}")
+                else:
+                    print("Approved: No linked LinkedIn account found in Unipile.")
+            except Exception as e:
+                print(f"Failed to trigger LinkedIn send: {e}")
+        else:
+            print("Approved: No LinkedIn URL found for this prospect.")
 
     return {
         "status": "approved", 

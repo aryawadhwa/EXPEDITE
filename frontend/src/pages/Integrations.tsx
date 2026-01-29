@@ -118,7 +118,7 @@ export function Integrations() {
             // Update local state to reflect disconnection
             setIntegrations(prev => prev.map(int => {
                 if (int.id === toolId) {
-                    return { ...int, status: "available" as const, connectedAs: undefined };
+                    return { ...int, status: "connect" as const, connectedAs: undefined };
                 }
                 return int;
             }));
