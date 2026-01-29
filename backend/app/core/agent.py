@@ -18,11 +18,148 @@ class AgentState(TypedDict):
     current_prospect: Dict # Valid prospect being processed
     draft_id: str
     feedback: str # Human feedback for revision
+    intents: List[str] # ["discovery", "outreach"]
+    missing_info: List[str] # ["contact_info"]
 
 # Real Tools
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.models import Agent
+
+async def classify_intent(objective: str, available_tools: List[str]) -> Dict:
+    """
+    Uses LLM to determine intents and required tools.
+    Returns {"intents": [...], "required_tools": [...]}
+    """
+    try:
+        system_prompt = f"""You are an Intent and Tool Classification Agent.
+
+Determine:
+1. What the user is trying to do (one or more intents).
+2. Which external tools are required.
+
+Possible intents:
+- discovery: finding, searching, collecting people or data
+- outreach: contacting, emailing, messaging someone
+
+Available tools (valid keys):
+{', '.join(available_tools)}
+
+Rules:
+- Intents may be multiple.
+- Infer intent semantically, not by keywords alone.
+- Only include tools that are clearly required.
+- Return valid tool keys only from the provided list.
+
+Return JSON ONLY:
+{{
+  "intents": ["discovery", "outreach"],
+  "required_tools": ["tool_key"]
+}}"""
+
+        llm = ChatGroq(
+            temperature=0.0, 
+            groq_api_key=settings.GROQ_API_KEY, 
+            model_name="llama-3.1-8b-instant" 
+        )
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=objective)
+        ]
+        
+        response = await llm.ainvoke(messages)
+        content = response.content.strip()
+        
+        # Clean up JSON
+        import json
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.replace("```", "").strip()
+            
+        data = json.loads(content)
+        return {
+            "intents": data.get("intents", []),
+            "required_tools": data.get("required_tools", [])
+        }
+        
+    except Exception as e:
+        print(f"Intent classification failed: {e}")
+        # Fail safe
+        return {"intents": ["discovery"], "required_tools": []}
+
+async def initial_triage(state: AgentState):
+    """Global Pre-Flight Check: Tools + Intent + Readiness"""
+    obj = state["objective"]
+    mission_id = state["mission_id"]
+    user_id = state["user_id"]
+    
+    # 1. Get Available Tools
+    from app.routers.integrations import TOOL_CONFIG_MAP
+    available_tools = list(TOOL_CONFIG_MAP.keys())
+    
+    # 2. Classify Intent & Tools
+    classification = await classify_intent(obj, available_tools)
+    intents = classification["intents"]
+    required_tools = classification["required_tools"]
+    
+    await log_event(mission_id, user_id, f"Understanding mission: {intents} with tools {required_tools}", "thinking")
+    
+    # Logic moved to initial_triage
+    # Just parse input now
+    # 3. Check Tools
+    user = await User.find_one(User.clerk_id == user_id)
+    connections = user.other_connections if (user and user.other_connections) else {}
+    slack_connected = bool(user and user.slack_connection_id)
+    gmail_connected = bool(user and user.gmail_connection_id)
+    
+    missing_tools = []
+    for tool in required_tools:
+        is_connected = False
+        if tool == "gmail":
+            is_connected = gmail_connected
+        elif tool == "slack":
+            is_connected = slack_connected
+        else:
+            is_connected = bool(connections.get(tool))
+            
+        if not is_connected:
+            missing_tools.append(tool)
+            
+    if missing_tools:
+        for tool in missing_tools:
+             label = tool.replace("_", " ").title()
+             await log_event(mission_id, user_id, f"To proceed, please connect {label}.", "action", metadata={"action": "connect_tool", "tool": tool})
+        
+        return {"intents": intents, "missing_info": ["tools"]} # Signal blockage
+        
+    # 4. Check Readiness (Outreach)
+    missing_info = []
+    if "outreach" in intents:
+        # Do we have contact info?
+        # Check explicit email in objective
+        import re
+        email_regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+        has_email = bool(re.search(email_regex, obj))
+        
+        # Or check if prospects (from previous step) have info - hard to check here as this is initial step.
+        # But if this is a resumed mission, prospects might exist. 
+        prospects = state.get("prospects", [])
+        has_prospect_email = any(p.get("public_contact") for p in prospects)
+        
+        # If strict outreach only (no discovery), we expect contact info.
+        if "discovery" not in intents and not has_email and not has_prospect_email:
+             # Assume single recipient for simple check
+             await log_event(mission_id, user_id, "I need an email address to send this message.", "action")
+             missing_info.append("contact_info")
+    
+    return {
+        "intents": intents, 
+        "missing_info": missing_info
+    }
+
+
 
 async def update_agent_stats(user_id: str, processed=0, queued=0, errors=0):
     """Update stats for the user's active agents and broadcast to frontend"""
@@ -53,7 +190,7 @@ async def update_agent_stats(user_id: str, processed=0, queued=0, errors=0):
         total_queued = sum(a.stats.queued for a in all_agents if a.stats)
         
         # Broadcast via WebSocket
-        from main import get_connection_manager
+        from app.core.socket import get_connection_manager
         manager = get_connection_manager()
         await manager.send_to_user(user_id, {
             "type": "stats_update",
@@ -81,7 +218,7 @@ async def log_event(mission_id: str, user_id: str, content: str, log_type: str =
     
     # Broadcast via WebSocket
     try:
-        from main import get_connection_manager
+        from app.core.socket import get_connection_manager
         manager = get_connection_manager()
         await manager.send_to_user(user_id, {
             "type": log_type,
@@ -218,7 +355,7 @@ async def write_draft(state: AgentState):
     if not prospect:
         await log_event(state["mission_id"], state["user_id"], "No valid prospect to draft for.", "error")
         return {}
-
+    
     feedback = state.get("feedback")
     
     await log_event(state["mission_id"], state["user_id"], f"Layer 3: Drafting outreach for {prospect.get('name')}", "thinking")
@@ -320,46 +457,11 @@ Attachments: {', '.join(attachments_list) if attachments_list else 'None'}
     
     return {"draft_id": str(d_doc.id)}
 
-# Build Graph
-def route_mission(state: AgentState) -> str:
-    obj = state["objective"].lower()
-    # Simple keyword heuristic. Can be upgraded to LLM classifier.
-    if any(k in obj for k in ["find", "search", "scout", "look for", "scrape"]):
-        return "scout"
-    return "direct_intake"
-
 async def direct_intake(state: AgentState):
     """Directly ingest contacts from user instruction without scraping"""
-    obj = state["objective"].lower()
+    obj = state["objective"]
     mission_id = state["mission_id"]
     user_id = state["user_id"]
-    
-    # Check for integration needs
-    user = await User.find_one(User.clerk_id == user_id)
-    connections = user.other_connections if (user and user.other_connections) else {}
-    slack_connected = bool(user and user.slack_connection_id)
-    
-    missing_tools = []
-    
-    # Keyword -> Tool Key mapping
-    # Note: Multi-word checks need care.
-    if "telegram" in obj and not connections.get("telegram"): missing_tools.append("telegram")
-    if "discord" in obj and not connections.get("discord"): missing_tools.append("discord")
-    if "slack" in obj and not slack_connected: missing_tools.append("slack")
-    if ("gmail" in obj or "email" in obj) and not user.gmail_connection_id: missing_tools.append("gmail")
-    if "github" in obj and not connections.get("github"): missing_tools.append("github")
-    if "reddit" in obj and not connections.get("reddit"): missing_tools.append("reddit")
-    if "perplexity" in obj and not connections.get("perplexity"): missing_tools.append("perplexity")
-    if ("sheets" in obj or "spreadsheet" in obj) and not connections.get("google_sheets"): missing_tools.append("google_sheets")
-
-    if missing_tools:
-        for tool in missing_tools:
-             print(f"DEBUG: Requesting connection for {tool}")
-             label = tool.replace("_", " ").title()
-             await log_event(mission_id, user_id, f"To proceed, please connect {label}.", "action", metadata={"action": "connect_tool", "tool": tool})
-        
-        # Stop here if we are just asking for connection
-        return {"prospects": []}
     
     await log_event(mission_id, user_id, "Skipping search (Direct Input Mode)", "thinking")
     
@@ -392,26 +494,52 @@ async def direct_intake(state: AgentState):
     await log_event(state["mission_id"], state["user_id"], f"Processed {len(contacts)} targets from input.", "success")
     return {"prospects": contacts}
 
+
 workflow = StateGraph(AgentState)
 
+
+workflow.add_node("initial_triage", initial_triage) # Entry Point
 workflow.add_node("scout", scout_prospects)
-workflow.add_node("direct_intake", direct_intake) # New node
+workflow.add_node("direct_intake", direct_intake)
 workflow.add_node("analyze", analyze_relevance) 
 workflow.add_node("draft_node", write_draft)
 
-# Conditional Entry
-workflow.set_conditional_entry_point(
-    route_mission,
+# Conditional Routing
+def route_after_triage(state: AgentState) -> str:
+    # 1. Blockage Check
+    if state.get("missing_info") or not state.get("intents"):
+        return "end"
+        
+    intents = state.get("intents", [])
+    
+    # 2. Logic Flow
+    if "discovery" in intents:
+        return "scout" # Always start with discovery if asked
+        
+    if "outreach" in intents:
+        # Pure outreach (no discovery asked)
+        # We go to direct_intake to parse inputs
+        return "direct_intake"
+        
+    return "end"
+
+workflow.set_entry_point("initial_triage")
+
+workflow.add_conditional_edges(
+    "initial_triage",
+    route_after_triage,
     {
         "scout": "scout",
-        "direct_intake": "direct_intake"
+        "direct_intake": "direct_intake",
+        "end": END
     }
 )
 
 # Edges
 # Conditional Edges
 def should_draft(state: AgentState) -> str:
-    if state.get("current_prospect"):
+    # Only draft if outreach is intended AND we have a valid prospect
+    if "outreach" in state.get("intents", []) and state.get("current_prospect"):
         return "draft"
     return "end"
 
