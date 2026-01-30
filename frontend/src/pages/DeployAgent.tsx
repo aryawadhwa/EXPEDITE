@@ -294,7 +294,7 @@ const DeployAgentContent = () => {
         [setEdges],
     );
 
-    const onDragStart = (event: React.DragEvent, type: string, data?: any) => {
+    const onDragStart = (event: React.DragEvent, type: string, data?: unknown) => {
         event.dataTransfer.setData('application/reactflow', JSON.stringify({ type, data }));
         event.dataTransfer.effectAllowed = 'move';
     };

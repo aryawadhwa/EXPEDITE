@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { useApi } from "@/lib/api";
-import { ReactFlow, Background, Controls, Handle, Position } from '@xyflow/react';
+import { ReactFlow, Background, Controls, Handle, Position, Node, Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 // Custom node component with dark theme styling
@@ -46,7 +46,7 @@ interface AgentUI {
   id: string;
   name: string;
   type: "scout" | "writer" | "enricher" | "custom";
-  status: "active" | "idle" | "error";
+  status: "active" | "inactive" | "error";
   mission: string;
   progress: number;
   stats: {
@@ -55,6 +55,10 @@ interface AgentUI {
     errors: number;
   };
   uptime: string;
+  workflow?: {
+    nodes: Node[];
+    edges: Edge[];
+  };
 }
 
 const typeConfig: Record<string, { label: string; color: string }> = {
@@ -66,8 +70,12 @@ const typeConfig: Record<string, { label: string; color: string }> = {
 
 const statusConfig: Record<string, { label: string; dotClass: string }> = {
   active: { label: "Active", dotClass: "status-dot-running" },
+  inactive: { label: "Inactive", dotClass: "bg-muted-foreground" },
   idle: { label: "Idle", dotClass: "bg-muted-foreground" },
+  running: { label: "Running", dotClass: "status-dot-running" },
+  stopped: { label: "Stopped", dotClass: "bg-muted-foreground" },
   error: { label: "Error", dotClass: "bg-destructive" },
+  paused: { label: "Paused", dotClass: "bg-warning" },
 };
 
 export default function ActiveAgents() {
@@ -80,14 +88,15 @@ export default function ActiveAgents() {
 
   console.log("Active User:", user?.id);
 
-  const fetchAgents = async () => {
+  const fetchAgents = useCallback(async () => {
     try {
       const data = await getAgents();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mappedAgents: AgentUI[] = data.map((item: any) => ({
         id: item._id || item.id,
         name: item.name,
         type: item.agent_type || "custom",
-        status: item.status || "idle",
+        status: item.status || "inactive",
         mission: item.description || "No mission assigned",
         progress: item.status === "active" ? 50 : 0,
         stats: {
@@ -97,22 +106,23 @@ export default function ActiveAgents() {
         },
         uptime: item.uptime || "0h 0m"
       }));
+      console.log("Mapped agents:", mappedAgents.map(a => ({ id: a.id, status: a.status })));
       setAgents(mappedAgents);
     } catch (error) {
       console.error("Failed to fetch agents:", error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getAgents]);
 
   useEffect(() => {
     fetchAgents();
-  }, [getAgents]);
+  }, [fetchAgents]);
 
   const handleToggleStatus = async (agent: AgentUI) => {
-    const newStatus = agent.status === "active" ? "idle" : "active";
+    const newStatus = agent.status === "active" ? "inactive" : "active";
     // Optimistic update
-    setAgents(prev => prev.map(a => a.id === agent.id ? { ...a, status: newStatus as any } : a));
+    setAgents(prev => prev.map(a => a.id === agent.id ? { ...a, status: newStatus as "active" | "inactive" } : a));
 
     try {
       await updateAgent(agent.id, { status: newStatus });
@@ -138,19 +148,19 @@ export default function ActiveAgents() {
   };
 
   return (
-    <div className="h-full p-6 lg:p-8 overflow-auto">
+    <div className="h-full p-6 lg:p-8 overflow-auto bg-black/50 backdrop-blur-sm">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Active Agents</h1>
-          <p className="text-muted-foreground mt-1">Monitor and control your AI workforce</p>
+          <h1 className="text-2xl font-bold text-white">Active Agents</h1>
+          <p className="text-zinc-400 mt-1">Monitor and control your AI workforce</p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="secondary" className="gap-1.5 font-mono">
+          <Badge variant="secondary" className="gap-1.5 font-mono bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10">
             <Activity className="w-3 h-3" />
             {agents.filter(a => a.status === "active").length} Active
           </Badge>
-          <Button className="gap-2" onClick={() => navigate('/agents/deploy')}>
+          <Button className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_15px_rgba(139,92,246,0.3)]" onClick={() => navigate('/agents/deploy')}>
             <Bot className="w-4 h-4" />
             Deploy Agent
           </Button>
@@ -158,40 +168,40 @@ export default function ActiveAgents() {
       </div>
 
       {/* Agent Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="columns-1 lg:columns-2 xl:columns-3 gap-4 space-y-4">
         {isLoading ? (
           Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="p-5 bg-card border border-border rounded-xl">
-              <Skeleton className="h-40 w-full" />
+            <div key={i} className="break-inside-avoid mb-4 p-5 bg-white/5 border border-white/10 rounded-xl">
+              <Skeleton className="h-40 w-full bg-white/5" />
             </div>
           ))
         ) : agents.length === 0 ? (
-          <div className="col-span-full relative overflow-hidden rounded-xl border border-dashed border-muted-foreground/25 min-h-[400px] flex items-center justify-center bg-card/50">
+          <div className="col-span-full relative overflow-hidden rounded-xl border border-dashed border-white/10 min-h-[400px] flex items-center justify-center bg-white/5">
             <MagnetLines
               rows={9}
               columns={9}
               containerSize="100%"
-              lineColor="hsl(var(--primary) / 0.2)"
+              lineColor="rgba(255, 255, 255, 0.1)"
               lineWidth="2px"
               lineHeight="20px"
               baseAngle={0}
               className="absolute inset-0 z-0"
             />
-            <div className="relative z-10 text-center py-12 text-muted-foreground">
+            <div className="relative z-10 text-center py-12 text-zinc-400">
               <Bot className="w-12 h-12 mx-auto mb-3 opacity-20" />
               <p>No active agents deployed.</p>
-              <Button variant="outline" className="mt-4 bg-background/80 backdrop-blur-sm" onClick={() => navigate('/agents/deploy')}>
+              <Button variant="outline" className="mt-4 bg-black/50 backdrop-blur-sm border-white/10 hover:bg-white/10 hover:text-white" onClick={() => navigate('/agents/deploy')}>
                 Deploy your first agent
               </Button>
             </div>
           </div>
         ) : (
           agents.map((agent) => (
-            <div key={agent.id} className="p-5 bg-card border border-border rounded-xl hover:border-primary/50 transition-colors">
+            <div key={agent.id} className="break-inside-avoid mb-4 p-5 bg-zinc-900/50 backdrop-blur-sm border border-white/10 rounded-xl hover:border-primary/50 transition-all hover:shadow-[0_0_20px_rgba(0,0,0,0.5)]">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                    "w-10 h-10 rounded-lg flex items-center justify-center border border-white/5",
                     typeConfig[agent.type]?.color || typeConfig.custom.color
                   )}>
                     <Bot className={cn(
@@ -201,35 +211,35 @@ export default function ActiveAgents() {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-foreground">{agent.name}</h3>
-                      <Badge variant="secondary" className={cn("text-xs", typeConfig[agent.type]?.color || typeConfig.custom.color)}>
+                      <h3 className="font-semibold text-white">{agent.name}</h3>
+                      <Badge variant="secondary" className={cn("text-xs border-0", typeConfig[agent.type]?.color || typeConfig.custom.color)}>
                         {typeConfig[agent.type]?.label || typeConfig.custom.label}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground font-mono">{agent.id}</p>
+                    <p className="text-xs text-zinc-500 font-mono">{agent.id}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5">
-                    <span className={cn("status-dot", statusConfig[agent.status].dotClass)} />
-                    <span className="text-xs text-muted-foreground">
-                      {statusConfig[agent.status].label}
+                    <span className={cn("status-dot", statusConfig[agent.status]?.dotClass || "bg-muted-foreground")} />
+                    <span className="text-xs text-zinc-400">
+                      {statusConfig[agent.status]?.label || agent.status}
                     </span>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/5">
                         <MoreVertical className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-popover">
-                      <DropdownMenuItem onClick={() => setSelectedAgent(agent)}>
+                    <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white">
+                      <DropdownMenuItem onClick={() => setSelectedAgent(agent)} className="focus:bg-white/10 focus:text-white">
                         View Workflow
                       </DropdownMenuItem>
-                      <DropdownMenuItem disabled>Edit Configuration</DropdownMenuItem>
+                      <DropdownMenuItem disabled className="text-zinc-500">Edit Configuration</DropdownMenuItem>
                       <DropdownMenuItem
-                        className="text-destructive"
+                        className="text-red-400 focus:bg-red-500/10 focus:text-red-400"
                         onClick={() => handleDelete(agent.id)}
                       >
                         Terminate
@@ -240,20 +250,20 @@ export default function ActiveAgents() {
               </div>
 
               {/* Mission */}
-              <div className="mb-4 p-3 rounded-lg bg-secondary/50">
-                <p className="text-sm text-foreground">{agent.mission}</p>
+              <div className="mb-4 p-3 rounded-lg bg-black/40 border border-white/5">
+                <p className="text-sm text-zinc-300">{agent.mission}</p>
               </div>
 
               {/* Time and Date Information */}
-              <div className="mb-4 flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="mb-4 flex items-center gap-4 text-xs text-zinc-500">
                 <div className="flex items-center gap-1.5">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   <span>Created: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Activity className="w-3 h-3" />
+                  <Activity className="w-3 h-3 opacity-70" />
                   <span>Last Active: {agent.uptime} ago</span>
                 </div>
               </div>
@@ -262,30 +272,30 @@ export default function ActiveAgents() {
               {agent.status === "active" && (
                 <div className="mb-4">
                   <div className="flex items-center justify-between text-xs mb-1.5">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className="font-mono text-foreground">{agent.progress}%</span>
+                    <span className="text-zinc-400">Progress</span>
+                    <span className="font-mono text-purple-400">{agent.progress}%</span>
                   </div>
-                  <Progress value={agent.progress} className="h-1.5" />
+                  <Progress value={agent.progress} className="h-1.5 bg-white/10" />
                 </div>
               )}
 
               {/* Stats */}
-              <div className="grid grid-cols-4 gap-3 pt-4 border-t border-border">
+              <div className="grid grid-cols-4 gap-3 pt-4 border-t border-white/10">
                 <div className="text-center">
-                  <p className="font-mono text-lg text-foreground">{agent.stats.processed}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Processed</p>
+                  <p className="font-mono text-2xl font-bold text-white">{agent.stats.processed}</p>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Processed</p>
                 </div>
                 <div className="text-center">
-                  <p className="font-mono text-lg text-warning">{agent.stats.queued}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Queued</p>
+                  <p className="font-mono text-2xl font-bold text-emerald-400">{agent.stats.queued}</p>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Queued</p>
                 </div>
                 <div className="text-center">
-                  <p className="font-mono text-lg text-destructive">{agent.stats.errors}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Errors</p>
+                  <p className="font-mono text-2xl font-bold text-red-400">{agent.stats.errors}</p>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Errors</p>
                 </div>
                 <div className="text-center">
-                  <p className="font-mono text-lg text-muted-foreground">{agent.uptime}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Uptime</p>
+                  <p className="font-mono text-xl font-medium text-zinc-400">{agent.uptime}</p>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Uptime</p>
                 </div>
               </div>
 
@@ -295,7 +305,7 @@ export default function ActiveAgents() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="flex-1 gap-2"
+                    className="flex-1 gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/5"
                     onClick={() => handleToggleStatus(agent)}
                   >
                     <Pause className="w-3.5 h-3.5" />
@@ -305,7 +315,7 @@ export default function ActiveAgents() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="flex-1 gap-2"
+                    className="flex-1 gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/5"
                     onClick={() => handleToggleStatus(agent)}
                   >
                     <Play className="w-3.5 h-3.5" />
@@ -320,26 +330,26 @@ export default function ActiveAgents() {
 
       {/* Workflow Dialog */}
       {selectedAgent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-4xl bg-card border border-border rounded-xl shadow-lg p-6 h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-4xl bg-zinc-950 border border-white/10 rounded-xl shadow-2xl p-6 h-[80vh] flex flex-col">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold">Agent Workflow: {selectedAgent.name}</h2>
-              <Button variant="ghost" size="icon" onClick={() => setSelectedAgent(null)}>X</Button>
+              <h2 className="text-lg font-bold text-white">Agent Workflow: {selectedAgent.name}</h2>
+              <Button variant="ghost" size="icon" onClick={() => setSelectedAgent(null)} className="text-zinc-400 hover:text-white">X</Button>
             </div>
-            <div className="flex-1 border rounded-md overflow-hidden bg-background">
-              {/* @ts-ignore */}
+            <div className="flex-1 border border-white/10 rounded-md overflow-hidden bg-black/50">
               <ReactFlow
-                nodes={(selectedAgent as any).workflow?.nodes || []}
-                edges={(selectedAgent as any).workflow?.edges || []}
+                nodes={selectedAgent.workflow?.nodes || []}
+                edges={selectedAgent.workflow?.edges || []}
                 nodeTypes={nodeTypes}
                 fitView
+                className="dark-flow"
               >
-                <Background />
-                <Controls />
+                <Background color="#333" gap={16} />
+                <Controls className="bg-zinc-900 border-white/10 fill-white [&>button]:fill-white" />
               </ReactFlow>
             </div>
             <div className="mt-4 flex justify-end">
-              <Button onClick={() => setSelectedAgent(null)}>Close</Button>
+              <Button onClick={() => setSelectedAgent(null)} className="bg-white/10 hover:bg-white/20 text-white">Close</Button>
             </div>
           </div>
         </div>

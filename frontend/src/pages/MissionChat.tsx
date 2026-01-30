@@ -30,13 +30,31 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+interface Attachment {
+    asset_id: string;
+    filename: string;
+    content_type: string;
+}
 
 // SpeechRecognition types for Web Speech API
 declare global {
     interface Window {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         SpeechRecognition: any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         webkitSpeechRecognition: any;
     }
+}
+
+interface Asset {
+    id: string;
+    filename: string;
+    content_type?: string;
+    url?: string;
+    [key: string]: unknown;
 }
 
 interface Message {
@@ -45,7 +63,26 @@ interface Message {
     content: string;
     timestamp: Date;
     status?: "thinking" | "complete" | "error";
-    metadata?: any;
+    metadata?: {
+        tool?: string;
+        connect_url?: string;
+        action?: string;
+        pending_action_id?: string;
+        channel?: string;
+        draft_id?: string;
+        posting?: boolean;
+        posted?: boolean;
+        // Allow other properties
+        [key: string]: unknown;
+    };
+}
+
+interface Mission {
+    id?: string;
+    _id?: string;
+    objective: string;
+    status: string;
+    created_at: string;
 }
 
 export default function MissionChat() {
@@ -58,7 +95,7 @@ export default function MissionChat() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [mission, setMission] = useState<any>(null);
+    const [mission, setMission] = useState<Mission | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const wsRef = useRef<WebSocket | null>(null);
     const pendingActionExecuted = useRef(false);
@@ -71,8 +108,8 @@ export default function MissionChat() {
 
     // Asset picker state
     const [showAssetPicker, setShowAssetPicker] = useState(false);
-    const [availableAssets, setAvailableAssets] = useState<any[]>([]);
-    const [selectedAttachments, setSelectedAttachments] = useState<any[]>([]);
+    const [availableAssets, setAvailableAssets] = useState<Asset[]>([]);
+    const [selectedAttachments, setSelectedAttachments] = useState<Asset[]>([]);
 
     // Voice input state
     const [isListening, setIsListening] = useState(false);
@@ -232,13 +269,14 @@ export default function MissionChat() {
                 try {
                     // Get mission details
                     const missions = await api.listMissions();
-                    const found = missions.find((m: any) => m._id === missionId || m.id === missionId);
+                    const found = missions.find((m: Mission) => m._id === missionId || m.id === missionId);
                     if (found) {
                         setMission(found);
 
                         // Load chat history
                         try {
                             const logs = await api.getMissionLogs(missionId);
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             const historyMessages: Message[] = logs.map((log: any) => ({
                                 id: log.id,
                                 role: log.role as "user" | "agent" | "system",
@@ -267,7 +305,7 @@ export default function MissionChat() {
             }
         };
         loadMission();
-    }, [missionId]);
+    }, [missionId, api]);
 
     // Handle pending action after OAuth callback
     useEffect(() => {
@@ -310,20 +348,20 @@ export default function MissionChat() {
                             description: result.message
                         });
                     }
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error("Failed to execute pending action:", e);
                     setMessages(prev => {
                         const filtered = prev.filter(m => !m.id.startsWith("executing-"));
                         return [...filtered, {
                             id: `error-${Date.now()}`,
                             role: "agent",
-                            content: `Failed to execute action: ${e.message}`,
+                            content: `Failed to execute action: ${(e as Error).message}`,
                             timestamp: new Date(),
                             status: "error"
                         }];
                     });
                     toast.error("Execution failed", {
-                        description: e.message
+                        description: (e as Error).message
                     });
                 }
 
@@ -335,7 +373,7 @@ export default function MissionChat() {
             // Wait a bit for the connection to be fully active
             setTimeout(executePending, 1500);
         }
-    }, [searchParams, api]);
+    }, [searchParams, api, setSearchParams]);
 
     const handleConnect = async (tool: string, params?: Record<string, string>) => {
         try {
@@ -344,9 +382,9 @@ export default function MissionChat() {
                 window.location.href = res.redirect_url;
             }
             setShowConnectDialog(false);
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Connect failed", e);
-            const msg = e.message || String(e);
+            const msg = (e as Error).message || String(e);
 
             // Check for missing fields error from Composio
             if (msg.includes("Missing required fields")) {
@@ -386,7 +424,7 @@ export default function MissionChat() {
     };
 
     // Handle asset selection
-    const handleSelectAsset = (asset: any) => {
+    const handleSelectAsset = (asset: Asset) => {
         // Add to selected attachments
         if (!selectedAttachments.find(a => a.id === asset.id)) {
             setSelectedAttachments(prev => [...prev, asset]);
@@ -429,10 +467,10 @@ export default function MissionChat() {
                 }]);
             } else {
                 // Create new mission from input with attachments
-                const attachmentData = selectedAttachments.map(a => ({
-                    asset_id: a.id || a._id,
+                const attachmentData: Attachment[] = selectedAttachments.map(a => ({
+                    asset_id: (a.id || a._id) as string,
                     filename: a.filename,
-                    content_type: a.content_type
+                    content_type: a.content_type || 'application/octet-stream'
                 }));
                 const newMission = await api.createMission(input, attachmentData);
                 setMission(newMission);
@@ -465,7 +503,14 @@ export default function MissionChat() {
     };
 
     // Poll user profile for connection status
-    const [userProfile, setUserProfile] = useState<any>(null);
+    interface UserProfile {
+        id: string;
+        gmail_connection_id?: string;
+        slack_connection_id?: string;
+        other_connections?: Record<string, boolean>;
+        [key: string]: unknown;
+    }
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     useEffect(() => {
         const fetchUser = async () => {
             try {
@@ -478,7 +523,7 @@ export default function MissionChat() {
         fetchUser();
         const interval = setInterval(fetchUser, 3000);
         return () => clearInterval(interval);
-    }, []);
+    }, [api]);
 
     const isConnected = (tool: string) => {
         if (!userProfile) return false;
@@ -549,7 +594,15 @@ export default function MissionChat() {
                                         ? "bg-muted"
                                         : "bg-card border border-border"
                             )}>
-                                <p className="text-sm">{message.content}</p>
+                                {message.role === "agent" || message.role === "system" ? (
+                                    <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {message.content}
+                                        </ReactMarkdown>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm">{message.content}</p>
+                                )}
                                 {(() => {
                                     // Check for connect_url in metadata (direct OAuth link)
                                     const connectUrl = message.metadata?.connect_url;
@@ -651,13 +704,13 @@ export default function MissionChat() {
                                                     } else {
                                                         toast.error("Failed", { description: result.message });
                                                     }
-                                                } catch (e: any) {
+                                                } catch (e: unknown) {
                                                     setMessages(prev => prev.map(m => 
                                                         m.id === message.id 
                                                             ? {...m, metadata: {...m.metadata, posting: false}}
                                                             : m
                                                     ));
-                                                    toast.error("Error", { description: e.message });
+                                                    toast.error("Error", { description: (e as Error).message });
                                                 }
                                             }}
                                             disabled={message.metadata?.posting || message.metadata?.posted}

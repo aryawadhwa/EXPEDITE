@@ -1,11 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import {
-  Search,
-  Mail,
-  CheckCircle,
   ArrowRight,
   Zap,
   Target,
@@ -13,408 +9,387 @@ import {
   BarChart3,
   Sparkles,
   Shield,
-  Clock
+  Mail,
+  Search,
+  CheckCircle,
+  ChevronDown,
+  Calendar,
+  Layers,
+  Rocket,
+  MessageSquare,
+  History
 } from "lucide-react";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
-import FloatingLines from "@/components/ui/FloatingLines";
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import { useRef, useState } from "react";
+import { GoogleGeminiEffect } from "@/components/ui/google-gemini-effect";
+import { CanvasRevealEffect } from "@/components/ui/canvas-reveal-effect";
+import { ShaderGradientBackground } from "@/components/ui/shader-gradient-background";
+import { GlassButton } from "@/components/ui/glass-button";
+import { NeuralGraph } from "@/components/ui/neural-graph";
+import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
+import { Logo } from "@/components/ui/logo";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { CTASection } from "@/components/landing/CTASection";
 
 const Landing = () => {
-  const fadeInUp = {
-    initial: { opacity: 0, y: 20 },
-    whileInView: { opacity: 1, y: 0 },
-    viewport: { once: true, margin: "-50px" },
-    transition: { duration: 0.5 }
-  };
-
-  const staggerContainer = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.2
-      }
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Floating Pillbox Navigation */}
-      <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-        <div className="flex items-center justify-between gap-4 px-6 py-2 rounded-full border border-border/40 bg-card/60 backdrop-blur-2xl shadow-2xl min-w-[600px]">
-          {/* Logo */}
-          <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="ExpediteAI" className="h-20 w-auto object-contain" />
-          </div>
+    <div className="min-h-screen bg-black text-white overflow-x-hidden relative">
+      {/* Shader Gradient Animated Background */}
+      <ShaderGradientBackground />
 
-          {/* Navigation Links */}
-          <div className="flex items-center gap-6">
-            <SignedIn>
-              <Link to="/dashboard">
-                <Button variant="ghost" size="lg" className="text-base text-muted-foreground hover:text-foreground">
-                  Dashboard
-                </Button>
-              </Link>
-              <div className="scale-125">
-                <UserButton />
-              </div>
-            </SignedIn>
-            <SignedOut>
-              <SignInButton mode="modal">
-                <Button variant="ghost" size="lg" className="text-base text-muted-foreground hover:text-foreground">
-                  Sign In
-                </Button>
-              </SignInButton>
-              <SignInButton mode="modal">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 rounded-full px-6 text-base">
-                  Get Started
-                </Button>
-              </SignInButton>
-            </SignedOut>
-          </div>
-        </div>
-      </nav>
+      {/* Header with Logo */}
+      <header className="fixed top-0 left-0 z-50 p-6">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="flex items-center gap-3"
+        >
+          <Logo className="w-8 h-8 text-white" />
+          <span className="text-lg font-bold tracking-tight text-white">Expedite AI</span>
+        </motion.div>
+      </header>
 
       {/* Hero Section */}
-      <section className="pt-40 pb-24 px-6 relative overflow-hidden min-h-screen">
-        {/* FloatingLines Background */}
-        <div className="absolute inset-0 w-full h-full">
-          <FloatingLines
-            enabledWaves={["top", "middle", "bottom"]}
-            lineCount={5}
-            lineDistance={5}
-            bendRadius={5}
-            bendStrength={-0.5}
-            interactive={true}
-            parallax={true}
-            linesGradient={["#6366f1", "#8b5cf6", "#a855f7"]}
-          />
-        </div>
-        {/* Background Effects */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.15),transparent_50%)]" />
-
-        <div className="max-w-5xl mx-auto text-center relative z-10">
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="text-5xl md:text-7xl font-bold tracking-tight mb-6"
-          >
-            Your AI-Powered
-            <span className="block bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
-              Outbound Team
-            </span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
+      <section className="relative z-10 min-h-screen flex items-center justify-center px-6 py-20">
+        <div className="relative z-10 max-w-6xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-xl text-white max-w-2xl mx-auto mb-10"
+          >
+            <h1 className="text-7xl md:text-9xl font-black tracking-tighter mb-8 leading-[0.9] text-white">
+              Your AI-Powered{" "}
+              <span className="pill-highlight">Outbound</span>{" "}
+              Team
+            </h1>
+          </motion.div>
+
+          <motion.p
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="text-xl md:text-2xl text-purple-200/80 max-w-3xl mx-auto mb-12 leading-relaxed"
           >
             Stop spending hours on manual prospecting. Let AI agents find, research,
             and craft personalized outreach while you focus on closing deals.
           </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <SignedIn>
               <Link to="/dashboard">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-lg px-8 py-6">
+                <GlassButton size="lg" variant="primary">
                   Launch Mission Control
                   <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
+                </GlassButton>
               </Link>
             </SignedIn>
             <SignedOut>
               <SignInButton mode="modal">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-lg px-8 py-6">
+                <GlassButton size="lg" variant="primary">
                   Start Your Mission
                   <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
+                </GlassButton>
               </SignInButton>
             </SignedOut>
-            <Button size="lg" variant="outline" className="text-lg px-8 py-6">
+            <GlassButton size="lg" variant="outline">
               Watch Demo
-            </Button>
+            </GlassButton>
           </motion.div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-8 mt-20 max-w-3xl mx-auto">
-            {[
-              { value: "10x", label: "Faster Prospecting" },
-              { value: "85%", label: "Open Rate Improvement" },
-              { value: "3hrs", label: "Saved Daily" },
-            ].map((stat, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.6 + (i * 0.1) }}
-                className="text-center"
-              >
-                <div className="text-3xl md:text-4xl font-bold text-primary">{stat.value}</div>
-                <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
-              </motion.div>
-            ))}
-          </div>
+
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-20 px-6 border-t border-border/50">
-        <div className="max-w-6xl mx-auto">
+      <section id="features" className="py-20 px-6 relative">
+        <div className="max-w-7xl mx-auto relative z-10">
           <motion.div
-            {...fadeInUp}
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Everything You Need to Scale Outbound
+            <h2 className="text-6xl md:text-8xl font-black tracking-tighter mb-6 text-white">
+              Everything You Need to{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">Scale</span>
             </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Our AI agents handle the heavy lifting so you can focus on what matters most—building relationships.
+            <p className="text-xl text-purple-200/70 max-w-2xl mx-auto">
+              Our AI agents handle the heavy lifting so you can focus on what matters most.
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <BentoGrid>
             {[
               {
-                icon: Search,
-                title: "AI-Powered Prospecting",
-                description: "Automatically find and qualify leads that match your ideal customer profile across LinkedIn and the web.",
-                color: "from-blue-500 to-cyan-500"
+                icon: <Search className="h-6 w-6" />,
+                title: "AI Powered Prospecting",
+                description: "Automatically find and qualify leads that match your ideal customer profile using advanced signals.",
+                className: "md:col-span-2",
               },
               {
-                icon: Mail,
+                icon: <Shield className="h-6 w-6" />,
+                title: "Human in the Loop",
+                description: "You stay in control. Review and approve every message before it sends.",
+                className: "md:col-span-1",
+              },
+              {
+                icon: <Mail className="h-6 w-6" />,
                 title: "Personalized Outreach",
-                description: "AI writes hyper-personalized emails using real context—recent news, company updates, and social activity.",
-                color: "from-primary to-purple-500"
+                description: "AI writes hyper-personalized emails using real context and company updates.",
+                className: "md:col-span-1",
               },
               {
-                icon: Shield,
-                title: "Human-in-the-Loop",
-                description: "You stay in control. Review, edit, and approve every message before it sends. No autopilot mistakes.",
-                color: "from-emerald-500 to-green-500"
-              }
+                icon: <Calendar className="h-6 w-6" />,
+                title: "Smart Scheduling",
+                description: "Agents negotiate times and book meetings directly to your calendar without back-and-forth.",
+                className: "md:col-span-2",
+              },
+              {
+                icon: <Layers className="h-6 w-6" />,
+                title: "Seamless Integrations",
+                description: "Connect instantly with Salesforce, HubSpot, LinkedIn, and your favorite tools.",
+                className: "md:col-span-1",
+              },
+              {
+                icon: <Rocket className="h-6 w-6" />,
+                title: "Agent Launchpad",
+                description: "Deploy specialized agent teams for specific campaigns and vertical markets.",
+                className: "md:col-span-1",
+              },
+              {
+                icon: <MessageSquare className="h-6 w-6" />,
+                title: "Interactive Strategy",
+                description: "Chat with your agents to refine targeting, adjust tone, and pivot strategies.",
+                className: "md:col-span-1",
+              },
             ].map((feature, i) => (
-              <motion.div
+              <BentoGridItem
                 key={i}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.2 }}
-              >
-                <Card className="p-6 bg-card/50 border-border/50 hover:border-primary/30 transition-colors h-full">
-                  <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4`}>
-                    <feature.icon className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-muted-foreground">{feature.description}</p>
-                </Card>
-              </motion.div>
+                title={feature.title}
+                description={feature.description}
+                icon={feature.icon}
+                className={feature.className}
+              />
             ))}
-          </div>
+          </BentoGrid>
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-20 px-6 bg-card/30 border-t border-border/50">
-        <div className="max-w-6xl mx-auto">
+      {/* Neural Graph - AI Workflow Visualization */}
+      <section className="py-20 px-6 relative">
+        <div className="max-w-6xl mx-auto relative z-10">
           <motion.div
-            {...fadeInUp}
-            className="text-center mb-16"
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-12"
           >
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              How It Works
+            <h2 className="text-6xl md:text-8xl font-black tracking-tighter mb-6 text-white">
+              AI <span className="pill-highlight">Workflow</span>
             </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              From mission brief to pipeline growth in four simple steps.
+            <p className="text-xl text-purple-200/70 max-w-2xl mx-auto">
+              Watch how our AI agents work together to automate your outbound process
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-4 gap-8">
-            {[
-              {
-                step: "01",
-                icon: Target,
-                title: "Define Your Mission",
-                description: "Tell our AI what you're looking for—role, industry, company size, or any criteria."
-              },
-              {
-                step: "02",
-                icon: Zap,
-                title: "AI Agents Activate",
-                description: "Our agents scout the web, find prospects, and research their context in real-time."
-              },
-              {
-                step: "03",
-                icon: CheckCircle,
-                title: "Review & Approve",
-                description: "See AI reasoning, edit if needed, and approve emails in your review queue."
-              },
-              {
-                step: "04",
-                icon: BarChart3,
-                title: "Watch It Grow",
-                description: "Track opens, replies, and conversions. Iterate on what works best."
-              }
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.2 }}
-                className="relative"
-              >
-                <div className="text-6xl font-bold text-primary/10 absolute -top-4 -left-2">
-                  {item.step}
-                </div>
-                <div className="relative z-10 pt-8">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                    <item.icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground">{item.description}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="glass-strong rounded-3xl p-8 h-[700px]"
+          >
+            <NeuralGraph />
+          </motion.div>
         </div>
       </section>
 
-      {/* Benefits Section */}
-      <section className="py-20 px-6 border-t border-border/50">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-            >
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Why Teams Choose ExpediteAI
-              </h2>
-              <div className="space-y-6">
-                {[
-                  {
-                    icon: Clock,
-                    title: "Save Hours Every Day",
-                    description: "No more manual LinkedIn searching or copy-pasting research."
-                  },
-                  {
-                    icon: Users,
-                    title: "Scale Without Hiring",
-                    description: "Get the output of a 10-person SDR team with AI automation."
-                  },
-                  {
-                    icon: Sparkles,
-                    title: "Better Personalization",
-                    description: "AI reads context humans miss—recent posts, news, company updates."
-                  },
-                  {
-                    icon: Shield,
-                    title: "Stay Compliant & Safe",
-                    description: "Human approval on every message. Your reputation stays intact."
-                  }
-                ].map((benefit, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.4, delay: i * 0.1 }}
-                    className="flex gap-4"
-                  >
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <benefit.icon className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold mb-1">{benefit.title}</h3>
-                      <p className="text-sm text-muted-foreground">{benefit.description}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, rotate: 2 }}
-              whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="relative"
-            >
-              <div className="aspect-video rounded-xl border border-border/50 bg-card/50 overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-purple-500/20" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4 animate-pulse">
-                      <Zap className="h-8 w-8 text-primary" />
-                    </div>
-                    <p className="text-sm text-muted-foreground">Live Demo Preview</p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
+      {/* New Animated How It Works Section */}
+      <HowItWorks />
 
       {/* CTA Section */}
-      <section className="py-20 px-6 border-t border-border/50">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="max-w-3xl mx-auto text-center"
-        >
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Supercharge Your Outbound?
-          </h2>
-          <p className="text-lg text-muted-foreground mb-8">
-            Join hundreds of sales teams already using AI to book more meetings with less effort.
-          </p>
 
-          <SignedIn>
-            <Link to="/dashboard">
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-lg px-8 py-6">
-                Go to Dashboard
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-          </SignedIn>
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-lg px-8 py-6">
-                Get Started Free
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </SignInButton>
-          </SignedOut>
-          <p className="text-sm text-muted-foreground mt-4">
-            No credit card required • Free trial included
-          </p>
-        </motion.div>
-      </section>
+      {/* CTA Section */}
+      <CTASection />
 
-      {/* Footer */}
-      <footer className="py-8 px-6 border-t border-border/50">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <span className="text-lg font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-            ExpediteAI
-          </span>
-          <p className="text-sm text-muted-foreground">
-            © 2024 ExpediteAI. All rights reserved.
-          </p>
+      {/* Minimal Footer */}
+      <footer className="border-t border-white/10 py-12 px-6 relative z-10">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <h3 className="text-sm font-semibold text-purple-200/50 mb-4 uppercase tracking-wider">Product</h3>
+              <ul className="space-y-2">
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Features</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Pricing</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Integrations</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-purple-200/50 mb-4 uppercase tracking-wider">Resources</h3>
+              <ul className="space-y-2">
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Documentation</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Blog</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Support</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-purple-200/50 mb-4 uppercase tracking-wider">Company</h3>
+              <ul className="space-y-2">
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">About</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Careers</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Contact</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-purple-200/50 mb-4 uppercase tracking-wider">Legal</h3>
+              <ul className="space-y-2">
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Privacy</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Terms</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Cookies</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t border-white/10 pt-8 text-center text-sm text-purple-200/50">
+            2026© ExpediteAI. All rights reserved.
+          </div>
         </div>
       </footer>
     </div>
+  );
+};
+
+// Workflow Section with Google Gemini Effect
+const WorkflowSection = () => {
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start start", "end start"],
+  });
+
+  const pathLengthFirst = useTransform(scrollYProgress, [0, 0.8], [0.2, 1.2]);
+  const pathLengthSecond = useTransform(scrollYProgress, [0, 0.8], [0.15, 1.2]);
+  const pathLengthThird = useTransform(scrollYProgress, [0, 0.8], [0.1, 1.2]);
+
+  return (
+    <div
+      id="workflow"
+      className="h-[400vh] w-full relative pt-40 overflow-clip"
+      ref={ref}
+    >
+      <GoogleGeminiEffect
+        title="Your AI Workflow"
+        description="Watch how our AI agents work together to find, research, and reach your ideal prospects"
+        pathLengths={[pathLengthFirst, pathLengthSecond, pathLengthThird]}
+      />
+    </div>
+  );
+};
+
+// Canvas Reveal Effect Section
+const CanvasRevealSection = () => {
+  return (
+    <section className="py-20 flex flex-col lg:flex-row items-center justify-center w-full gap-4 mx-auto px-8 relative z-10">
+      <FeatureCard
+        title="AI-Powered Prospecting"
+        icon={<Search className="h-10 w-10" />}
+        colors={[[0, 255, 255]]}
+        containerClassName="bg-emerald-900"
+      />
+      <FeatureCard
+        title="Personalized Outreach"
+        icon={<Mail className="h-10 w-10" />}
+        colors={[[236, 72, 153], [232, 121, 249]]}
+        containerClassName="bg-black"
+        dotSize={2}
+      />
+      <FeatureCard
+        title="Human-in-the-Loop"
+        icon={<Shield className="h-10 w-10" />}
+        colors={[[125, 211, 252]]}
+        containerClassName="bg-sky-600"
+      />
+    </section>
+  );
+};
+
+// Feature Card Component
+const FeatureCard = ({
+  title,
+  icon,
+  colors,
+  containerClassName,
+  dotSize,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  colors: number[][];
+  containerClassName: string;
+  dotSize?: number;
+}) => {
+  const [hovered, setHovered] = useState(false);
+  
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="border border-white/10 group/canvas-card flex items-center justify-center max-w-sm w-full mx-auto p-4 relative h-[30rem] rounded-3xl overflow-hidden"
+    >
+      <PlusIcon className="absolute h-6 w-6 -top-3 -left-3 text-white" />
+      <PlusIcon className="absolute h-6 w-6 -bottom-3 -left-3 text-white" />
+      <PlusIcon className="absolute h-6 w-6 -top-3 -right-3 text-white" />
+      <PlusIcon className="absolute h-6 w-6 -bottom-3 -right-3 text-white" />
+
+      <AnimatePresence>
+        {hovered && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="h-full w-full absolute inset-0"
+          >
+            <CanvasRevealEffect
+              animationSpeed={3}
+              containerClassName={containerClassName}
+              colors={colors}
+              dotSize={dotSize}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="relative z-20">
+        <div className="text-center group-hover/canvas-card:-translate-y-4 group-hover/canvas-card:opacity-0 transition duration-200 w-full mx-auto flex items-center justify-center text-white">
+          {icon}
+        </div>
+        <h2 className="text-white text-xl opacity-0 group-hover/canvas-card:opacity-100 relative z-10 mt-4 font-bold group-hover/canvas-card:-translate-y-2 transition duration-200 text-center">
+          {title}
+        </h2>
+      </div>
+    </div>
+  );
+};
+
+// Plus Icon Component
+const PlusIcon = ({ className }: { className?: string }) => {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth="1.5"
+      stroke="currentColor"
+      className={className}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
+    </svg>
   );
 };
 
