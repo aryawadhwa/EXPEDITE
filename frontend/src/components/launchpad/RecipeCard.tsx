@@ -14,30 +14,38 @@ export function RecipeCard({ icon: Icon, title, description, gradient, onClick }
     <button
       onClick={onClick}
       className={cn(
-        "group relative flex flex-col p-5 rounded-xl border border-border bg-card",
-        "hover:border-primary/30 hover:shadow-lg transition-all duration-300",
-        "text-left"
+        "group relative flex flex-col p-6 rounded-2xl border border-white/10 bg-white/5",
+        "hover:bg-white/10 hover:border-white/20 hover:-translate-y-1 transition-all duration-300",
+        "text-left overflow-hidden backdrop-blur-sm"
       )}
     >
-      {/* Gradient accent */}
+      {/* Gradient glow */}
       <div
         className={cn(
-          "absolute top-0 left-0 right-0 h-0.5 rounded-t-xl opacity-0 group-hover:opacity-100 transition-opacity",
+          "absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500",
+          "bg-gradient-to-br from-white/5 to-transparent"
+        )}
+      />
+      
+      {/* Top Border Accent */}
+      <div
+        className={cn(
+          "absolute top-0 left-0 right-0 h-[1px] opacity-0 group-hover:opacity-100 transition-opacity",
           gradient
         )}
       />
 
       <div
         className={cn(
-          "w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors",
-          "bg-secondary group-hover:bg-primary/20"
+          "w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-all duration-300",
+          "bg-white/5 border border-white/10 group-hover:scale-110 group-hover:border-white/20"
         )}
       >
-        <Icon className="w-5 h-5 text-primary" />
+        <Icon className="w-6 h-6 text-white group-hover:text-purple-300 transition-colors" />
       </div>
 
-      <h3 className="font-medium text-foreground mb-1">{title}</h3>
-      <p className="text-sm text-muted-foreground line-clamp-2">{description}</p>
+      <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-200 transition-colors">{title}</h3>
+      <p className="text-sm text-zinc-400 line-clamp-2 leading-relaxed group-hover:text-zinc-300">{description}</p>
     </button>
   );
 }

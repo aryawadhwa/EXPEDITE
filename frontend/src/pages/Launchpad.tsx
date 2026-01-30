@@ -38,8 +38,19 @@ const recipes = [
   },
 ];
 
+interface Mission {
+  _id?: string;
+  id?: string;
+  objective?: string;
+  status?: string;
+  prospects_count?: number;
+  drafts_count?: number;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
 const Launchpad = () => {
-  const [activeMissions, setActiveMissions] = useState<any[]>([]);
+  const [activeMissions, setActiveMissions] = useState<Mission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const api = useApi();
   const navigate = useNavigate();
@@ -96,15 +107,17 @@ const Launchpad = () => {
   };
 
   return (
-    <div className="min-h-full p-6 lg:p-8 space-y-12">
-      {/* Hero Section - Clean Input */}
-      <section className="pt-8 pb-4">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl lg:text-5xl font-bold text-foreground mb-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-            Launch Your Mission
+    <div className="min-h-full p-6 lg:p-8 space-y-12 max-w-[1600px] mx-auto">
+      {/* Hero Section */}
+      <section className="pt-8 pb-4 relative">
+        <div className="text-center mb-12 relative z-10">
+
+          
+          <h1 className="text-5xl lg:text-7xl font-bold text-white mb-6 tracking-tight">
+            Launch Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Campaign</span>
           </h1>
-          <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-            Describe your target audience and let our AI agents find, enrich, and craft personalized outreach.
+          <p className="text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+            Describe your target audience and let our AI agents scout, research, and engage prospects on autopilot.
           </p>
         </div>
         <HeroInput />
@@ -112,14 +125,18 @@ const Launchpad = () => {
 
       {/* Quick Recipes */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Quick Recipes</h2>
-          <button className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            View all
+        <div className="flex items-center justify-between mb-8 px-2">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-semibold text-white">Quick Recipes</h2>
+            <p className="text-sm text-zinc-500">One-click templates to get started fast</p>
+          </div>
+          <button className="text-sm font-medium text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1 group">
+            View all templates
+            <span className="group-hover:translate-x-1 transition-transform">→</span>
           </button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {recipes.map((recipe) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {recipes.map((recipe, i) => (
             <RecipeCard
               key={recipe.title}
               {...recipe}
@@ -130,41 +147,26 @@ const Launchpad = () => {
       </section>
 
       {/* Active Missions */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Active Missions</h2>
-          <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded-md">
-            {activeMissions.filter((m) => m.status === "running").length} running
+      <section className="pb-20">
+        <div className="flex items-center justify-between mb-8 px-2">
+           <div className="space-y-1">
+            <h2 className="text-2xl font-semibold text-white">Active Missions</h2>
+            <p className="text-sm text-zinc-500">Monitor your running campaigns</p>
+          </div>
+          <span className="text-xs font-mono text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-3 py-1 rounded-full">
+            {activeMissions.filter((m) => m.status === "running").length} SYSTEM(S) ONLINE
           </span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="p-4 rounded-xl border border-border bg-card">
-                <div className="flex justify-between mb-3">
-                  <div className="space-y-2">
-                    <div className="h-5 w-32 animate-pulse bg-muted rounded" />
-                    <div className="h-3 w-20 animate-pulse bg-muted rounded" />
-                  </div>
-                  <div className="h-6 w-16 rounded-full animate-pulse bg-muted" />
-                </div>
-                <div className="mb-3 space-y-2">
-                  <div className="flex justify-between">
-                    <div className="h-3 w-12 animate-pulse bg-muted rounded" />
-                    <div className="h-3 w-16 animate-pulse bg-muted rounded" />
-                  </div>
-                  <div className="h-1.5 w-full animate-pulse bg-muted rounded" />
-                </div>
-                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
-                  <div className="h-4 w-20 animate-pulse bg-muted rounded" />
-                  <div className="h-4 w-20 animate-pulse bg-muted rounded" />
-                </div>
-              </div>
+              <div key={i} className="h-[240px] rounded-2xl border border-white/5 bg-white/5 animate-pulse" />
             ))
           ) : activeMissions.length === 0 ? (
-            <p className="text-muted-foreground text-sm col-span-full">
-              No active missions. Launch one above!
-            </p>
+            <div className="col-span-full py-20 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
+              <p className="text-zinc-400 text-lg mb-2">No active missions</p>
+              <p className="text-zinc-600 text-sm">Launch your first campaign from the input above</p>
+            </div>
           ) : (
             activeMissions.map((mission) => (
               <LiveMissionCard

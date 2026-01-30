@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
@@ -19,24 +20,6 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-        // nvg8.io-inspired accent colors
-        lime: {
-          DEFAULT: "#B2FF4D",
-          50: "#F0FFDB",
-          100: "#E5FFB8",
-          200: "#D4FF8A",
-          300: "#C3FF5C",
-          400: "#B2FF4D",
-          500: "#9FE63D",
-          600: "#8BCC35",
-          700: "#77B32D",
-          800: "#639925",
-          900: "#4F801D",
-        },
-        vibrant: {
-          orange: "#FF5C00",
-          blue: "#4D7BFF",
-        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -105,5 +88,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [animate, require('@tailwindcss/typography')],
 } satisfies Config;

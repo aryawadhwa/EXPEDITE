@@ -39,7 +39,11 @@ export function Integrations() {
                 const connectedMap = new Map();
 
                 if (data && data.integrations) {
-                    data.integrations.forEach((conn: any) => {
+                    interface IntegrationConnection {
+                        name: string;
+                        [key: string]: unknown;
+                    }
+                    data.integrations.forEach((conn: IntegrationConnection) => {
                         connectedMap.set(conn.name.toLowerCase(), conn);
                     });
                 }
@@ -99,10 +103,10 @@ export function Integrations() {
                     variant: "destructive"
                 });
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             toast({
                 title: "Connection Failed",
-                description: error.message || "Could not initiate connection",
+                description: (error as Error).message || "Could not initiate connection",
                 variant: "destructive"
             });
         } finally {
@@ -127,10 +131,10 @@ export function Integrations() {
                 title: "Disconnected",
                 description: "Integration disconnected successfully.",
             });
-        } catch (error: any) {
+        } catch (error: unknown) {
             toast({
                 title: "Disconnect Failed",
-                description: error.message || "Could not disconnect tool",
+                description: (error as Error).message || "Could not disconnect tool",
                 variant: "destructive"
             });
         } finally {

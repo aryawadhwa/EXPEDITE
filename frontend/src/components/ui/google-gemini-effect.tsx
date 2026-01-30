@@ -8,7 +8,7 @@ export const GoogleGeminiEffect = ({
   description,
   className,
 }: {
-  pathLengths?: any[];
+  pathLengths?: number[];
   title?: string;
   description?: string;
   className?: string;

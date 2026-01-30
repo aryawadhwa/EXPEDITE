@@ -3,11 +3,28 @@ import { useMemo, useCallback } from "react";
 
 const API_BASE_URL = "http://localhost:8000/api/v1";
 
+interface Attachment {
+  asset_id: string;
+  filename: string;
+  content_type?: string;
+}
+
+interface Agent {
+  id?: string;
+  name: string;
+  role: string;
+  capabilities: string[];
+  system_prompt?: string;
+  status: "active" | "inactive" | "training";
+}
+
 export function useApi() {
     const { getToken } = useAuth();
-
+    
+    // Stable fetch wrapper
     const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
         const token = await getToken();
+        // ... implementation
         const headers = {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -24,7 +41,7 @@ export function useApi() {
         },
 
         // Missions
-        createMission: async (objective: string, attachments: any[] = []) => {
+        createMission: async (objective: string, attachments: Attachment[] = []) => {
             const res = await fetchWithAuth("/missions/", {
                 method: "POST",
                 body: JSON.stringify({ objective, attachments }),
@@ -185,7 +202,7 @@ export function useApi() {
             return res.json();
         },
 
-        createAgent: async (agent: any) => {
+        createAgent: async (agent: Agent) => {
             const res = await fetchWithAuth("/agents/", {
                 method: "POST",
                 body: JSON.stringify(agent),
@@ -200,7 +217,7 @@ export function useApi() {
             return res.json();
         },
 
-        updateAgent: async (id: string, updates: any) => {
+        updateAgent: async (id: string, updates: Partial<Agent>) => {
             const res = await fetchWithAuth(`/agents/${id}`, {
                 method: "PATCH",
                 body: JSON.stringify(updates),
@@ -349,5 +366,5 @@ export function useApi() {
             if (!res.ok) throw new Error('Failed to update settings');
             return res.json();
         },
-    }), [fetchWithAuth]);
+    }), [fetchWithAuth, getToken]);
 }

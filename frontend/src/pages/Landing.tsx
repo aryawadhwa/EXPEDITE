@@ -12,7 +12,12 @@ import {
   Mail,
   Search,
   CheckCircle,
-  ChevronDown
+  ChevronDown,
+  Calendar,
+  Layers,
+  Rocket,
+  MessageSquare,
+  History
 } from "lucide-react";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
@@ -20,6 +25,12 @@ import { useRef, useState } from "react";
 import { GoogleGeminiEffect } from "@/components/ui/google-gemini-effect";
 import { CanvasRevealEffect } from "@/components/ui/canvas-reveal-effect";
 import { ShaderGradientBackground } from "@/components/ui/shader-gradient-background";
+import { GlassButton } from "@/components/ui/glass-button";
+import { NeuralGraph } from "@/components/ui/neural-graph";
+import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
+import { Logo } from "@/components/ui/logo";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { CTASection } from "@/components/landing/CTASection";
 
 const Landing = () => {
   return (
@@ -27,53 +38,28 @@ const Landing = () => {
       {/* Shader Gradient Animated Background */}
       <ShaderGradientBackground />
 
-      {/* Floating Pill Navigation */}
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
+      {/* Header with Logo */}
+      <header className="fixed top-0 left-0 z-50 p-6">
         <motion.div
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className="flex items-center justify-between gap-8 px-8 py-4 rounded-full bg-[rgba(22,22,22,0.8)] backdrop-blur-heavy border border-white/10 shadow-2xl min-w-[700px]"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="flex items-center gap-3"
         >
-          <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="ExpediteAI" className="h-10 w-auto object-contain" />
-          </div>
-
-          <div className="flex items-center gap-8">
-            <a href="#features" className="text-sm text-white/70 hover:text-white transition-colors">Features</a>
-            <a href="#workflow" className="text-sm text-white/70 hover:text-white transition-colors">Workflow</a>
-            <a href="#how-it-works" className="text-sm text-white/70 hover:text-white transition-colors">How It Works</a>
-          </div>
-
-          <SignedIn>
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard">
-                <Button variant="ghost" size="sm" className="text-sm">
-                  Dashboard
-                </Button>
-              </Link>
-              <UserButton />
-            </div>
-          </SignedIn>
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button className="bg-lime hover:bg-lime/90 text-black font-bold rounded-full px-6 glow-lime transition-all hover:scale-105">
-                Launch App
-              </Button>
-            </SignInButton>
-          </SignedOut>
+          <Logo className="w-8 h-8 text-white" />
+          <span className="text-lg font-bold tracking-tight text-white">Expedite AI</span>
         </motion.div>
-      </nav>
+      </header>
 
       {/* Hero Section */}
-      <section className="relative z-10 min-h-screen flex items-center justify-center px-6">
+      <section className="relative z-10 min-h-screen flex items-center justify-center px-6 py-20">
         <div className="relative z-10 max-w-6xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <h1 className="text-7xl md:text-9xl font-black tracking-tighter mb-8 leading-[0.9]">
+            <h1 className="text-7xl md:text-9xl font-black tracking-tighter mb-8 leading-[0.9] text-white">
               Your AI-Powered{" "}
               <span className="pill-highlight">Outbound</span>{" "}
               Team
@@ -84,7 +70,7 @@ const Landing = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
-            className="text-xl md:text-2xl text-white/80 max-w-3xl mx-auto mb-12 leading-relaxed"
+            className="text-xl md:text-2xl text-purple-200/80 max-w-3xl mx-auto mb-12 leading-relaxed"
           >
             Stop spending hours on manual prospecting. Let AI agents find, research,
             and craft personalized outreach while you focus on closing deals.
@@ -98,252 +84,181 @@ const Landing = () => {
           >
             <SignedIn>
               <Link to="/dashboard">
-                <Button size="lg" className="bg-lime hover:bg-lime/90 text-black font-bold text-lg px-10 py-7 rounded-full glow-lime transition-all hover:scale-105">
+                <GlassButton size="lg" variant="primary">
                   Launch Mission Control
                   <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
+                </GlassButton>
               </Link>
             </SignedIn>
             <SignedOut>
               <SignInButton mode="modal">
-                <Button size="lg" className="bg-lime hover:bg-lime/90 text-black font-bold text-lg px-10 py-7 rounded-full glow-lime transition-all hover:scale-105">
+                <GlassButton size="lg" variant="primary">
                   Start Your Mission
                   <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
+                </GlassButton>
               </SignInButton>
             </SignedOut>
-            <Button size="lg" variant="outline" className="text-lg px-10 py-7 rounded-full border-white/20 hover:bg-white/10">
+            <GlassButton size="lg" variant="outline">
               Watch Demo
-            </Button>
+            </GlassButton>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1, delay: 1 }}
-            className="absolute bottom-12 left-1/2 -translate-x-1/2"
-          >
-            <motion.div
-              animate={{ y: [0, 10, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <ChevronDown className="w-8 h-8 text-white/50" />
-            </motion.div>
-          </motion.div>
+
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="min-h-screen flex items-center justify-center px-6 py-20 relative">
+      <section id="features" className="py-20 px-6 relative">
         <div className="max-w-7xl mx-auto relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8 }}
-            className="text-center mb-20"
+            className="text-center mb-16"
           >
-            <h2 className="text-6xl md:text-8xl font-black tracking-tighter mb-6">
+            <h2 className="text-6xl md:text-8xl font-black tracking-tighter mb-6 text-white">
               Everything You Need to{" "}
-              <span className="pill-highlight">Scale</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">Scale</span>
             </h2>
-            <p className="text-xl text-white/70 max-w-2xl mx-auto">
+            <p className="text-xl text-purple-200/70 max-w-2xl mx-auto">
               Our AI agents handle the heavy lifting so you can focus on what matters most.
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <BentoGrid>
             {[
               {
-                icon: Search,
-                title: "AI-Powered Prospecting",
-                description: "Automatically find and qualify leads that match your ideal customer profile.",
+                icon: <Search className="h-6 w-6" />,
+                title: "AI Powered Prospecting",
+                description: "Automatically find and qualify leads that match your ideal customer profile using advanced signals.",
+                className: "md:col-span-2",
               },
               {
-                icon: Mail,
+                icon: <Shield className="h-6 w-6" />,
+                title: "Human in the Loop",
+                description: "You stay in control. Review and approve every message before it sends.",
+                className: "md:col-span-1",
+              },
+              {
+                icon: <Mail className="h-6 w-6" />,
                 title: "Personalized Outreach",
                 description: "AI writes hyper-personalized emails using real context and company updates.",
+                className: "md:col-span-1",
               },
               {
-                icon: Shield,
-                title: "Human-in-the-Loop",
-                description: "You stay in control. Review and approve every message before it sends.",
-              }
+                icon: <Calendar className="h-6 w-6" />,
+                title: "Smart Scheduling",
+                description: "Agents negotiate times and book meetings directly to your calendar without back-and-forth.",
+                className: "md:col-span-2",
+              },
+              {
+                icon: <Layers className="h-6 w-6" />,
+                title: "Seamless Integrations",
+                description: "Connect instantly with Salesforce, HubSpot, LinkedIn, and your favorite tools.",
+                className: "md:col-span-1",
+              },
+              {
+                icon: <Rocket className="h-6 w-6" />,
+                title: "Agent Launchpad",
+                description: "Deploy specialized agent teams for specific campaigns and vertical markets.",
+                className: "md:col-span-1",
+              },
+              {
+                icon: <MessageSquare className="h-6 w-6" />,
+                title: "Interactive Strategy",
+                description: "Chat with your agents to refine targeting, adjust tone, and pivot strategies.",
+                className: "md:col-span-1",
+              },
             ].map((feature, i) => (
-              <motion.div
+              <BentoGridItem
                 key={i}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: i * 0.2 }}
-                whileHover={{ scale: 1.05, y: -10 }}
-              >
-                <Card className="p-8 bg-white/5 backdrop-blur-sm border-white/10 rounded-3xl h-full hover:border-lime/50 transition-all">
-                  <div className="w-16 h-16 rounded-2xl bg-lime flex items-center justify-center mb-6">
-                    <feature.icon className="h-8 w-8 text-black" />
-                  </div>
-                  <h3 className="text-2xl font-bold mb-4 text-white">{feature.title}</h3>
-                  <p className="text-white/70 leading-relaxed">{feature.description}</p>
-                </Card>
-              </motion.div>
+                title={feature.title}
+                description={feature.description}
+                icon={feature.icon}
+                className={feature.className}
+              />
             ))}
-          </div>
+          </BentoGrid>
         </div>
       </section>
 
-      {/* Google Gemini Effect - Workflow Visualization */}
-      <WorkflowSection />
-
-      {/* Canvas Reveal Effect - Interactive Feature Cards */}
-      <CanvasRevealSection />
-
-      {/* How It Works Section */}
-      <section id="how-it-works" className="min-h-screen flex items-center justify-center px-6 py-20 relative">
+      {/* Neural Graph - AI Workflow Visualization */}
+      <section className="py-20 px-6 relative">
         <div className="max-w-6xl mx-auto relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="text-center mb-20"
+            className="text-center mb-12"
           >
-            <h2 className="text-6xl md:text-8xl font-black tracking-tighter mb-6">
-              How It <span className="pill-highlight">Works</span>
+            <h2 className="text-6xl md:text-8xl font-black tracking-tighter mb-6 text-white">
+              AI <span className="pill-highlight">Workflow</span>
             </h2>
-            <p className="text-xl text-white/80 max-w-2xl mx-auto">
-              From mission brief to pipeline growth in four simple steps.
+            <p className="text-xl text-purple-200/70 max-w-2xl mx-auto">
+              Watch how our AI agents work together to automate your outbound process
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-12">
-            {[
-              {
-                step: "01",
-                icon: Target,
-                title: "Define Your Mission",
-                description: "Tell our AI what you're looking for—role, industry, company size, or any criteria."
-              },
-              {
-                step: "02",
-                icon: Zap,
-                title: "AI Agents Activate",
-                description: "Our agents scout the web, find prospects, and research their context in real-time."
-              },
-              {
-                step: "03",
-                icon: CheckCircle,
-                title: "Review & Approve",
-                description: "See AI reasoning, edit if needed, and approve emails in your review queue."
-              },
-              {
-                step: "04",
-                icon: BarChart3,
-                title: "Watch It Grow",
-                description: "Track opens, replies, and conversions. Iterate on what works best."
-              }
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: i % 2 === 0 ? -50 : 50 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: i * 0.2 }}
-                className="relative p-8 rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-lime/50 transition-all"
-              >
-                <div className="text-8xl font-black text-lime/20 absolute top-4 right-4">
-                  {item.step}
-                </div>
-                <div className="relative z-10">
-                  <div className="w-14 h-14 rounded-2xl bg-lime flex items-center justify-center mb-6">
-                    <item.icon className="h-7 w-7 text-black" />
-                  </div>
-                  <h3 className="text-2xl font-bold mb-3 text-white">{item.title}</h3>
-                  <p className="text-white/70 leading-relaxed">{item.description}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="glass-strong rounded-3xl p-8 h-[700px]"
+          >
+            <NeuralGraph />
+          </motion.div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="min-h-screen flex items-center justify-center px-6 py-20 relative z-10">
-        <div className="absolute inset-0 peripheral-glow" />
-        
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-          className="relative z-10 max-w-4xl mx-auto text-center"
-        >
-          <h2 className="text-6xl md:text-8xl font-black tracking-tighter mb-8">
-            Ready to <span className="pill-highlight">Supercharge</span> Your Outbound?
-          </h2>
-          <p className="text-xl text-white/70 mb-12 max-w-2xl mx-auto">
-            Join hundreds of sales teams already using AI to book more meetings with less effort.
-          </p>
+      {/* New Animated How It Works Section */}
+      <HowItWorks />
 
-          <SignedIn>
-            <Link to="/dashboard">
-              <Button size="lg" className="bg-lime hover:bg-lime/90 text-black font-bold text-xl px-12 py-8 rounded-full glow-lime transition-all hover:scale-105">
-                Go to Dashboard
-                <ArrowRight className="ml-3 h-6 w-6" />
-              </Button>
-            </Link>
-          </SignedIn>
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button size="lg" className="bg-lime hover:bg-lime/90 text-black font-bold text-xl px-12 py-8 rounded-full glow-lime transition-all hover:scale-105">
-                Get Started Free
-                <ArrowRight className="ml-3 h-6 w-6" />
-              </Button>
-            </SignInButton>
-          </SignedOut>
-          <p className="text-sm text-white/50 mt-6">
-            No credit card required • Free trial included
-          </p>
-        </motion.div>
-      </section>
+      {/* CTA Section */}
+
+      {/* CTA Section */}
+      <CTASection />
 
       {/* Minimal Footer */}
       <footer className="border-t border-white/10 py-12 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
-              <h3 className="text-sm font-semibold text-white/50 mb-4 uppercase tracking-wider">Product</h3>
+              <h3 className="text-sm font-semibold text-purple-200/50 mb-4 uppercase tracking-wider">Product</h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">Features</a></li>
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">Integrations</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Features</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Pricing</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Integrations</a></li>
               </ul>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white/50 mb-4 uppercase tracking-wider">Resources</h3>
+              <h3 className="text-sm font-semibold text-purple-200/50 mb-4 uppercase tracking-wider">Resources</h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">Documentation</a></li>
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">Support</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Documentation</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Blog</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Support</a></li>
               </ul>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white/50 mb-4 uppercase tracking-wider">Company</h3>
+              <h3 className="text-sm font-semibold text-purple-200/50 mb-4 uppercase tracking-wider">Company</h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">Contact</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">About</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Careers</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Contact</a></li>
               </ul>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white/50 mb-4 uppercase tracking-wider">Legal</h3>
+              <h3 className="text-sm font-semibold text-purple-200/50 mb-4 uppercase tracking-wider">Legal</h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">Privacy</a></li>
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">Terms</a></li>
-                <li><a href="#" className="text-sm text-white/70 hover:text-white transition-colors">Cookies</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Privacy</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Terms</a></li>
+                <li><a href="#" className="text-sm text-purple-200/70 hover:text-white transition-colors">Cookies</a></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-white/10 pt-8 text-center text-sm text-white/50">
+          <div className="border-t border-white/10 pt-8 text-center text-sm text-purple-200/50">
             2026© ExpediteAI. All rights reserved.
           </div>
         </div>

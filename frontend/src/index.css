@@ -56,13 +56,13 @@
     --radius: 0.5rem;
 
     /* Sidebar - Darker than main */
-    --sidebar-background: 240 6% 5%;
+    --sidebar-background: 240 5% 8%;
     --sidebar-foreground: 240 5% 65%;
     --sidebar-primary: 239 84% 67%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 4% 12%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 4% 12%;
+    --sidebar-border: 240 5% 20%;
     --sidebar-ring: 239 84% 67%;
 
     /* Terminal/Brain Sidebar - Darkest */
@@ -257,23 +257,23 @@
 
 /* nvg8.io-Style Utilities */
 
-/* Glow Effects */
-.glow-lime {
-  box-shadow: 0 0 20px rgba(178, 255, 77, 0.3),
-              0 0 40px rgba(178, 255, 77, 0.2),
-              0 0 60px rgba(178, 255, 77, 0.1);
+/* Glow Effects - Sophisticated Purple/Blue Palette */
+.glow-primary {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4),
+              0 0 40px rgba(139, 92, 246, 0.3),
+              0 0 60px rgba(139, 92, 246, 0.2);
 }
 
-.glow-orange {
-  box-shadow: 0 0 20px rgba(255, 92, 0, 0.3),
-              0 0 40px rgba(255, 92, 0, 0.2),
-              0 0 60px rgba(255, 92, 0, 0.1);
+.glow-secondary {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.4),
+              0 0 40px rgba(168, 85, 247, 0.3),
+              0 0 60px rgba(168, 85, 247, 0.2);
 }
 
-.glow-blue {
-  box-shadow: 0 0 20px rgba(77, 123, 255, 0.3),
-              0 0 40px rgba(77, 123, 255, 0.2),
-              0 0 60px rgba(77, 123, 255, 0.1);
+.glow-accent {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4),
+              0 0 40px rgba(59, 130, 246, 0.3),
+              0 0 60px rgba(59, 130, 246, 0.2);
 }
 
 .peripheral-glow {
@@ -287,9 +287,9 @@
   border-radius: inherit;
   padding: 2px;
   background: linear-gradient(45deg, 
-    rgba(178, 255, 77, 0.3),
-    rgba(77, 123, 255, 0.3),
-    rgba(255, 92, 0, 0.3)
+    rgba(139, 92, 246, 0.4),
+    rgba(168, 85, 247, 0.4),
+    rgba(59, 130, 246, 0.4)
   );
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -298,17 +298,41 @@
   opacity: 0.6;
 }
 
-/* Pill Highlight */
+/* Pill Highlight - Glassmorphic Style */
 .pill-highlight {
   display: inline-block;
   padding: 0.25rem 1rem;
   border-radius: 9999px;
-  background: #B2FF4D;
-  color: #000;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9), rgba(168, 85, 247, 0.9));
+  color: #fff;
   font-weight: 700;
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
 }
 
-/* Backdrop Blur */
+/* Glassmorphic Effects - Optimized for Performance */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  will-change: transform;
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  will-change: transform;
+}
+
+.glass-subtle {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px) saturate(130%);
+  -webkit-backdrop-filter: blur(8px) saturate(130%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .backdrop-blur-heavy {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);

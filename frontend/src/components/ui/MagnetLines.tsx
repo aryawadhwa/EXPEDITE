@@ -88,7 +88,7 @@ export function MagnetLines({
                 backgroundColor: lineColor,
                 width: lineWidth,
                 height: lineHeight,
-                // @ts-ignore - CSS custom property
+                // @ts-expect-error - CSS custom property
                 '--rotate': `${baseAngle}deg`,
                 transform: 'rotate(var(--rotate))',
                 willChange: 'transform',

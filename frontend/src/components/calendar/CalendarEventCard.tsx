@@ -2,8 +2,17 @@ import { cn } from "@/lib/utils";
 import { Mail, Zap, Play, CheckCircle, Bot } from "lucide-react";
 import { useMemo } from "react";
 
+interface CalendarEvent {
+    type: 'mission' | 'draft' | 'email' | 'agent_log' | string;
+    content?: string;
+    subject?: string;
+    objective?: string;
+    preview?: string;
+    [key: string]: unknown;
+}
+
 interface CalendarEventCardProps {
-    item: any;
+    item: CalendarEvent;
     onClick?: () => void;
 }
 
