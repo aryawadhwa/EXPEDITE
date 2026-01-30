@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,7 +25,8 @@ import {
     XCircle,
     Clock,
     Mic,
-    MicOff
+    MicOff,
+    ExternalLink
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -50,6 +51,7 @@ interface Message {
 export default function MissionChat() {
     const { missionId } = useParams();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { userId } = useAuth();
     const api = useApi();
 
@@ -59,6 +61,7 @@ export default function MissionChat() {
     const [mission, setMission] = useState<any>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const wsRef = useRef<WebSocket | null>(null);
+    const pendingActionExecuted = useRef(false);
 
     // Connect Param State
     const [showConnectDialog, setShowConnectDialog] = useState(false);
@@ -194,6 +197,12 @@ export default function MissionChat() {
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
+                
+                // Skip messages targeted only for LiveBrain
+                if (data.target === "brain") {
+                    return; // Don't add to chat messages, LiveBrain handles these
+                }
+                
                 setMessages(prev => [...prev, {
                     id: `ws-${Date.now()}`,
                     role: "agent",
@@ -259,6 +268,74 @@ export default function MissionChat() {
         };
         loadMission();
     }, [missionId]);
+
+    // Handle pending action after OAuth callback
+    useEffect(() => {
+        const pendingActionId = searchParams.get("pending_action");
+        if (pendingActionId && !pendingActionExecuted.current) {
+            pendingActionExecuted.current = true;
+            
+            // Small delay to ensure user profile is loaded
+            const executePending = async () => {
+                // Show executing message
+                setMessages(prev => [...prev, {
+                    id: `executing-${Date.now()}`,
+                    role: "agent",
+                    content: "🔄 Connection successful! Executing your pending action...",
+                    timestamp: new Date(),
+                    status: "thinking"
+                }]);
+
+                try {
+                    const result = await api.executePendingAction(pendingActionId);
+                    
+                    // Remove the "executing" message and add the result
+                    setMessages(prev => {
+                        const filtered = prev.filter(m => !m.id.startsWith("executing-"));
+                        return [...filtered, {
+                            id: `result-${Date.now()}`,
+                            role: "agent",
+                            content: result.message,
+                            timestamp: new Date(),
+                            status: result.success ? "complete" : "error"
+                        }];
+                    });
+
+                    if (result.success) {
+                        toast.success("Action completed!", {
+                            description: result.message
+                        });
+                    } else {
+                        toast.error("Action failed", {
+                            description: result.message
+                        });
+                    }
+                } catch (e: any) {
+                    console.error("Failed to execute pending action:", e);
+                    setMessages(prev => {
+                        const filtered = prev.filter(m => !m.id.startsWith("executing-"));
+                        return [...filtered, {
+                            id: `error-${Date.now()}`,
+                            role: "agent",
+                            content: `Failed to execute action: ${e.message}`,
+                            timestamp: new Date(),
+                            status: "error"
+                        }];
+                    });
+                    toast.error("Execution failed", {
+                        description: e.message
+                    });
+                }
+
+                // Clear the pending_action param from URL
+                searchParams.delete("pending_action");
+                setSearchParams(searchParams, { replace: true });
+            };
+
+            // Wait a bit for the connection to be fully active
+            setTimeout(executePending, 1500);
+        }
+    }, [searchParams, api]);
 
     const handleConnect = async (tool: string, params?: Record<string, string>) => {
         try {
@@ -473,10 +550,12 @@ export default function MissionChat() {
                             )}>
                                 <p className="text-sm">{message.content}</p>
                                 {(() => {
+                                    // Check for connect_url in metadata (direct OAuth link)
+                                    const connectUrl = message.metadata?.connect_url;
                                     let toolMatch = message.metadata?.tool;
 
                                     if (!toolMatch) {
-                                        const match = message.content.match(/(?:I need|please connect) (Telegram|Discord|Slack|GitHub|Reddit|Perplexity|Google Sheets|Gmail|Email)/i);
+                                        const match = message.content.match(/(?:I need|please connect|connect your) (LinkedIn|Twitter|Telegram|Discord|Slack|GitHub|Reddit|Perplexity|Google Sheets|Gmail|Email)/i);
                                         if (match) {
                                             toolMatch = match[1].toLowerCase().replace(" ", "_");
                                         }
@@ -498,6 +577,19 @@ export default function MissionChat() {
                                                         <CheckCircle className="w-4 h-4" />
                                                         {displayName} Connected
                                                     </Button>
+                                                ) : connectUrl ? (
+                                                    // Direct OAuth link - will redirect back with pending_action
+                                                    <Button
+                                                        variant="default"
+                                                        size="sm"
+                                                        className="w-full gap-2 animate-in fade-in zoom-in duration-300 shadow-md bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                                                        onClick={() => {
+                                                            window.location.href = connectUrl;
+                                                        }}
+                                                    >
+                                                        <ExternalLink className="w-4 h-4" />
+                                                        Connect {displayName} & Post Automatically
+                                                    </Button>
                                                 ) : (
                                                     <Button
                                                         variant="default"
@@ -514,7 +606,100 @@ export default function MissionChat() {
                                     }
                                     return null;
                                 })()}
-                                {/* View Draft Button */}
+                                {/* Social Media Draft Preview with Post Now + Edit buttons */}
+                                {message.metadata?.action === "draft_preview" && (
+                                    <div className="mt-3 flex gap-2">
+                                        <Button
+                                            variant="default"
+                                            size="sm"
+                                            className="flex-1 gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                                            onClick={async () => {
+                                                const pendingId = message.metadata?.pending_action_id;
+                                                if (!pendingId) return;
+                                                
+                                                // Show loading state
+                                                setMessages(prev => prev.map(m => 
+                                                    m.id === message.id 
+                                                        ? {...m, metadata: {...m.metadata, posting: true}}
+                                                        : m
+                                                ));
+                                                
+                                                try {
+                                                    const result = await api.executePendingAction(pendingId);
+                                                    
+                                                    // Add success/error message
+                                                    setMessages(prev => {
+                                                        // Update the original message to show posted
+                                                        const updated = prev.map(m => 
+                                                            m.id === message.id 
+                                                                ? {...m, metadata: {...m.metadata, posting: false, posted: result.success}}
+                                                                : m
+                                                        );
+                                                        // Add result message
+                                                        return [...updated, {
+                                                            id: `result-${Date.now()}`,
+                                                            role: "agent" as const,
+                                                            content: result.message,
+                                                            timestamp: new Date(),
+                                                            status: result.success ? "complete" as const : "error" as const
+                                                        }];
+                                                    });
+                                                    
+                                                    if (result.success) {
+                                                        toast.success("Posted!", { description: result.message });
+                                                    } else {
+                                                        toast.error("Failed", { description: result.message });
+                                                    }
+                                                } catch (e: any) {
+                                                    setMessages(prev => prev.map(m => 
+                                                        m.id === message.id 
+                                                            ? {...m, metadata: {...m.metadata, posting: false}}
+                                                            : m
+                                                    ));
+                                                    toast.error("Error", { description: e.message });
+                                                }
+                                            }}
+                                            disabled={message.metadata?.posting || message.metadata?.posted}
+                                        >
+                                            {message.metadata?.posting ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    Posting...
+                                                </>
+                                            ) : message.metadata?.posted ? (
+                                                <>
+                                                    <CheckCircle className="w-4 h-4" />
+                                                    Posted!
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Send className="w-4 h-4" />
+                                                    Post Now
+                                                </>
+                                            )}
+                                        </Button>
+                                        {!message.metadata?.posted && !message.metadata?.posting && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="gap-2"
+                                                onClick={() => {
+                                                    // Redirect to Review Queue with draft_id filter
+                                                    const draftId = message.metadata?.draft_id;
+                                                    const channel = message.metadata?.channel;
+                                                    if (draftId) {
+                                                        navigate(`/review?draft_id=${draftId}`);
+                                                    } else {
+                                                        navigate(`/review?mission_id=${missionId}`);
+                                                    }
+                                                }}
+                                            >
+                                                Edit
+                                            </Button>
+                                        )}
+                                    </div>
+                                )}
+                                {/* View Draft Button (for email drafts) */}
                                 {(message.metadata?.action === "draft_ready" ||
                                     message.content.toLowerCase().includes("draft generated") ||
                                     message.content.toLowerCase().includes("ready for review")) && (

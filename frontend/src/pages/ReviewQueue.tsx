@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ProspectCard } from "@/components/review/ProspectCard";
-import { EmailEditor } from "@/components/review/EmailEditor";
+import { ReviewCardRenderer } from "@/components/review/ReviewCardRenderer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,10 +14,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, ChevronLeft, ChevronRight, Inbox, Loader2, CheckCheck, XCircle } from "lucide-react";
+import { Check, X, ChevronLeft, ChevronRight, Inbox, Loader2, CheckCheck, XCircle, Mail, Linkedin, Twitter, MessageSquare } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "@/lib/api";
 import { toast } from "sonner";
+
+// Channel icon helper
+const getChannelIcon = (channel: string) => {
+  switch (channel?.toLowerCase()) {
+    case "linkedin": return <Linkedin className="w-4 h-4 text-blue-500" />;
+    case "twitter": return <Twitter className="w-4 h-4 text-sky-400" />;
+    case "reddit": return <MessageSquare className="w-4 h-4 text-orange-500" />;
+    case "slack": return <MessageSquare className="w-4 h-4 text-purple-500" />;
+    default: return <Mail className="w-4 h-4 text-blue-400" />;
+  }
+};
 
 interface DraftEdits {
   [draftId: string]: {
@@ -47,9 +58,10 @@ export default function ReviewQueue() {
   const api = useApi();
   const navigate = useNavigate();
 
-  // Get mission_id from URL query params
+  // Get filter params from URL query
   const [searchParams] = useSearchParams();
   const filterMissionId = searchParams.get("mission_id");
+  const filterDraftId = searchParams.get("draft_id");
 
   const fetchDrafts = async () => {
     try {
@@ -62,6 +74,14 @@ export default function ReviewQueue() {
         initialEdits[id] = { subject: d.subject, body: d.body };
       });
       setDraftEdits(initialEdits);
+      
+      // If a specific draft_id was requested, navigate to it
+      if (filterDraftId && data?.length) {
+        const idx = data.findIndex((d: any) => (d.id || d._id) === filterDraftId);
+        if (idx >= 0) {
+          setCurrentIndex(idx);
+        }
+      }
     } catch (error) {
       console.error("Failed to fetch drafts:", error);
     } finally {
@@ -71,7 +91,7 @@ export default function ReviewQueue() {
 
   useEffect(() => {
     fetchDrafts();
-  }, [api, filterMissionId]);
+  }, [api, filterMissionId, filterDraftId]);
 
   const currentDraft = drafts[currentIndex];
   const currentDraftId = currentDraft?.id || currentDraft?._id;
@@ -177,12 +197,40 @@ export default function ReviewQueue() {
         ...prev,
         [currentDraftId]: { subject: result.subject, body: result.body }
       }));
-      toast.success("Draft Regenerated", { description: "AI has created a new draft." });
+      toast.success("Draft Regenerated", { description: "AI has created a new draft based on your mission." });
     } catch (error) {
       console.error("Failed to regenerate:", error);
       toast.error("Failed to regenerate draft");
     } finally {
       setIsRegenerating(false);
+    }
+  };
+
+  const handleLoadAssets = async () => {
+    if (!currentDraftId) return [];
+    try {
+      return await api.getAvailableAssets(currentDraftId);
+    } catch (error) {
+      console.error("Failed to load assets:", error);
+      return [];
+    }
+  };
+
+  const handleAttachmentsChange = async (newAttachments: { filename: string; asset_id: string }[]) => {
+    if (!currentDraftId) return;
+    try {
+      await api.updateDraftAttachments(currentDraftId, newAttachments.map(a => a.asset_id));
+      // Update local state
+      const updatedDrafts = [...drafts];
+      updatedDrafts[currentIndex] = {
+        ...updatedDrafts[currentIndex],
+        attachments: newAttachments,
+      };
+      setDrafts(updatedDrafts);
+      toast.success("Attachments Updated");
+    } catch (error) {
+      console.error("Failed to update attachments:", error);
+      toast.error("Failed to update attachments");
     }
   };
 
@@ -339,6 +387,12 @@ export default function ReviewQueue() {
       <header className="flex items-center justify-between px-6 h-14 border-b border-border bg-card/50">
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-semibold text-foreground">Review Queue</h1>
+          {currentDraft && !selectMode && (
+            <Badge variant="outline" className="gap-1.5">
+              {getChannelIcon(currentDraft.channel)}
+              {(currentDraft.channel || "email").toUpperCase()}
+            </Badge>
+          )}
           <Badge variant="secondary" className="font-mono">
             {selectMode ? `${selectedDrafts.size} selected` : `${currentIndex + 1} / ${drafts.length}`}
           </Badge>
@@ -482,15 +536,33 @@ export default function ReviewQueue() {
           )}
         </div>
 
-        {/* Right: Email Draft */}
+        {/* Right: Dynamic Content Editor based on Channel */}
         <div className="w-1/2 overflow-auto">
           {!selectMode && currentDraft && (
-            <EmailEditor
+            <ReviewCardRenderer
+              channel={currentDraft.channel || "email"}
               subject={currentEdits?.subject || currentDraft.subject || ""}
               body={currentEdits?.body || currentDraft.body || ""}
+              draftId={currentDraftId}
+              metadata={{
+                // LinkedIn metadata
+                recipientName: currentDraft.name,
+                recipientTitle: currentDraft.company,
+                messageType: currentDraft.metadata?.messageType,
+                // Reddit metadata
+                subreddit: currentDraft.metadata?.subreddit,
+                postType: currentDraft.metadata?.postType,
+                // Slack metadata
+                slackChannel: currentDraft.metadata?.slackChannel,
+                threadTs: currentDraft.metadata?.threadTs,
+                // Email attachments
+                attachments: currentDraft.attachments,
+              }}
               onSubjectChange={handleSubjectChange}
               onBodyChange={handleBodyChange}
               onRegenerate={handleRegenerate}
+              onAttachmentsChange={handleAttachmentsChange}
+              onLoadAssets={handleLoadAssets}
               isRegenerating={isRegenerating}
             />
           )}
@@ -537,7 +609,11 @@ export default function ReviewQueue() {
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  Approve & Send
+                  {currentDraft?.channel === "twitter" ? "Approve & Tweet" :
+                   currentDraft?.channel === "reddit" ? "Approve & Post" :
+                   currentDraft?.channel === "linkedin" ? "Approve & Send" :
+                   currentDraft?.channel === "slack" ? "Approve & Send" :
+                   "Approve & Send"}
                 </>
               )}
             </Button>

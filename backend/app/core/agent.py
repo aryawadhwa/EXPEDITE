@@ -1,206 +1,194 @@
+"""
+LangGraph Agentic Automation Engine
+HARD CONTRACT - Fixed Graph Shape
+
+WORKFLOW:
+ENTRY → initial_triage → resolve_person → resolve_channel_identity → route_by_intent
+    ├─ discovery_flow
+    ├─ outreach_flow
+    └─ publish_flow
+→ review_queue (ONLY if draft_required == true) → execute_action → post_action_update → END
+"""
 
 import asyncio
+import json
+import re
 import httpx
-from typing import TypedDict, Annotated, List, Dict
+from typing import TypedDict, Annotated, List, Dict, Optional, Literal
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
-from app.models import Draft, Prospect, Mission, DraftStatus, MissionLog, User
-from app.core.config import settings
-from datetime import datetime
-
-# Define Agent State
-class AgentState(TypedDict):
-    mission_id: str
-    objective: str
-    user_id: str
-    attachments: List[Dict]  # Attachments from launchpad
-    prospects: List[Dict] # List of prospect data found
-    current_prospect: Dict # Valid prospect being processed
-    draft_id: str
-    feedback: str # Human feedback for revision
-    intents: List[str] # ["discovery", "outreach"]
-    missing_info: List[str] # ["contact_info"]
-
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
-from app.models import Agent
+from datetime import datetime
+
+from app.models import Draft, Prospect, Mission, DraftStatus, MissionLog, User, Agent, AgentStats
+from app.core.config import settings
 from app.services.neo4j import neo4j_service
 
-async def classify_intent(objective: str, available_tools: List[str]) -> Dict:
-    """
-    Uses LLM to determine intents and required tools.
-    Returns {"intents": [...], "required_tools": [...]}
-    """
-    try:
-        system_prompt = f"""You are an Intent and Tool Classification Agent.
+# ==================================================
+# AGENT STATE (Fixed Shape)
+# ==================================================
 
-Determine:
-1. What the user is trying to do (one or more intents).
-2. Which external tools are required.
+class AgentState(TypedDict):
+    # Core identifiers
+    mission_id: str
+    user_id: str
+    objective: str
+    
+    # Triage output (LLM decides)
+    intents: List[str]  # ["discovery", "outreach", "publish", "read", "query"]
+    channels: List[str]  # ["/linkedin", "/reddit", "/slack", "/gmail", "/twitter", "/github"]
+    required_tools: List[str]  # ["composio_linkedin", "gmail"]
+    draft_required: bool  # TRUE only for write/send/post/create actions
+    
+    # Resolution state
+    person_name: Optional[str]
+    person_id: Optional[str]  # Neo4j person ID
+    channel_identities: Dict[str, str]  # {"/linkedin": "member_id", "/slack": "user_id"}
+    
+    # Flow state
+    missing_info: List[str]  # What's blocking progress
+    pause_reason: Optional[str]  # Why graph is paused
+    
+    # Data
+    attachments: List[Dict]
+    prospects: List[Dict]
+    current_prospect: Dict
+    
+    # Draft state
+    draft_id: Optional[str]
+    draft_content: Dict  # {channel, subject, body, metadata}
+    feedback: Optional[str]  # Human feedback for revision
+    
+    # Execution state
+    execution_result: Dict  # Result from execute_action
+    action_status: str  # "pending", "sent", "failed"
 
-Possible intents:
-- discovery: finding, searching, collecting people or data
-- outreach: contacting, emailing, messaging someone
 
-Available tools (valid keys):
-{', '.join(available_tools)}
+# ==================================================
+# UTILITY FUNCTIONS
+# ==================================================
 
-Rules:
-- Intents may be multiple.
-- Infer intent semantically, not by keywords alone.
-- Only include tools that are clearly required.
-- Return valid tool keys only from the provided list.
+def extract_person_name(objective: str) -> Optional[str]:
+    """Extract person name from objective using heuristics"""
+    patterns = [
+        r"(?:message|email|contact|send to|reach out to|dm|ping) ([A-Z][a-z]+(?: [A-Z][a-z]+)?)",
+        r"([A-Z][a-z]+(?: [A-Z][a-z]+)?)'s (?:LinkedIn|email|Twitter|Slack)",
+        r"(?:did|has|when did) ([A-Z][a-z]+(?: [A-Z][a-z]+)?) (?:reply|respond|message)",
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, objective, re.IGNORECASE)
+        if match:
+            return match.group(1)
+    return None
 
-Return JSON ONLY:
-{{
-  "intents": ["discovery", "outreach"],
-  "required_tools": ["tool_key"]
-}}"""
 
-        llm = ChatGroq(
-            temperature=0.0, 
-            groq_api_key=settings.GROQ_API_KEY, 
-            model_name="llama-3.1-8b-instant" 
-        )
-        
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=objective)
-        ]
-        
-        response = await llm.ainvoke(messages)
-        content = response.content.strip()
-        
-        # Clean up JSON
-        import json
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            content = content.replace("```", "").strip()
-            
-        data = json.loads(content)
-        return {
-            "intents": data.get("intents", []),
-            "required_tools": data.get("required_tools", [])
-        }
-        
-    except Exception as e:
-        print(f"Intent classification failed: {e}")
-        # Fail safe
-        return {"intents": ["discovery"], "required_tools": []}
-
-async def initial_triage(state: AgentState):
-    """Global Pre-Flight Check: Tools + Intent + Readiness"""
-    obj = state["objective"]
-    mission_id = state["mission_id"]
-    user_id = state["user_id"]
-    
-    # 1. Get Available Tools
-    from app.routers.integrations import TOOL_CONFIG_MAP
-    available_tools = list(TOOL_CONFIG_MAP.keys())
-    
-    # 2. Classify Intent & Tools
-    classification = await classify_intent(obj, available_tools)
-    intents = classification["intents"]
-    required_tools = classification["required_tools"]
-    
-    await log_event(mission_id, user_id, f"Understanding mission: {intents} with tools {required_tools}", "thinking")
-    
-    # Logic moved to initial_triage
-    # Just parse input now
-    # 3. Check Tools
-    user = await User.find_one(User.clerk_id == user_id)
-    connections = user.other_connections if (user and user.other_connections) else {}
-    slack_connected = bool(user and user.slack_connection_id)
-    gmail_connected = bool(user and user.gmail_connection_id)
-    
-    missing_tools = []
-    for tool in required_tools:
-        is_connected = False
-        if tool == "gmail":
-            is_connected = gmail_connected
-        elif tool == "slack":
-            is_connected = slack_connected
-        else:
-            is_connected = bool(connections.get(tool))
-            
-        if not is_connected:
-            missing_tools.append(tool)
-            
-    if missing_tools:
-        for tool in missing_tools:
-             label = tool.replace("_", " ").title()
-             await log_event(mission_id, user_id, f"To proceed, please connect {label}.", "action", metadata={"action": "connect_tool", "tool": tool})
-        
-        return {"intents": intents, "missing_info": ["tools"]} # Signal blockage
-        
-    # 4. Check Readiness (Outreach)
-    missing_info = []
-    
-    # Identify Person of Interest (POI)
-    # Simple heuristic: Look for capitalized words or use NLP. 
-    # For now, let's assume the name is often the first capitalized word or passed in objective 'message X'
-    # We can use the classify_intent LLM to also extract entities, but let's try regex/simple first or leverage existing extraction.
-    
-    person_name = None
-    import re
-    # Extract "message [Name] on" or "email [Name]"
-    name_match = re.search(r"(?:message|email|send to|contact) ([A-Z][a-z]+(?: [A-Z][a-z]+)?)", obj, re.IGNORECASE)
-    if name_match:
-        person_name = name_match.group(1)
-        
-    if "outreach" in intents:
-        # Check Channel Requirements
-        is_linkedin = "linkedin" in required_tools or "linkedin" in obj.lower()
-        
-        if is_linkedin and person_name:
-            # Check Neo4j Protocol
-            contacts = neo4j_service.get_contact_methods(person_name)
-            linkedin_url = contacts.get("linkedin")
-            
-            if not linkedin_url:
-                await log_event(mission_id, user_id, f"I don't have {person_name}'s LinkedIn yet. Please share the profile URL.", "action")
-                missing_info.append("linkedin_url")
-            else:
-                await log_event(mission_id, user_id, f"found linkedin url for {person_name}: {linkedin_url}", "thinking")
-                # Inject into state for downstream
-                # We can't easily inject into 'prospects' here as state is immutable-ish in some contexts, but we return it.
-                # Actually LangGraph state update comes from return.
-                # We'll pass it via a temporary field or handle in direct_intake/analyze
-                pass
-
-        elif not is_linkedin:
-             # Email Check (Logic exists)
-             email_regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-             has_email = bool(re.search(email_regex, obj))
-             prospects = state.get("prospects", [])
-             has_prospect_email = any(p.get("public_contact") for p in prospects)
-             
-             if not has_email and not has_prospect_email and "discovery" not in intents:
-                 await log_event(mission_id, user_id, "I need an email address to send this message.", "action")
-                 missing_info.append("contact_info")
-    
-    return {
-        "intents": intents, 
-        "missing_info": missing_info
+def extract_channel_from_objective(objective: str) -> List[str]:
+    """Detect channel mentions in objective"""
+    channels = []
+    channel_keywords = {
+        "/linkedin": ["linkedin", "li message", "linkedin message"],
+        "/twitter": ["twitter", "tweet", "x.com"],
+        "/reddit": ["reddit", "subreddit", "r/"],
+        "/slack": ["slack", "slack message", "dm on slack"],
+        "/github": ["github", "gh issue", "pull request", "pr"],
+        "/gmail": ["email", "gmail", "send email", "mail"],
     }
+    
+    obj_lower = objective.lower()
+    for channel, keywords in channel_keywords.items():
+        if any(kw in obj_lower for kw in keywords):
+            channels.append(channel)
+    
+    return channels if channels else ["/gmail"]  # Default to email
 
+
+def extract_identifiers_from_objective(objective: str) -> Dict[str, str]:
+    """Extract platform identifiers from objective text"""
+    identifiers = {}
+    
+    # LinkedIn URL
+    linkedin_match = re.search(r"(https?://(?:www\.)?linkedin\.com/in/[^\s]+)", objective)
+    if linkedin_match:
+        identifiers["linkedin"] = linkedin_match.group(1)
+    
+    # Twitter handle
+    twitter_match = re.search(r"@([a-zA-Z0-9_]+)", objective)
+    if twitter_match:
+        identifiers["twitter"] = twitter_match.group(1)
+    
+    # Email
+    email_match = re.search(r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", objective)
+    if email_match:
+        identifiers["gmail"] = email_match.group(1)
+    
+    # GitHub username (from URL or mention)
+    github_match = re.search(r"github\.com/([a-zA-Z0-9_-]+)", objective)
+    if github_match:
+        identifiers["github"] = github_match.group(1)
+    
+    # Reddit username
+    reddit_match = re.search(r"u/([a-zA-Z0-9_-]+)", objective)
+    if reddit_match:
+        identifiers["reddit"] = reddit_match.group(1)
+    
+    return identifiers
+
+# ==================================================
+# UTILITY FUNCTIONS (continued)
+# ==================================================
+
+async def log_event(
+    mission_id: str, 
+    user_id: str, 
+    content: str, 
+    log_type: str = "action", 
+    role: str = "agent", 
+    metadata: Dict = {},
+    target: str = "chat"  # "chat" = shows in mission chat, "brain" = shows only in LiveBrain
+):
+    """Log an event to DB and broadcast via WebSocket
+    
+    Args:
+        target: "chat" shows in both chat and LiveBrain, "brain" shows only in LiveBrain sidebar
+    """
+    # Only save to DB if it's a chat message (user-facing)
+    if target == "chat":
+        log = MissionLog(
+            mission_id=mission_id,
+            role=role,
+            content=content,
+            log_type=log_type,
+            metadata=metadata
+        )
+        await log.insert()
+    
+    try:
+        from app.core.socket import get_connection_manager
+        manager = get_connection_manager()
+        await manager.send_to_user(user_id, {
+            "type": log_type,
+            "message": content,
+            "agent": "OutboundAI",
+            "mission_id": mission_id,
+            "metadata": metadata,
+            "target": target  # Frontend uses this to route to appropriate UI
+        })
+    except Exception as e:
+        print(f"[WS] Failed to broadcast: {e}")
 
 
 async def update_agent_stats(user_id: str, processed=0, queued=0, errors=0):
     """Update stats for the user's active agents and broadcast to frontend"""
     try:
-        # Find all active agents for this user
         agents = await Agent.find(Agent.user_id == user_id, Agent.status == "active").to_list()
-        
-        # If no active agents, just find any agent to log stats to
         if not agents:
             agents = await Agent.find(Agent.user_id == user_id).limit(1).to_list()
             
         now = datetime.utcnow()
         for agent in agents:
             if not agent.stats:
-                from app.models import AgentStats
                 agent.stats = AgentStats()
             
             agent.stats.processed += processed
@@ -209,13 +197,11 @@ async def update_agent_stats(user_id: str, processed=0, queued=0, errors=0):
             agent.stats.last_run_at = now
             await agent.save()
             
-        # Calculate aggregates for broadcast
         all_agents = await Agent.find(Agent.user_id == user_id).to_list()
         total_active = sum(1 for a in all_agents if a.status == "active")
         total_processed = sum(a.stats.processed for a in all_agents if a.stats)
         total_queued = sum(a.stats.queued for a in all_agents if a.stats)
         
-        # Broadcast via WebSocket
         from app.core.socket import get_connection_manager
         manager = get_connection_manager()
         await manager.send_to_user(user_id, {
@@ -230,38 +216,303 @@ async def update_agent_stats(user_id: str, processed=0, queued=0, errors=0):
     except Exception as e:
         print(f"Failed to update agent stats: {e}")
 
-async def log_event(mission_id: str, user_id: str, content: str, log_type: str = "action", role: str = "agent", metadata: Dict = {}):
-    """Log an event to DB and broadcast via WebSocket"""
-    # Save to database
-    log = MissionLog(
-        mission_id=mission_id,
-        role=role,
-        content=content,
-        log_type=log_type,
-        metadata=metadata
-    )
-    await log.insert()
-    
-    # Broadcast via WebSocket
-    try:
-        from app.core.socket import get_connection_manager
-        manager = get_connection_manager()
-        await manager.send_to_user(user_id, {
-            "type": log_type,
-            "message": content,
-            "agent": "OutboundAI",
-            "mission_id": mission_id,
-            "metadata": metadata
-        })
-    except Exception as e:
-        print(f"[WS] Failed to broadcast: {e}")
 
-async def scout_prospects(state: AgentState):
-    """Layer 1: Public Data Discovery (Role-Agnostic) with improved queries"""
-    await log_event(state["mission_id"], state["user_id"], f"Layer 1: Scouting public contexts for: {state['objective']}", "thinking")
+# ==================================================
+# NODE 1: INITIAL_TRIAGE (LLM)
+# ==================================================
+
+async def initial_triage(state: AgentState) -> Dict:
+    """
+    PURPOSE:
+    - Understand intent semantically
+    - Classify action type
+    - Infer platforms & tools
+    - Decide if draft is required
+    
+    NO keyword matching
+    NO API calls
+    NO database calls
+    
+    Output JSON ONLY
+    """
+    objective = state["objective"]
+    mission_id = state["mission_id"]
+    user_id = state["user_id"]
+    
+    await log_event(mission_id, user_id, "Analyzing your request...", "thinking")
     
     try:
-        # Use Firecrawl search API with more specific query for contacts
+        system_prompt = """You are an Intent Classification Agent for an automation system.
+
+Analyze the user's request and determine:
+1. What they are trying to do (intents)
+2. Which channels/platforms are involved
+3. What tools are required
+4. Whether content needs to be drafted (for human approval)
+
+INTENT CATEGORIES:
+- "discovery": Finding, searching, collecting people or data
+- "outreach": Contacting, messaging, emailing someone directly
+- "publish": Posting content publicly (tweets, LinkedIn posts, Reddit posts)
+- "read": Reading/fetching existing data (get my emails, show messages)
+- "query": Asking questions about data (did X reply?, what's the status?)
+
+CHANNEL MAPPING:
+- LinkedIn messages/posts → /linkedin
+- Twitter/X tweets/replies → /twitter
+- Reddit posts/comments → /reddit
+- Slack messages → /slack
+- GitHub issues/PRs → /github
+- Email → /gmail
+
+CRITICAL RULES FOR draft_required:
+- draft_required = TRUE for: send, post, create, write, publish, message, email, tweet, comment
+- draft_required = FALSE for: read, get, fetch, show, list, check, query, search, find
+
+Return ONLY valid JSON:
+{
+  "intents": ["discovery", "outreach"],
+  "channels": ["/linkedin", "/gmail"],
+  "required_tools": ["linkedin", "gmail"],
+  "draft_required": true,
+  "person_mentioned": "Name or null"
+}"""
+
+        llm = ChatGroq(
+            temperature=0.0, 
+            groq_api_key=settings.GROQ_API_KEY, 
+            model_name="llama-3.1-8b-instant"
+        )
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=f"User request: {objective}")
+        ]
+        
+        response = await llm.ainvoke(messages)
+        content = response.content.strip()
+        
+        # Clean JSON
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.replace("```", "").strip()
+            
+        data = json.loads(content)
+        
+        intents = data.get("intents", ["discovery"])
+        channels = data.get("channels", extract_channel_from_objective(objective))
+        required_tools = data.get("required_tools", [])
+        draft_required = data.get("draft_required", False)
+        person_name = data.get("person_mentioned") or extract_person_name(objective)
+        
+        # Technical info goes to LiveBrain only, not chat
+        await log_event(
+            mission_id, user_id, 
+            f"Intent: {intents} | Channels: {channels} | Draft needed: {draft_required}", 
+            "thinking",
+            target="brain"
+        )
+        
+        return {
+            "intents": intents,
+            "channels": channels,
+            "required_tools": required_tools,
+            "draft_required": draft_required,
+            "person_name": person_name,
+            "missing_info": []
+        }
+        
+    except Exception as e:
+        print(f"Intent classification failed: {e}")
+        # Fail safe - infer from objective
+        channels = extract_channel_from_objective(objective)
+        person_name = extract_person_name(objective)
+        
+        # Simple heuristic for draft_required
+        write_keywords = ["send", "post", "create", "write", "message", "email", "tweet", "dm"]
+        draft_required = any(kw in objective.lower() for kw in write_keywords)
+        
+        return {
+            "intents": ["outreach"] if draft_required else ["read"],
+            "channels": channels,
+            "required_tools": [c.replace("/", "") for c in channels],
+            "draft_required": draft_required,
+            "person_name": person_name,
+            "missing_info": []
+        }
+
+
+# ==================================================
+# NODE 2: RESOLVE_PERSON (Deterministic)
+# ==================================================
+
+async def resolve_person(state: AgentState) -> Dict:
+    """
+    PURPOSE:
+    - Query Neo4j for person
+    - Create person if missing
+    - Handle ambiguity once, then cache
+    
+    NEVER call LLM
+    """
+    person_name = state.get("person_name")
+    mission_id = state["mission_id"]
+    user_id = state["user_id"]
+    
+    if not person_name:
+        # No person mentioned, skip
+        return {"person_id": None}
+    
+    await log_event(mission_id, user_id, f"Looking up {person_name} in contact graph...", "thinking")
+    
+    try:
+        # Query Neo4j - deterministic, no LLM
+        person = neo4j_service.resolve_person(person_name)
+        
+        if person:
+            person_id = person.get("name", person_name)  # Use name as ID for now
+            await log_event(mission_id, user_id, f"Found {person_name} in contact graph", "success")
+            return {"person_id": person_id}
+        else:
+            # Person created by resolve_person (MERGE)
+            await log_event(mission_id, user_id, f"Added {person_name} to contact graph", "success")
+            return {"person_id": person_name}
+            
+    except Exception as e:
+        print(f"Neo4j person resolution failed: {e}")
+        return {"person_id": None}
+
+
+# ==================================================
+# NODE 3: RESOLVE_CHANNEL_IDENTITY
+# ==================================================
+
+async def resolve_channel_identity(state: AgentState) -> Dict:
+    """
+    PURPOSE:
+    - Resolve platform-specific identifiers
+    
+    Examples:
+    - /linkedin → member_id
+    - /twitter → handle
+    - /slack → user_id
+    
+    If identifier missing → Pause and ask user ONCE
+    """
+    channels = state.get("channels", [])
+    person_name = state.get("person_name")
+    mission_id = state["mission_id"]
+    user_id = state["user_id"]
+    objective = state["objective"]
+    
+    channel_identities = {}
+    missing_identities = []
+    
+    # Get existing contact methods from Neo4j if person is known
+    existing_contacts = {}
+    if person_name:
+        existing_contacts = neo4j_service.get_contact_methods(person_name)
+    
+    # Also extract identifiers from objective
+    extracted = extract_identifiers_from_objective(objective)
+    
+    for channel in channels:
+        channel_key = channel.replace("/", "")
+        
+        # Check Neo4j first
+        if channel_key in existing_contacts:
+            channel_identities[channel] = existing_contacts[channel_key]
+            continue
+            
+        # Check extracted from objective
+        if channel_key in extracted:
+            identifier = extracted[channel_key]
+            channel_identities[channel] = identifier
+            
+            # Store in Neo4j for future
+            if person_name:
+                neo4j_service.add_contact_method(person_name, channel_key, identifier)
+                await log_event(mission_id, user_id, f"Saved {channel_key} for {person_name}", "success")
+            continue
+        
+        # If this is a READ/QUERY operation, we may not need person identifier
+        intents = state.get("intents", [])
+        if "read" in intents or "query" in intents:
+            # For read operations on user's own accounts, no target identifier needed
+            continue
+            
+        # Missing identifier for WRITE operation
+        if state.get("draft_required"):
+            missing_identities.append(channel)
+    
+    # If missing identifiers for write operations, pause and ask
+    if missing_identities:
+        missing_str = ", ".join(missing_identities)
+        target = person_name or "this contact"
+        
+        await log_event(
+            mission_id, user_id,
+            f"I need {target}'s identifier for {missing_str}. Please provide the profile URL or username.",
+            "action",
+            metadata={"action": "request_identifier", "channels": missing_identities, "person": person_name}
+        )
+        
+        return {
+            "channel_identities": channel_identities,
+            "missing_info": [f"{ch}_identifier" for ch in missing_identities],
+            "pause_reason": f"Need identifier for {missing_str}"
+        }
+    
+    return {
+        "channel_identities": channel_identities,
+        "missing_info": []
+    }
+
+
+# ==================================================
+# NODE 4: ROUTE_BY_INTENT (Conditional Router)
+# ==================================================
+
+def route_by_intent(state: AgentState) -> str:
+    """
+    Route to appropriate flow based on intent.
+    This is a routing function, not a node.
+    """
+    # Check for blockers
+    if state.get("missing_info"):
+        return "end"  # Paused, waiting for user input
+    
+    intents = state.get("intents", [])
+    
+    if "discovery" in intents:
+        return "discovery_flow"
+    elif "outreach" in intents:
+        return "outreach_flow"
+    elif "publish" in intents:
+        return "publish_flow"
+    elif "read" in intents or "query" in intents:
+        return "execute_action"  # Skip draft for read operations
+    else:
+        return "end"
+
+
+# ==================================================
+# NODE 5a: DISCOVERY_FLOW
+# ==================================================
+
+async def discovery_flow(state: AgentState) -> Dict:
+    """
+    Discovery: Finding, searching, collecting people or data
+    Uses Firecrawl or platform search APIs
+    """
+    objective = state["objective"]
+    mission_id = state["mission_id"]
+    user_id = state["user_id"]
+    
+    await log_event(mission_id, user_id, "Searching for relevant contacts...", "thinking")
+    
+    try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://api.firecrawl.dev/v1/search",
@@ -270,8 +521,7 @@ async def scout_prospects(state: AgentState):
                     "Content-Type": "application/json"
                 },
                 json={
-                    # Enforce looking for contact info
-                    "query": f"{state['objective']} email contact info site:linkedin.com/in/ OR site:twitter.com OR site:github.com OR site:company.com",
+                    "query": f"{objective} contact email site:linkedin.com/in/ OR site:twitter.com",
                     "limit": 5,
                     "scrapeOptions": {"formats": ["markdown"]}
                 },
@@ -282,396 +532,811 @@ async def scout_prospects(state: AgentState):
                 data = response.json()
                 results = data.get("data", [])
                 
-                raw_prospects = []
-                import re
+                prospects = []
                 email_regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-
+                
                 for result in results[:5]:
-                    title = result.get("title", "Unknown Page")
+                    title = result.get("title", "Unknown")
                     url = result.get("url", "")
                     snippet = result.get("description", "")
                     
-                    # Try to find email in snippet
                     emails = re.findall(email_regex, snippet)
-                    public_contact = emails[0] if emails else url
                     
-                    raw_prospects.append({
+                    prospects.append({
                         "name": title.split(" - ")[0] if " - " in title else title[:30],
-                        "company": title.split(" at ")[-1] if " at " in title else "Unknown Company",
-                        "context_source": "Web Search (Firecrawl)",
-                        "public_contact": public_contact, 
-                        "original_data": result,
-                        "snippet": snippet
+                        "company": title.split(" at ")[-1] if " at " in title else "Unknown",
+                        "context_source": "Web Search",
+                        "public_contact": emails[0] if emails else url,
+                        "snippet": snippet,
+                        "original_data": result
                     })
                 
-                if raw_prospects:
-                    await log_event(state["mission_id"], state["user_id"], f"Found {len(raw_prospects)} potential contact points.", "success")
-                    await update_agent_stats(state["user_id"], processed=len(raw_prospects))
-                    return {"prospects": raw_prospects}
-            
-            await log_event(state["mission_id"], state["user_id"], f"Firecrawl returned status {response.status_code}", "error")
-            
+                if prospects:
+                    await log_event(mission_id, user_id, f"Found {len(prospects)} contacts", "success")
+                    await update_agent_stats(user_id, processed=len(prospects))
+                    
+                    # If outreach is also intended, set current prospect
+                    current = prospects[0] if "outreach" in state.get("intents", []) else {}
+                    
+                    return {
+                        "prospects": prospects,
+                        "current_prospect": current
+                    }
+                    
     except Exception as e:
-        await log_event(state["mission_id"], state["user_id"], f"Error in Layer 1: {str(e)[:100]}", "error")
+        print(f"Discovery error: {e}")
+        await log_event(mission_id, user_id, f"Search encountered an issue: {str(e)[:50]}", "error")
     
-    # Fallback to Mock Data
-    await log_event(state["mission_id"], state["user_id"], "Using fallback data (API may have failed or no results).", "action")
-    return {"prospects": [
-        {"name": "Satya Nadella", "company": "Microsoft", "context_source": "Public Knowledge", "public_contact": "satya.nadella@microsoft.com", "snippet": "CEO of Microsoft.", "original_data": {}},
-        {"name": "General HR", "company": "Microsoft", "context_source": "Careers Page", "public_contact": "careers@microsoft.com", "snippet": "Microsoft Careers.", "original_data": {}}
-    ]}
+    return {"prospects": [], "current_prospect": {}}
 
-async def analyze_relevance(state: AgentState):
-    """Layer 2: User-Driven Matching (Filter & Contextualize)"""
-    prospects = state.get("prospects", [])
-    if not prospects:
-        return {"current_prospect": None}
 
-    # We process the first one for the loop, or in a real agent, batch process.
-    # For this demo, we pick the first one to draft for.
-    cand = prospects[0] 
-    
-    await log_event(state["mission_id"], state["user_id"], f"Layer 2: Analyzing relevance for {cand['name']}", "thinking")
-    
-    # Simple logic: If it matches keyword in objective, it's relevant.
-    # in production, use LLM to classify.
-    
-    relevance_reason = "Matches mission context based on keywords."
-    relevance_score = 0.8
-    
-    enriched_cand = {
-        **cand,
-        "relevance_score": relevance_score,
-        "relevance_reason": relevance_reason,
-        "enriched": True # Mark as processed
-    }
-    
-    # Attachment Logic
-    # Use attachments passed from launchpad if available
-    attachments = state.get("attachments", []) or []
-    
-    # Fallback: Simple heuristic if none passed/explicitly requested but keywords exist
-    if not attachments and any(k in state['objective'].lower() for k in ["attach", "file", "pdf", "deck", "case study"]):
-        from app.models import UserAsset
-        user_assets = await UserAsset.find(UserAsset.user_id == state['user_id']).sort("-created_at").to_list()
-        
-        if user_assets:
-             best_match = user_assets[0] 
-             attachments.append({
-                 "filename": best_match.filename,
-                 "asset_id": str(best_match.id),
-                 "content_type": best_match.content_type
-             })
-             await log_event(state["mission_id"], state["user_id"], f"Found relevant attachment: {best_match.filename}", "success")
-    
-    enriched_cand = {
-        **cand,
-        "relevance_score": relevance_score,
-        "relevance_reason": relevance_reason,
-        "attachments": attachments, # Pass to draft
-        "enriched": True
-    }
-    
-    await log_event(state["mission_id"], state["user_id"], f"Marked as relevant: {relevance_reason}", "success")
-    return {"current_prospect": enriched_cand}
+# ==================================================
+# NODE 5b: OUTREACH_FLOW
+# ==================================================
 
-async def write_draft(state: AgentState):
-    """Layer 3: Outreach (Role-Independent)"""
-    prospect = state.get("current_prospect")
-    if not prospect:
-        await log_event(state["mission_id"], state["user_id"], "No valid prospect to draft for.", "error")
-        return {}
+async def outreach_flow(state: AgentState) -> Dict:
+    """
+    Outreach: Prepare content for direct messaging/emailing
+    Generates draft if draft_required == True
+    """
+    objective = state["objective"]
+    mission_id = state["mission_id"]
+    user_id = state["user_id"]
+    channels = state.get("channels", ["/gmail"])
+    person_name = state.get("person_name", "Contact")
+    channel_identities = state.get("channel_identities", {})
     
-    feedback = state.get("feedback")
+    # If we have prospects from discovery, use first one
+    prospect = state.get("current_prospect") or {}
+    if not prospect and state.get("prospects"):
+        prospect = state["prospects"][0]
     
-    await log_event(state["mission_id"], state["user_id"], f"Layer 3: Drafting outreach for {prospect.get('name')}", "thinking")
+    # Build target info
+    target_email = channel_identities.get("/gmail", prospect.get("public_contact", ""))
+    target_linkedin = channel_identities.get("/linkedin", "")
+    
+    if not state.get("draft_required"):
+        # This is a read operation disguised as outreach (e.g., "check if X replied")
+        return {
+            "draft_content": {},
+            "draft_required": False
+        }
+    
+    await log_event(mission_id, user_id, f"Drafting message for {person_name}...", "thinking")
     
     try:
-        # Check for user credits or connection logic here if needed
-        # For now, just generate.
-        
         llm = ChatGroq(
             temperature=0.7, 
             groq_api_key=settings.GROQ_API_KEY, 
             model_name="llama-3.3-70b-versatile"
         )
         
-        attachments_list = [a['filename'] for a in prospect.get('attachments', [])]
-        attachment_context = ""
-        if attachments_list:
-            attachment_context = f"""
-IMPORTANT: You have the following files attached to this email: {', '.join(attachments_list)}.
-- You cannot read the file content, but you should write the email as if the recipient will see it.
-- Do NOT say "refer to the image" or "I cannot see the file".
-- Instead say things like "I've attached [Filename] for your review" or "Please see the attached case study".
-"""
-
+        # Determine primary channel and constraints
+        primary_channel = channels[0] if channels else "/gmail"
+        
+        channel_constraints = {
+            "/linkedin": "Max 300 chars for connection request, 8000 for message",
+            "/twitter": "Max 280 characters",
+            "/slack": "Supports markdown formatting",
+            "/gmail": "Professional email format with subject line",
+            "/reddit": "Follows subreddit rules and etiquette"
+        }
+        
+        attachments = state.get("attachments", [])
+        attachment_names = [a.get("filename", "") for a in attachments]
+        
         system_prompt = f"""You are an expert outreach specialist.
-Write a personalized email based on the publicly available context.
-{attachment_context}
-Format:
-SUBJECT: [Subject]
-EMAIL: [Body]
-REASONING: [Reasoning]"""
+Write a personalized message for {primary_channel}.
 
-        human_prompt = f"""Target Context: {prospect.get('name')} at {prospect.get('company')}
-Source: {prospect.get('context_source')}
-Snippet: {prospect.get('snippet')}
-Relevance: {prospect.get('relevance_reason')}
-Mission: {state.get('objective')}
-Attachments: {', '.join(attachments_list) if attachments_list else 'None'}
+Channel: {primary_channel}
+Constraints: {channel_constraints.get(primary_channel, "Standard message format")}
+
+{"Attachments included: " + ", ".join(attachment_names) if attachment_names else ""}
+
+Return in this format:
+SUBJECT: [Subject line - only for email]
+BODY: [Message content]
+REASONING: [Why this approach works]"""
+
+        human_prompt = f"""
+Target: {person_name}
+Contact: {target_email or target_linkedin or "Unknown"}
+Context: {prospect.get("snippet", objective)}
+Mission: {objective}
 """
-        messages = [
+
+        response = await llm.ainvoke([
             SystemMessage(content=system_prompt),
             HumanMessage(content=human_prompt)
-        ]
+        ])
         
-        response = await llm.ainvoke(messages)
         content = response.content
         
-        # Parse Logic (same as before)
-        subject, body, reasoning = "Hello", content, "AI Generated"
+        # Parse response
+        subject = ""
+        body = content
+        reasoning = ""
+        
         if "SUBJECT:" in content:
-            parts = content.split("EMAIL:")
+            parts = content.split("BODY:")
             subject = parts[0].replace("SUBJECT:", "").strip()
             if len(parts) > 1:
-                rem = parts[1]
-                if "REASONING:" in rem:
-                    bps = rem.split("REASONING:")
-                    body = bps[0].strip()
-                    reasoning = bps[1].strip() if len(bps) > 1 else ""
+                remainder = parts[1]
+                if "REASONING:" in remainder:
+                    body_parts = remainder.split("REASONING:")
+                    body = body_parts[0].strip()
+                    reasoning = body_parts[1].strip() if len(body_parts) > 1 else ""
                 else:
-                    body = rem.strip()
+                    body = remainder.strip()
         
-        # Clean up any markdown code blocks if present
-        subject = subject.replace("`", "").strip()
-        body = body.replace("```", "").strip()
-
-        await log_event(state["mission_id"], state["user_id"], f"Draft generated. Sending to Review Queue.", "success")
-
+        draft_content = {
+            "channel": primary_channel,
+            "subject": subject.replace("`", "").strip(),
+            "body": body.replace("```", "").strip(),
+            "reasoning": reasoning,
+            "target_name": person_name,
+            "target_identifier": channel_identities.get(primary_channel, target_email),
+            "attachments": attachments
+        }
+        
+        await log_event(mission_id, user_id, "Draft ready for review", "success")
+        
+        return {
+            "draft_content": draft_content,
+            "current_prospect": prospect
+        }
+        
     except Exception as e:
-        print(f"LLM Error: {e}")
-        subject = "Hello"
-        body = "I saw your profile and wanted to reach out."
-        reasoning = f"Fallback due to error: {str(e)}"
+        print(f"Outreach draft error: {e}")
+        return {
+            "draft_content": {
+                "channel": channels[0] if channels else "/gmail",
+                "subject": "Hello",
+                "body": objective,
+                "error": str(e)
+            }
+        }
 
-    # Data Persistence
-    # 1. Save Prospect (Layer 1 & 2 data)
-    p_doc = Prospect(
-        mission_id=state["mission_id"],
-        name=prospect.get("name", "Unknown"),
-        company=prospect.get("company", "Unknown"),
-        context_source=prospect.get("context_source"),
-        public_contact=prospect.get("public_contact"),
-        relevance_score=prospect.get("relevance_score", 0.0),
-        relevance_reason=prospect.get("relevance_reason"),
-        original_data=prospect.get("original_data", {})
-    )
-    await p_doc.insert()
 
-    # Determine Channel
-    channel = "email"
-    if "linkedin" in state["objective"].lower():
-        channel = "linkedin"
+# ==================================================
+# NODE 5c: PUBLISH_FLOW
+# ==================================================
 
-    # 2. Save Draft (Layer 3)
-    d_doc = Draft(
-        prospect_id=str(p_doc.id),
-        channel=channel,
-        subject=subject,
-        body=body,
-        ai_reasoning=reasoning,
-        status=DraftStatus.PENDING,
-        attachments=prospect.get('attachments', [])
-    )
-    await d_doc.insert()
-    await update_agent_stats(state["user_id"], queued=1)
-    
-    return {"draft_id": str(d_doc.id)}
-
-async def direct_intake(state: AgentState):
-    """Directly ingest contacts from user instruction without scraping"""
-    obj = state["objective"]
+async def publish_flow(state: AgentState) -> Dict:
+    """
+    Publish: Create public content (posts, tweets, etc.)
+    Always requires draft for public content
+    """
+    objective = state["objective"]
     mission_id = state["mission_id"]
     user_id = state["user_id"]
+    channels = state.get("channels", [])
     
-    await log_event(mission_id, user_id, "Skipping search (Direct Input Mode)", "thinking")
+    primary_channel = channels[0] if channels else "/twitter"
     
-    import re
-    email_regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-    emails = re.findall(email_regex, state["objective"])
+    await log_event(mission_id, user_id, f"Drafting content for {primary_channel}...", "thinking")
     
-    contacts = []
-    if emails:
-        for email in emails:
-            contacts.append({
-                "name": email.split("@")[0],
-                "company": "Unknown",
-                "context_source": "User Input",
-                "public_contact": email,
-                "snippet": f"User provided email in objective: {email}",
-                "original_data": {}
-            })
-            
-    # Neo4j Store Check (LinkedIn)
-    if "linkedin.com" in state["objective"]:
-        # Extract URL
-        # simple extraction
-        url_match = re.search(r"(https?://[a-z]{2,3}\.linkedin\.com/in/[^ \t\n\r\f\v]+)", state["objective"])
-        if url_match:
-            url = url_match.group(1)
-            # Try to associate with a name if present
-            # We assume the name of potential prospect was the one we asked about previously.
-            # But here we just extract name from objective if possible or URL.
-            # User says: "Here is Sriram's LinkedIn: ..."
-            name_match = re.search(r"([A-Z][a-z]+)'s LinkedIn", state["objective"])
-            target_name = name_match.group(1) if name_match else "Unknown"
-            
-            if target_name != "Unknown":
-                neo4j_service.add_contact_method(target_name, "linkedin", url)
-                await log_event(mission_id, user_id, f"Stored LinkedIn for {target_name} in Neo4j.", "success")
-                
-                # Add to contacts list
-                contacts.append({
-                    "name": target_name,
-                    "company": "Unknown",
-                    "context_source": "User Input (Neo4j)",
-                    "public_contact": url,
-                    "snippet": f"LinkedIn URL: {url}",
-                    "original_data": {"linkedin": url}
-                })
-    else:
-        # Generic fallback
-        contacts.append({
-            "name": "Target Contact",
-            "company": "Unknown",
-            "context_source": "User Instruction",
-            "public_contact": "",
-            "snippet": state["objective"],
-            "original_data": {}
-        })
+    try:
+        llm = ChatGroq(
+            temperature=0.8, 
+            groq_api_key=settings.GROQ_API_KEY, 
+            model_name="llama-3.3-70b-versatile"
+        )
         
-    await log_event(state["mission_id"], state["user_id"], f"Processed {len(contacts)} targets from input.", "success")
-    return {"prospects": contacts}
+        platform_guides = {
+            "/twitter": "Tweet: Max 280 chars, engaging, use hashtags sparingly",
+            "/linkedin": "Professional tone, thought leadership, can be longer",
+            "/reddit": "Match subreddit culture, provide value, avoid self-promotion",
+        }
+        
+        system_prompt = f"""You are a social media content expert.
+Create content for {primary_channel}.
 
+Guidelines: {platform_guides.get(primary_channel, "Engaging, authentic content")}
+
+Return:
+CONTENT: [The post content]
+REASONING: [Why this works]"""
+
+        response = await llm.ainvoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=f"Create: {objective}")
+        ])
+        
+        content = response.content
+        post_content = content
+        reasoning = ""
+        
+        if "CONTENT:" in content:
+            parts = content.split("REASONING:")
+            post_content = parts[0].replace("CONTENT:", "").strip()
+            reasoning = parts[1].strip() if len(parts) > 1 else ""
+        
+        draft_content = {
+            "channel": primary_channel,
+            "subject": "",  # Posts don't have subjects
+            "body": post_content.replace("```", "").strip(),
+            "reasoning": reasoning,
+            "type": "publish"
+        }
+        
+        await log_event(mission_id, user_id, "Content draft ready for review", "success")
+        
+        return {"draft_content": draft_content}
+        
+    except Exception as e:
+        print(f"Publish draft error: {e}")
+        return {
+            "draft_content": {
+                "channel": primary_channel,
+                "body": objective,
+                "error": str(e)
+            }
+        }
+
+
+# ==================================================
+# NODE 6: REVIEW_QUEUE (Human-in-the-Loop)
+# ==================================================
+
+async def review_queue(state: AgentState) -> Dict:
+    """
+    PURPOSE:
+    - ONLY for write/send/post/create actions
+    - Populate channel-aware draft UI
+    
+    Each review item includes:
+    - channel
+    - intent
+    - preview content
+    - metadata (limits, warnings)
+    
+    This node SAVES the draft and pauses for human approval.
+    """
+    draft_content = state.get("draft_content", {})
+    mission_id = state["mission_id"]
+    user_id = state["user_id"]
+    prospect = state.get("current_prospect") or {}
+    
+    if not draft_content or not state.get("draft_required"):
+        # No draft needed, skip review
+        return {"draft_id": None}
+    
+    channel = draft_content.get("channel", "/gmail")
+    
+    # Save Prospect first (only if we have meaningful data)
+    p_doc = None
+    prospect_name = prospect.get("name") or draft_content.get("target_name")
+    if prospect_name:
+        p_doc = Prospect(
+            mission_id=mission_id,
+            name=prospect_name,
+            company=prospect.get("company", "Unknown"),
+            context_source=prospect.get("context_source", "User Input"),
+            public_contact=prospect.get("public_contact") or draft_content.get("target_identifier", ""),
+            relevance_score=prospect.get("relevance_score", 0.8),
+            relevance_reason=prospect.get("relevance_reason", "Mission context"),
+            original_data=prospect.get("original_data", {})
+        )
+        await p_doc.insert()
+    
+    # Save Draft (prospect_id is now optional)
+    d_doc = Draft(
+        prospect_id=str(p_doc.id) if p_doc else None,
+        channel=channel.replace("/", ""),
+        subject=draft_content.get("subject", ""),
+        body=draft_content.get("body", ""),
+        ai_reasoning=draft_content.get("reasoning", ""),
+        status=DraftStatus.PENDING,
+        attachments=draft_content.get("attachments", [])
+    )
+    await d_doc.insert()
+    
+    await update_agent_stats(user_id, queued=1)
+    
+    # Broadcast to review UI
+    await log_event(
+        mission_id, user_id,
+        "Draft added to review queue",
+        "success",
+        metadata={
+            "action": "review_required",
+            "draft_id": str(d_doc.id),
+            "channel": channel,
+            "preview": draft_content.get("body", "")[:100]
+        }
+    )
+    
+    return {
+        "draft_id": str(d_doc.id),
+        "action_status": "pending_review"
+    }
+
+
+# ==================================================
+# NODE 7: EXECUTE_ACTION
+# ==================================================
+
+async def execute_action(state: AgentState) -> Dict:
+    """
+    PURPOSE:
+    - Use platform integration files ONLY
+    - Use Composio ONLY
+    - NO LLM calls
+    
+    Handle fallbacks gracefully:
+    - /linkedin message fails → send connection request
+    - Missing permission → ask user
+    """
+    mission_id = state["mission_id"]
+    user_id = state["user_id"]
+    intents = state.get("intents", [])
+    channels = state.get("channels", ["/gmail"])
+    draft_content = state.get("draft_content", {})
+    channel_identities = state.get("channel_identities", {})
+    
+    # Get user connections
+    user = await User.find_one(User.clerk_id == user_id)
+    if not user:
+        return {"execution_result": {"success": False, "error": "User not found"}, "action_status": "failed"}
+    
+    primary_channel = channels[0] if channels else "/gmail"
+    
+    # READ/QUERY operations - execute directly
+    if "read" in intents or "query" in intents:
+        await log_event(mission_id, user_id, f"Fetching data from {primary_channel}...", "thinking")
+        
+        result = await execute_read_action(user, primary_channel, state)
+        
+        if result.get("success"):
+            await log_event(mission_id, user_id, "Here's what I found:", "success", metadata={"data": result.get("data")})
+        else:
+            await log_event(mission_id, user_id, f"Couldn't fetch data: {result.get('error')}", "error")
+        
+        return {"execution_result": result, "action_status": "completed" if result.get("success") else "failed"}
+    
+    # WRITE operations - execute approved draft
+    if state.get("draft_required") and draft_content:
+        await log_event(mission_id, user_id, f"Sending via {primary_channel}...", "thinking")
+        
+        result = await execute_write_action(user, primary_channel, draft_content, channel_identities, state)
+        
+        if result.get("success"):
+            await log_event(mission_id, user_id, "Message sent successfully!", "success")
+            await update_agent_stats(user_id, processed=1)
+        else:
+            # Fallback logic
+            if primary_channel == "/linkedin" and "not connected" in str(result.get("error", "")).lower():
+                await log_event(mission_id, user_id, "Sending connection request instead...", "action")
+                # Attempt connection request fallback
+                from app.integrations import linkedin
+                connection_id = user.other_connections.get("linkedin") if user.other_connections else None
+                if connection_id:
+                    fallback_result = await linkedin.send_connection_request(
+                        connection_id,
+                        channel_identities.get("/linkedin", ""),
+                        draft_content.get("body", "")[:300]
+                    )
+                    if fallback_result.get("success"):
+                        await log_event(mission_id, user_id, "Connection request sent!", "success")
+                        return {"execution_result": fallback_result, "action_status": "sent"}
+            
+            await log_event(mission_id, user_id, f"Failed to send: {result.get('error')}", "error")
+            await update_agent_stats(user_id, errors=1)
+        
+        return {"execution_result": result, "action_status": "sent" if result.get("success") else "failed"}
+    
+    return {"execution_result": {}, "action_status": "no_action"}
+
+
+async def execute_read_action(user: User, channel: str, state: AgentState) -> Dict:
+    """Execute read/query operations via platform integrations"""
+    objective = state.get("objective", "")
+    
+    if channel == "/gmail":
+        # For read operations, we'd need a separate read function
+        # Currently not implemented - sender only handles sending
+        return {"success": False, "error": "Gmail read operations not yet implemented"}
+    
+    elif channel == "/slack":
+        from app.integrations import slack
+        connection_id = user.slack_connection_id
+        if not connection_id:
+            return {"success": False, "error": "Slack not connected"}
+        
+        # Check if searching or listing
+        if "search" in objective.lower():
+            query = objective.replace("search", "").strip()
+            return await slack.search_messages(connection_id, query)
+        else:
+            return await slack.list_channels(connection_id)
+    
+    elif channel == "/linkedin":
+        from app.integrations import linkedin
+        connection_id = user.other_connections.get("linkedin") if user.other_connections else None
+        if not connection_id:
+            return {"success": False, "error": "LinkedIn not connected"}
+        
+        return await linkedin.get_messages(connection_id)
+    
+    elif channel == "/twitter":
+        from app.integrations import twitter
+        connection_id = user.other_connections.get("twitter") if user.other_connections else None
+        if not connection_id:
+            return {"success": False, "error": "Twitter not connected"}
+        
+        if "mention" in objective.lower():
+            return await twitter.get_mentions(connection_id)
+        return await twitter.get_timeline(connection_id)
+    
+    elif channel == "/github":
+        from app.integrations import github
+        connection_id = user.other_connections.get("github") if user.other_connections else None
+        if not connection_id:
+            return {"success": False, "error": "GitHub not connected"}
+        
+        # Try to extract repo info
+        match = re.search(r"([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)", objective)
+        if match:
+            owner, repo = match.groups()
+            if "pr" in objective.lower() or "pull" in objective.lower():
+                return await github.list_pull_requests(connection_id, owner, repo)
+            return await github.list_issues(connection_id, owner, repo)
+        return {"success": False, "error": "Could not parse repository info"}
+    
+    elif channel == "/reddit":
+        from app.integrations import reddit
+        connection_id = user.other_connections.get("reddit") if user.other_connections else None
+        if not connection_id:
+            return {"success": False, "error": "Reddit not connected"}
+        
+        # Extract subreddit if mentioned
+        match = re.search(r"r/([a-zA-Z0-9_]+)", objective)
+        if match:
+            subreddit = match.group(1)
+            return await reddit.get_subreddit_posts(connection_id, subreddit)
+        
+        # General search
+        return await reddit.search_posts(connection_id, objective)
+    
+    return {"success": False, "error": f"Unknown channel: {channel}"}
+
+
+async def execute_write_action(user: User, channel: str, draft_content: Dict, channel_identities: Dict, state: AgentState) -> Dict:
+    """Execute write/send operations via platform integrations"""
+    
+    body = draft_content.get("body", "")
+    subject = draft_content.get("subject", "")
+    target = draft_content.get("target_identifier") or channel_identities.get(channel, "")
+    
+    if channel == "/gmail":
+        from app.core.sender import send_email_via_composio
+        connection_id = user.gmail_connection_id
+        if not connection_id:
+            return {"success": False, "error": "Gmail not connected"}
+        
+        return await send_email_via_composio(user.clerk_id, target, subject, body)
+    
+    elif channel == "/slack":
+        from app.integrations import slack
+        connection_id = user.slack_connection_id
+        if not connection_id:
+            return {"success": False, "error": "Slack not connected"}
+        
+        return await slack.send_message(user.clerk_id, target, body)
+    
+    elif channel == "/linkedin":
+        from app.integrations import linkedin
+        connection_id = user.other_connections.get("linkedin") if user.other_connections else None
+        if not connection_id:
+            return {"success": False, "error": "LinkedIn not connected"}
+        
+        # Check if this is a post or message
+        if draft_content.get("type") == "publish":
+            return await linkedin.publish_post(user.clerk_id, body)
+        return await linkedin.send_message(user.clerk_id, target, body)
+    
+    elif channel == "/twitter":
+        from app.integrations import twitter
+        connection_id = user.other_connections.get("twitter") if user.other_connections else None
+        if not connection_id:
+            return {"success": False, "error": "Twitter not connected"}
+        
+        return await twitter.post_tweet(user.clerk_id, body)
+    
+    elif channel == "/reddit":
+        from app.integrations import reddit
+        connection_id = user.other_connections.get("reddit") if user.other_connections else None
+        if not connection_id:
+            return {"success": False, "error": "Reddit not connected"}
+        
+        # Extract subreddit from target or content
+        subreddit = target.replace("r/", "") if target else "test"
+        return await reddit.create_post(user.clerk_id, subreddit, subject or "Post", body)
+    
+    elif channel == "/github":
+        from app.integrations import github
+        connection_id = user.other_connections.get("github") if user.other_connections else None
+        if not connection_id:
+            return {"success": False, "error": "GitHub not connected"}
+        
+        # Parse owner/repo from target
+        match = re.search(r"([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)", target)
+        if match:
+            owner, repo = match.groups()
+            return await github.create_issue(user.clerk_id, owner, repo, subject or "Issue", body)
+        return {"success": False, "error": "Could not parse repository info"}
+    
+    return {"success": False, "error": f"Unknown channel: {channel}"}
+
+
+# ==================================================
+# NODE 8: POST_ACTION_UPDATE
+# ==================================================
+
+async def post_action_update(state: AgentState) -> Dict:
+    """
+    PURPOSE:
+    - Update Neo4j relationships
+    - Store execution result
+    - Mark sent / pending / failed
+    """
+    mission_id = state["mission_id"]
+    user_id = state["user_id"]
+    execution_result = state.get("execution_result", {})
+    draft_id = state.get("draft_id")
+    action_status = state.get("action_status", "completed")
+    person_name = state.get("person_name")
+    channels = state.get("channels", [])
+    
+    # Update Draft status if exists
+    if draft_id:
+        draft = await Draft.get(draft_id)
+        if draft:
+            if action_status == "sent":
+                draft.status = DraftStatus.SENT
+            elif action_status == "failed":
+                draft.status = DraftStatus.REJECTED  # or add FAILED status
+            await draft.save()
+    
+    # Update Neo4j relationship
+    if person_name and execution_result.get("success"):
+        try:
+            primary_channel = channels[0].replace("/", "") if channels else "email"
+            # Could add a "CONTACTED_VIA" relationship
+            # neo4j_service.add_interaction(person_name, primary_channel, datetime.utcnow())
+            pass
+        except Exception as e:
+            print(f"Failed to update Neo4j: {e}")
+    
+    # Update mission
+    try:
+        mission = await Mission.get(mission_id)
+        if mission:
+            mission.status = "completed" if action_status in ["sent", "completed"] else "failed"
+            await mission.save()
+    except Exception:
+        pass
+    
+    await log_event(
+        mission_id, user_id,
+        f"Mission {action_status}",
+        "success" if action_status in ["sent", "completed"] else "error"
+    )
+    
+    return {"action_status": action_status}
+
+
+# ==================================================
+# CONDITIONAL ROUTING FUNCTIONS
+# ==================================================
+
+def should_resolve_person(state: AgentState) -> str:
+    """Check if we need to resolve a person"""
+    if state.get("person_name"):
+        return "resolve_person"
+    return "resolve_channel_identity"
+
+
+def route_after_flow(state: AgentState) -> str:
+    """Route after discovery/outreach/publish flows"""
+    if state.get("missing_info"):
+        return "end"
+    
+    # Check if we need human review
+    if state.get("draft_required") and state.get("draft_content"):
+        return "review_queue"
+    
+    return "execute_action"
+
+
+# ==================================================
+# BUILD GRAPH (Fixed Shape)
+# ==================================================
 
 workflow = StateGraph(AgentState)
 
+# Add all nodes
+workflow.add_node("initial_triage", initial_triage)
+workflow.add_node("resolve_person", resolve_person)
+workflow.add_node("resolve_channel_identity", resolve_channel_identity)
+workflow.add_node("discovery_flow", discovery_flow)
+workflow.add_node("outreach_flow", outreach_flow)
+workflow.add_node("publish_flow", publish_flow)
+workflow.add_node("review_queue", review_queue)
+workflow.add_node("execute_action", execute_action)
+workflow.add_node("post_action_update", post_action_update)
 
-workflow.add_node("initial_triage", initial_triage) # Entry Point
-workflow.add_node("scout", scout_prospects)
-workflow.add_node("direct_intake", direct_intake)
-workflow.add_node("analyze", analyze_relevance) 
-workflow.add_node("draft_node", write_draft)
-
-# Conditional Routing
-def route_after_triage(state: AgentState) -> str:
-    # 1. Blockage Check
-    if state.get("missing_info") or not state.get("intents"):
-        return "end"
-        
-    intents = state.get("intents", [])
-    
-    # 2. Logic Flow
-    if "discovery" in intents:
-        return "scout" # Always start with discovery if asked
-        
-    if "outreach" in intents:
-        # Pure outreach (no discovery asked)
-        # We go to direct_intake to parse inputs
-        return "direct_intake"
-        
-    return "end"
-
+# Set entry point
 workflow.set_entry_point("initial_triage")
 
+# initial_triage → resolve_person (if person mentioned) OR resolve_channel_identity
 workflow.add_conditional_edges(
     "initial_triage",
-    route_after_triage,
+    should_resolve_person,
     {
-        "scout": "scout",
-        "direct_intake": "direct_intake",
-        "end": END
+        "resolve_person": "resolve_person",
+        "resolve_channel_identity": "resolve_channel_identity"
     }
 )
 
-# Edges
-# Conditional Edges
-def should_draft(state: AgentState) -> str:
-    # Only draft if outreach is intended AND we have a valid prospect
-    if "outreach" in state.get("intents", []) and state.get("current_prospect"):
-        return "draft"
-    return "end"
+# resolve_person → resolve_channel_identity
+workflow.add_edge("resolve_person", "resolve_channel_identity")
 
-workflow.add_edge("scout", "analyze")
-workflow.add_edge("direct_intake", "analyze")
+# resolve_channel_identity → route_by_intent
 workflow.add_conditional_edges(
-    "analyze",
-    should_draft,
+    "resolve_channel_identity",
+    route_by_intent,
     {
-        "draft": "draft_node",
+        "discovery_flow": "discovery_flow",
+        "outreach_flow": "outreach_flow",
+        "publish_flow": "publish_flow",
+        "execute_action": "execute_action",  # For read/query operations
         "end": END
     }
 )
 
+# Flow nodes → review_queue OR execute_action
+workflow.add_conditional_edges(
+    "discovery_flow",
+    route_after_flow,
+    {
+        "review_queue": "review_queue",
+        "execute_action": "execute_action",
+        "end": END
+    }
+)
 
-# Checkpointer
+workflow.add_conditional_edges(
+    "outreach_flow",
+    route_after_flow,
+    {
+        "review_queue": "review_queue",
+        "execute_action": "execute_action",
+        "end": END
+    }
+)
+
+workflow.add_conditional_edges(
+    "publish_flow",
+    route_after_flow,
+    {
+        "review_queue": "review_queue",
+        "execute_action": "execute_action",
+        "end": END
+    }
+)
+
+# review_queue → execute_action (after human approval)
+workflow.add_edge("review_queue", "execute_action")
+
+# execute_action → post_action_update
+workflow.add_edge("execute_action", "post_action_update")
+
+# post_action_update → END
+workflow.add_edge("post_action_update", END)
+
+# Compile with checkpointer and interrupt before review_queue for human approval
 memory = MemorySaver()
+app = workflow.compile(
+    checkpointer=memory, 
+    interrupt_before=["execute_action"]  # Pause before executing approved actions
+)
 
-# Add human approval logic
-def check_approval(state: AgentState):
-    print("Waiting for approval...")
-    pass
 
-workflow.add_node("human_approval", check_approval)
-workflow.add_edge("draft_node", "human_approval")
-workflow.add_edge("human_approval", END) 
+# ==================================================
+# HELPER RUNNERS
+# ==================================================
 
-# Compile with interrupt
-app = workflow.compile(checkpointer=memory, interrupt_before=["human_approval"])
-
-# Helper runners
 async def run_mission_agent(mission_id: str, objective: str, user_id: str, attachments: List[Dict] = []):
-    print(f"DEBUG: Starting mission agent for {mission_id} with {len(attachments)} attachment(s)")
+    """Start a new mission agent run"""
+    print(f"DEBUG: Starting mission {mission_id} with objective: {objective[:50]}...")
+    
     config = {"configurable": {"thread_id": mission_id}}
     inputs = {
-        "mission_id": mission_id, 
-        "objective": objective, 
+        "mission_id": mission_id,
+        "objective": objective,
         "user_id": user_id,
-        "attachments": attachments  # Pass attachments to agent state
+        "attachments": attachments,
+        "intents": [],
+        "channels": [],
+        "required_tools": [],
+        "draft_required": False,
+        "person_name": None,
+        "person_id": None,
+        "channel_identities": {},
+        "missing_info": [],
+        "pause_reason": None,
+        "prospects": [],
+        "current_prospect": {},
+        "draft_id": None,
+        "draft_content": {},
+        "feedback": None,
+        "execution_result": {},
+        "action_status": "pending"
     }
     
     try:
         async for event in app.astream(inputs, config=config):
-            # print(f"DEBUG: Agent event: {event}") # Optional verbose logging
-            pass 
+            print(f"DEBUG: Event: {list(event.keys())}")
     except Exception as e:
         import traceback
-        err = traceback.format_exc()
-        print(f"ERROR: Agent failed: {err}")
-        # Log to DB so user sees it
+        print(f"ERROR: Agent failed: {traceback.format_exc()}")
         try:
-             await log_event(mission_id, user_id, f"Agent crashed: {str(e)}", "error")
+            await log_event(mission_id, user_id, f"Agent encountered an error: {str(e)}", "error")
         except:
             pass
 
-async def resume_mission_agent(draft_prospect_id_or_thread: str, feedback: str = None):
-    # Depending on how we mapped thread_id (mission_id vs draft_id)
-    # If thread_id is mission_id, we need to know it.
-    # For now assuming thread_id passed is correct.
+
+async def resume_mission_agent(mission_id: str, feedback: str = None, approved: bool = True):
+    """Resume a paused mission after human review"""
+    config = {"configurable": {"thread_id": mission_id}}
     
-    # We need to find the mission_id from the draft/prospect to use as thread_id
-    # This complexity suggests storing thread_id on the Draft or Mission.
+    try:
+        if feedback:
+            # Update state with feedback
+            current_state = app.get_state(config)
+            if current_state and current_state.values:
+                # Trigger re-draft with feedback
+                current_state.values["feedback"] = feedback
+                app.update_state(config, current_state.values)
+        
+        if approved:
+            # Continue execution
+            async for event in app.astream(None, config=config):
+                print(f"DEBUG: Resume event: {list(event.keys())}")
+    except Exception as e:
+        print(f"ERROR: Resume failed: {e}")
+
+
+async def provide_missing_info(mission_id: str, user_id: str, info_type: str, value: str):
+    """Provide missing information to continue paused mission"""
+    config = {"configurable": {"thread_id": mission_id}}
     
-    # Placeholder logic
-    config = {"configurable": {"thread_id": draft_prospect_id_or_thread}}
-    
-    if feedback:
-        # Update state with feedback and route back to draft
-        # app.update_state(config, {"feedback": feedback}) # pseudo code
-        # app.invoke(Command(resume=feedback)) # if using interrupt inputs
-        pass
-    else:
-        # Just resume
-        async for event in app.astream(None, config=config):
-            pass
+    try:
+        current_state = app.get_state(config)
+        if current_state and current_state.values:
+            state_values = current_state.values
+            
+            # Update based on info_type
+            if "_identifier" in info_type:
+                channel = info_type.replace("_identifier", "")
+                state_values["channel_identities"][f"/{channel}"] = value
+                
+                # Store in Neo4j if person is known
+                if state_values.get("person_name"):
+                    neo4j_service.add_contact_method(state_values["person_name"], channel, value)
+            
+            # Clear missing_info
+            state_values["missing_info"] = [m for m in state_values.get("missing_info", []) if m != info_type]
+            state_values["pause_reason"] = None
+            
+            app.update_state(config, state_values)
+            
+            # Resume
+            async for event in app.astream(None, config=config):
+                print(f"DEBUG: Continue event: {list(event.keys())}")
+                
+    except Exception as e:
+        print(f"ERROR: Provide info failed: {e}")
+        await log_event(mission_id, user_id, f"Failed to process input: {str(e)}", "error")

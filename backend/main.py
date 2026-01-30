@@ -7,7 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import json
 
 from app.core.config import settings
-from app.models import User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory
+from app.models import User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory, PendingAction
 from app.routers import missions, reviews, agents, contacts
 
 @asynccontextmanager
@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
         raise ValueError("MONGODB_URI environment variable is required")
     
     client = AsyncIOMotorClient(settings.MONGODB_URI, tlsAllowInvalidCertificates=True)
-    await init_beanie(database=client.outbound_ai, document_models=[User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory])
+    await init_beanie(database=client.outbound_ai, document_models=[User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory, PendingAction])
     yield
     # Shutdown
 

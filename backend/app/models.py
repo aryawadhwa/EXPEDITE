@@ -9,6 +9,7 @@ class DraftStatus(str, Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+    SENT = "SENT"
 
 class UserSettings(BaseModel):
     """User preferences that persist"""
@@ -59,13 +60,14 @@ class Prospect(Document):
         name = "prospects"
 
 class Draft(Document):
-    prospect_id: str # Link to Prospect.id
-    channel: str = "email" # email, linkedin, etc.
-    subject: str
+    prospect_id: Optional[str] = None  # Link to Prospect.id (optional for direct posts)
+    channel: str = "email" # email, linkedin, twitter, reddit, slack, instagram, etc.
+    subject: str = ""
     body: str
-    ai_reasoning: str
+    ai_reasoning: str = ""
     status: DraftStatus = DraftStatus.PENDING
     attachments: List[Dict] = []  # List of {"filename": str, "content_type": str, "asset_id": str}
+    metadata: Dict = {}  # Channel-specific metadata (subreddit, message_type, etc.)
 
     class Settings:
         name = "drafts"
@@ -80,6 +82,20 @@ class MissionLog(Document):
 
     class Settings:
         name = "mission_logs"
+
+
+class PendingAction(Document):
+    """Stores pending actions to execute after OAuth callback"""
+    user_id: str  # Link to User.clerk_id
+    mission_id: str  # Which mission/chat to return to
+    action_type: str  # e.g., "linkedin_post", "twitter_post", "slack_message"
+    action_data: Dict = {}  # The extracted content: {"content": "...", "subreddit": "...", etc.}
+    tool: str  # The tool that needs to be connected
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    executed: bool = False  # Whether the action has been executed
+    
+    class Settings:
+        name = "pending_actions"
 
 
 class AgentStats(BaseModel):

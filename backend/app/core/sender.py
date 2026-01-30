@@ -1,6 +1,7 @@
 from app.core.config import settings
 from composio import Composio
-import base64
+from typing import Optional
+import os
 
 # Lazy initialization to ensure settings are loaded
 _composio_client = None
@@ -13,72 +14,103 @@ def get_composio_client():
         _composio_client = Composio(api_key=settings.COMPOSIO_API_KEY)
     return _composio_client
 
-async def send_email_via_composio(user_id: str, recipient: str, subject: str, body: str, attachments: list = []):
-    """Execute Gmail Send Email action via Composio SDK using user_id for authentication."""
+
+async def send_email_via_composio(
+    user_id: str,
+    recipient: str,
+    subject: str,
+    body: str,
+    attachments: Optional[list] = None,
+):
+    """
+    Execute Gmail Send Email action via Composio SDK.
+    
+    Args:
+        user_id: Composio entity ID (e.g., clerk_id)
+        recipient: Email address to send to
+        subject: Email subject line
+        body: Email body content
+        attachments: Optional list of dicts with 'asset_id' keys
+        
+    Returns:
+        Dict with execution result
+    """
+    import tempfile
+    
+    client = get_composio_client()
+
+    arguments = {
+        "recipient_email": recipient,
+        "subject": subject,
+        "body": body,
+        "user_id": "me",  # Required by Gmail API
+    }
+
+    temp_files = []
+
+    if attachments:
+        from app.models import UserAsset
+        import base64
+
+        # Process first attachment (Composio uses singular "attachment" parameter)
+        for att in attachments:
+            asset_id = att.get("asset_id")
+            if not asset_id:
+                continue
+                
+            asset = await UserAsset.get(asset_id)
+            if not asset:
+                continue
+
+            # Get file extension and create proper filename
+            filename = asset.filename
+            suffix = os.path.splitext(filename)[1] if "." in filename else ""
+            
+            # Create temp file with the asset data - use original filename
+            tf = tempfile.NamedTemporaryFile(delete=False, suffix=suffix, prefix=os.path.splitext(filename)[0] + "_")
+            tf.write(asset.file_data)
+            tf.close()
+
+            temp_files.append(tf.name)
+            
+            # Composio Gmail uses singular "attachment" parameter with file path
+            arguments["attachment"] = tf.name
+            print(f"Including attachment: {filename} -> {tf.name}")
+            break  # Gmail SEND_EMAIL only supports one attachment at a time
+
     try:
-        client = get_composio_client()
-        
-        # Build arguments
-        arguments = {
-            "recipient_email": recipient,
-            "subject": subject,
-            "body": body,
-        }
-        
-        # Handle attachments if present
-        temp_files = [] # Keep track to clean up later (optional, or rely on OS)
-        if attachments:
-            from app.models import UserAsset
-            import tempfile
-            import os
-            
-            attachment_data = [] # List of dicts or paths? SDK docs say "paths to tools that need them"
-            # But GMAIL_SEND_EMAIL input schema for 'attachments' expects a list of objects with 'path' or just list of paths.
-            # Let's try passing list of dicts with 'path' and 'name'
-            
-            for att in attachments:
-                asset_id = att.get('asset_id')
-                if asset_id:
-                    asset = await UserAsset.get(asset_id)
-                    if asset:
-                        # Create temp file
-                        suffix = "." + asset.filename.split(".")[-1] if "." in asset.filename else ""
-                        tf = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-                        tf.write(asset.file_data)
-                        tf.close()
-                        temp_files.append(tf.name)
-                        
-                        # Manual Upload using Composio Internal Helpers
-                        # This guarantees we get the correct {s3key, mimetype, name} structure
-                        # bypassing any auto-magic issues with lists.
-                        from composio.core.models._files import FileUploadable
-                        
-                        # We need the tool schema to get toolkit slug
-                        tool_schema = client.tools.get_raw_composio_tool_by_slug("GMAIL_SEND_EMAIL")
-                        toolkit_slug = tool_schema.toolkit.slug if tool_schema.toolkit else "gmail"
-
-                        uploaded_file = FileUploadable.from_path(
-                            client=client._client, # Access the underlying HttpClient
-                            file=tf.name,
-                            tool="GMAIL_SEND_EMAIL",
-                            toolkit=toolkit_slug,
-                        ).model_dump()
-                        
-                        print(f"DEBUG: Uploaded file manually: {uploaded_file}")
-                        attachment_data.append(uploaded_file)
-
-            if attachment_data:
-                arguments["attachments"] = attachment_data
-                print(f"Including {len(attachment_data)} attachment(s) via temp files")
-        
         result = client.tools.execute(
             slug="GMAIL_SEND_EMAIL",
             arguments=arguments,
             user_id=user_id,
             dangerously_skip_version_check=True,
         )
-        print(f"Email sent successfully: {result}")
-        return result
+        print(f"Email sent - Composio result: {result}")
+        
+        # Composio SDK returns a result object with 'successful' key
+        if hasattr(result, 'successful'):
+            if result.successful:
+                return {"success": True, "data": result}
+            else:
+                error_msg = getattr(result, 'error', None) or str(result)
+                return {"success": False, "error": error_msg}
+        
+        # Handle dict response (older SDK versions)
+        if isinstance(result, dict):
+            if result.get("successful") or result.get("success"):
+                return {"success": True, "data": result}
+            else:
+                return {"success": False, "error": result.get("error") or result.get("message") or "Unknown error"}
+        
+        # If we got here, assume success if no error
+        return {"success": True, "data": result}
     except Exception as e:
         print(f"ERROR: Composio SDK execution failed: {e}")
-        raise
+        return {"success": False, "error": str(e)}
+    finally:
+        # Cleanup temp files
+        for p in temp_files:
+            try:
+                os.unlink(p)
+            except Exception:
+                pass

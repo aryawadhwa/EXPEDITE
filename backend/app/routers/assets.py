@@ -94,6 +94,65 @@ async def delete_asset(asset_id: str, user: User = Depends(get_current_user)):
     await asset.delete()
     return {"status": "deleted", "asset_id": asset_id}
 
+
+@router.get("/{asset_id}/content")
+async def get_asset_content(asset_id: str, user: User = Depends(get_current_user)):
+    """
+    Extract and return the text content of a knowledge asset.
+    Used for RAG (Retrieval Augmented Generation) context.
+    """
+    from app.services.rag import rag_service
+    
+    asset = await UserAsset.get(asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    # Verify ownership
+    if asset.user_id != user.clerk_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    content = await rag_service.get_asset_content(asset_id)
+    
+    return {
+        "asset_id": asset_id,
+        "filename": asset.filename,
+        "content": content,
+        "content_length": len(content) if content else 0
+    }
+
+
+@router.post("/context")
+async def build_rag_context(
+    asset_ids: List[str],
+    max_chars: int = 8000,
+    user: User = Depends(get_current_user)
+):
+    """
+    Build a combined context string from multiple knowledge assets.
+    
+    This is used to inject relevant knowledge into AI prompts for
+    content generation (posts, emails, etc.)
+    """
+    from app.services.rag import rag_service
+    
+    # Verify ownership of all assets
+    for asset_id in asset_ids:
+        asset = await UserAsset.get(asset_id)
+        if not asset or asset.user_id != user.clerk_id:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Asset {asset_id} not found or access denied"
+            )
+    
+    context = await rag_service.build_context_from_assets(asset_ids, max_chars)
+    
+    return {
+        "context": context,
+        "asset_count": len(asset_ids),
+        "context_length": len(context)
+    }
+
+
 # Explicit options handler if needed for some environments (usually main CORSMiddleware handles this, but sometimes specific routers need help)
 from fastapi import Response
 @router.options("/upload")
