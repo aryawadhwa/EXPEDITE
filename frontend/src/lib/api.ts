@@ -115,6 +115,23 @@ export function useApi() {
             return res.json();
         },
 
+        // Attachment management for drafts
+        getAvailableAssets: async (draftId: string) => {
+            const res = await fetchWithAuth(`/reviews/${draftId}/available-assets`);
+            if (!res.ok) throw new Error('Failed to get assets');
+            return res.json();
+        },
+
+        updateDraftAttachments: async (draftId: string, assetIds: string[]) => {
+            const res = await fetchWithAuth(`/reviews/${draftId}/attachments`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ asset_ids: assetIds }),
+            });
+            if (!res.ok) throw new Error('Failed to update attachments');
+            return res.json();
+        },
+
         // Integrations
         connectTool: async (tool: string, params?: Record<string, string>) => {
             const res = await fetchWithAuth("/integrations/connect", {
@@ -146,6 +163,18 @@ export function useApi() {
         getToolStatus: async (tool: string) => {
             const res = await fetchWithAuth(`/integrations/${tool}/status`);
             if (!res.ok) return { status: "INACTIVE" };
+            return res.json();
+        },
+
+        // Execute pending action after OAuth callback
+        executePendingAction: async (actionId: string) => {
+            const res = await fetchWithAuth(`/missions/pending-action/${actionId}/execute`, {
+                method: "POST",
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || "Failed to execute pending action");
+            }
             return res.json();
         },
 
@@ -220,6 +249,23 @@ export function useApi() {
                 method: "DELETE",
             });
             if (!res.ok) throw new Error('Failed to delete asset');
+            return res.json();
+        },
+
+        // Get text content from an asset (for RAG)
+        getAssetContent: async (id: string) => {
+            const res = await fetchWithAuth(`/assets/${id}/content`);
+            if (!res.ok) throw new Error('Failed to get asset content');
+            return res.json();
+        },
+
+        // Build RAG context from multiple assets
+        buildRagContext: async (assetIds: string[], maxChars: number = 8000) => {
+            const res = await fetchWithAuth("/assets/context", {
+                method: "POST",
+                body: JSON.stringify({ asset_ids: assetIds, max_chars: maxChars }),
+            });
+            if (!res.ok) throw new Error('Failed to build RAG context');
             return res.json();
         },
 
