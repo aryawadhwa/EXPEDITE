@@ -1,5 +1,5 @@
 "use client";
-import { useScroll, useTransform, motion } from "framer-motion";
+import { useScroll, useTransform, motion, MotionValue } from "framer-motion";
 import React, { useRef } from "react";
 
 export const GoogleGeminiEffect = ({
@@ -8,7 +8,7 @@ export const GoogleGeminiEffect = ({
   description,
   className,
 }: {
-  pathLengths?: number[];
+  pathLengths?: (number | MotionValue<number>)[];
   title?: string;
   description?: string;
   className?: string;

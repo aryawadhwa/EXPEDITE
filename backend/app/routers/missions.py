@@ -76,8 +76,8 @@ class MissionCreate(BaseModel):
 # Direct action patterns - bypass agent workflow for these
 DIRECT_ACTION_PATTERNS = {
     "twitter_post": ["post on twitter", "tweet this", "create a tweet", "post a tweet", "tweet:", "post to twitter", "send tweet", "twitter post", "publish a tweet", "publish on twitter"],
-    "reddit_post": ["post on reddit", "create a reddit post", "post to reddit", "post in r/", "submit to reddit", "reddit post", "post to r/", "post a reddit", "publish a reddit", "publish on reddit", "publish to reddit", "reddit about", "in r/"],
-    "linkedin_post": ["post on linkedin", "create a linkedin post", "share on linkedin", "linkedin post", "post to linkedin", "post a linkedin", "publish on linkedin", "publish a linkedin"],
+    "reddit_post": ["post on reddit", "create a reddit post", "post to reddit", "post in r/", "submit to reddit", "reddit post", "post to r/", "post a reddit", "publish a reddit", "publish on reddit", "publish to reddit", "reddit about", "in r/", "in reddit", "on reddit"],
+    "linkedin_post": ["post on linkedin", "create a linkedin post", "share on linkedin", "linkedin post", "post to linkedin", "post a linkedin", "publish on linkedin", "publish a linkedin", "on linkedin"],
     "slack_message": ["send to slack", "slack message", "post to slack", "message on slack", "notify slack"],
     "gmail_send": ["send email", "send an email", "email to", "compose email", "mail to"],
 }

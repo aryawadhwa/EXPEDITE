@@ -32,7 +32,7 @@ export function CTASection() {
                 <p className="text-xl md:text-2xl text-purple-400 font-mono mb-6 tracking-wider">
                     /// MISSION READY
                 </p>
-                <h2 className="text-[12vw] leading-[0.8] font-black tracking-tighter text-white mb-12">
+                <h2 className="text-[8vw] leading-[0.8] font-black tracking-tighter text-white mb-12">
                     <span className="block text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">
                         DEPLOY
                     </span>

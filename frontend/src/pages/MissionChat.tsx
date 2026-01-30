@@ -19,7 +19,6 @@ import {
     Send,
     ArrowLeft,
     User,
-    Bot,
     Loader2,
     CheckCircle,
     XCircle,
@@ -28,6 +27,16 @@ import {
     MicOff,
     ExternalLink
 } from "lucide-react";
+
+// App Logo Component
+const AppLogo = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+        <path d="M 20 4 L 36 20 L 20 28 L 20 4 Z" fill="currentColor" fillOpacity="0.9"/>
+        <path d="M 20 12 L 28 20 L 20 36 L 12 20 L 20 12 Z" fill="currentColor" fillOpacity="0.7"/>
+        <path d="M 20 16 L 24 20 L 20 24 L 16 20 L 20 16 Z" fill="currentColor" fillOpacity="0.4"/>
+        <path d="M 4 20 L 12 16 L 12 24 L 4 20 Z" fill="currentColor" fillOpacity="0.6"/>
+    </svg>
+);
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import ReactMarkdown from 'react-markdown';
@@ -559,7 +568,7 @@ export default function MissionChat() {
                 <div className="max-w-3xl mx-auto space-y-4">
                     {messages.length === 0 && (
                         <div className="text-center py-20">
-                            <Bot className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                            <AppLogo className="w-16 h-16 text-primary mx-auto mb-4" />
                             <h2 className="text-xl font-semibold text-foreground mb-2">
                                 What's your outbound mission?
                             </h2>
@@ -582,7 +591,7 @@ export default function MissionChat() {
                                     "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
                                     message.role === "agent" ? "bg-primary/20" : "bg-muted"
                                 )}>
-                                    <Bot className="w-4 h-4 text-primary" />
+                                    <AppLogo className="w-5 h-5 text-primary" />
                                 </div>
                             )}
 
@@ -595,13 +604,13 @@ export default function MissionChat() {
                                         : "bg-card border border-border"
                             )}>
                                 {message.role === "agent" || message.role === "system" ? (
-                                    <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2">
+                                    <div className="text-sm text-foreground prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-p:text-foreground prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:text-foreground prose-headings:text-foreground prose-strong:text-foreground">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                             {message.content}
                                         </ReactMarkdown>
                                     </div>
                                 ) : (
-                                    <p className="text-sm">{message.content}</p>
+                                    <p className="text-sm text-foreground">{message.content}</p>
                                 )}
                                 {(() => {
                                     // Check for connect_url in metadata (direct OAuth link)
@@ -796,7 +805,7 @@ export default function MissionChat() {
                     {isLoading && (
                         <div className="flex gap-3">
                             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                <Bot className="w-4 h-4 text-primary" />
+                                <AppLogo className="w-5 h-5 text-primary" />
                             </div>
                             <div className="bg-card border border-border rounded-xl px-4 py-3">
                                 <div className="flex items-center gap-2">

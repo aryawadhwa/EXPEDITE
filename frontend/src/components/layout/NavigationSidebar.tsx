@@ -12,6 +12,7 @@ import {
   Users,
   Puzzle,
   Coins,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
@@ -50,17 +51,23 @@ export function NavigationSidebar({ isCollapsed, onToggle }: NavigationSidebarPr
       )}
     >
       <div className="flex items-center gap-3 p-4 h-16 border-b border-sidebar-border/50">
-        {!isCollapsed && (
-             <div className="flex items-center gap-2">
-                <Logo className="h-8 w-8 text-primary" />
-
-              </div>
-        )}
-        {isCollapsed && (
-             <div className="flex justify-center w-full">
-                 <Logo className="h-8 w-8 text-primary" />
-             </div>
-        )}
+        {/* Logo - links to home */}
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <a
+              href="http://localhost:8080"
+              className={cn(
+                "flex items-center gap-2 hover:opacity-80 transition-opacity",
+                isCollapsed && "justify-center w-full"
+              )}
+            >
+              <Logo className="h-8 w-8 text-primary" />
+            </a>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="bg-popover">
+            Back to Home
+          </TooltipContent>
+        </Tooltip>
         <Button
           variant="ghost"
           size="icon"
