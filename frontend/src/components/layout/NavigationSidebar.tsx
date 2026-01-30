@@ -14,6 +14,7 @@ import {
   Coins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/logo";
 import {
   Tooltip,
   TooltipContent,
@@ -44,19 +45,32 @@ export function NavigationSidebar({ isCollapsed, onToggle }: NavigationSidebarPr
   return (
     <aside
       className={cn(
-        "flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-300",
-        isCollapsed ? "w-16" : "w-56"
+        "flex flex-col h-full bg-terminal border-r border-sidebar-border transition-all duration-300",
+        isCollapsed ? "w-16" : "w-64"
       )}
     >
-      {/* Logo */}
-      <div className="flex items-center h-14 px-4 border-b border-sidebar-border overflow-hidden">
-        <Link to="/" className="flex items-center gap-2">
-          {isCollapsed ? (
-            <span className="font-bold text-xl bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">EA</span>
-          ) : (
-            <img src="/logo.png" alt="ExpediteAI" className="h-18 w-auto object-contain" />
-          )}
-        </Link>
+      <div className="flex items-center gap-3 p-4 h-16 border-b border-sidebar-border/50">
+        {!isCollapsed && (
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Logo className="h-8 w-8 text-primary" />
+            <span className="font-bold text-lg tracking-tight text-white">ExpenditeAI</span>
+          </Link>
+        )}
+        {isCollapsed && (
+          <div className="flex justify-center w-full">
+            <Link to="/" className="hover:opacity-80 transition-opacity">
+              <Logo className="h-8 w-8 text-primary" />
+            </Link>
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggle}
+          className={cn("ml-auto h-6 w-6 text-sidebar-foreground/50 hover:text-sidebar-foreground", isCollapsed && "mx-auto ml-0")}
+        >
+          {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </Button>
       </div>
 
       {/* Navigation */}

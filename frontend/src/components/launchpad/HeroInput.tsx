@@ -301,9 +301,9 @@ export function HeroInput() {
             size="lg"
             disabled={!query.trim() || isLoading}
             className={cn(
-              "h-12 px-6 rounded-xl font-semibold transition-all shrink-0 gap-2",
+              "h-12 px-6 rounded-xl font-semibold transition-all shrink-0 gap-2 text-white",
               query.trim()
-                ? "bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg shadow-primary/25"
+                ? "bg-primary/80 hover:bg-primary shadow-lg shadow-primary/25"
                 : "bg-secondary text-muted-foreground"
             )}
           >

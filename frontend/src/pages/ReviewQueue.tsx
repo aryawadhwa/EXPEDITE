@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { ProspectCard } from "@/components/review/ProspectCard";
-import { EmailEditor } from "@/components/review/EmailEditor";
+import { ReviewCardRenderer } from "@/components/review/ReviewCardRenderer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,10 +15,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, ChevronLeft, ChevronRight, Inbox, Loader2, CheckCheck, XCircle } from "lucide-react";
+import { Check, X, ChevronLeft, ChevronRight, Inbox, Loader2, CheckCheck, XCircle, Mail, Linkedin, Twitter, MessageSquare } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "@/lib/api";
 import { toast } from "sonner";
+
+// Channel icon helper
+const getChannelIcon = (channel: string) => {
+  switch (channel?.toLowerCase()) {
+    case "linkedin": return <Linkedin className="w-4 h-4 text-blue-500" />;
+    case "twitter": return <Twitter className="w-4 h-4 text-sky-400" />;
+    case "reddit": return <MessageSquare className="w-4 h-4 text-orange-500" />;
+    case "slack": return <MessageSquare className="w-4 h-4 text-purple-500" />;
+    default: return <Mail className="w-4 h-4 text-blue-400" />;
+  }
+};
 
 interface DraftEdits {
   [draftId: string]: {
@@ -26,9 +38,33 @@ interface DraftEdits {
   };
 }
 
+interface Draft {
+  id: string;
+  _id?: string;
+  name: string;
+  subject: string;
+  body: string;
+  channel: string;
+  company?: string;
+  context_source?: string;
+  public_contact?: string;
+  linkedin?: string;
+  relevance_reason?: string;
+  ai_reasoning?: string;
+  relevance_score?: number;
+  metadata?: {
+    messageType?: "connection" | "inmail" | "message";
+    subreddit?: string;
+    postType?: "link" | "image" | "text";
+    slackChannel?: string;
+    threadTs?: string;
+  };
+  attachments?: { filename: string; asset_id: string }[];
+}
+
 export default function ReviewQueue() {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [drafts, setDrafts] = useState<any[]>([]);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isActioning, setIsActioning] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -47,31 +83,42 @@ export default function ReviewQueue() {
   const api = useApi();
   const navigate = useNavigate();
 
-  // Get mission_id from URL query params
+  // Get filter params from URL query
   const [searchParams] = useSearchParams();
   const filterMissionId = searchParams.get("mission_id");
+  const filterDraftId = searchParams.get("draft_id");
 
-  const fetchDrafts = async () => {
+  const fetchDrafts = useCallback(async () => {
     try {
       const data = await api.getPendingDrafts(filterMissionId || undefined);
       setDrafts(data || []);
       // Initialize edits for all drafts
       const initialEdits: DraftEdits = {};
-      (data || []).forEach((d: any) => {
+      (data || []).forEach((d: Draft) => {
         const id = d.id || d._id;
         initialEdits[id] = { subject: d.subject, body: d.body };
       });
       setDraftEdits(initialEdits);
+
+      setDraftEdits(initialEdits);
+
+      // If a specific draft_id was requested, navigate to it
+      if (filterDraftId && data?.length) {
+        const idx = data.findIndex((d: Draft) => (d.id || d._id) === filterDraftId);
+        if (idx >= 0) {
+          setCurrentIndex(idx);
+        }
+      }
     } catch (error) {
       console.error("Failed to fetch drafts:", error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [api, filterMissionId, filterDraftId]);
 
   useEffect(() => {
     fetchDrafts();
-  }, [api, filterMissionId]);
+  }, [fetchDrafts]);
 
   const currentDraft = drafts[currentIndex];
   const currentDraftId = currentDraft?.id || currentDraft?._id;
@@ -177,12 +224,40 @@ export default function ReviewQueue() {
         ...prev,
         [currentDraftId]: { subject: result.subject, body: result.body }
       }));
-      toast.success("Draft Regenerated", { description: "AI has created a new draft." });
+      toast.success("Draft Regenerated", { description: "AI has created a new draft based on your mission." });
     } catch (error) {
       console.error("Failed to regenerate:", error);
       toast.error("Failed to regenerate draft");
     } finally {
       setIsRegenerating(false);
+    }
+  };
+
+  const handleLoadAssets = async () => {
+    if (!currentDraftId) return [];
+    try {
+      return await api.getAvailableAssets(currentDraftId);
+    } catch (error) {
+      console.error("Failed to load assets:", error);
+      return [];
+    }
+  };
+
+  const handleAttachmentsChange = async (newAttachments: { filename: string; asset_id: string }[]) => {
+    if (!currentDraftId) return;
+    try {
+      await api.updateDraftAttachments(currentDraftId, newAttachments.map(a => a.asset_id));
+      // Update local state
+      const updatedDrafts = [...drafts];
+      updatedDrafts[currentIndex] = {
+        ...updatedDrafts[currentIndex],
+        attachments: newAttachments,
+      };
+      setDrafts(updatedDrafts);
+      toast.success("Attachments Updated");
+    } catch (error) {
+      console.error("Failed to update attachments:", error);
+      toast.error("Failed to update attachments");
     }
   };
 
@@ -334,65 +409,104 @@ export default function ReviewQueue() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-black/50 backdrop-blur-sm">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 h-14 border-b border-border bg-card/50">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-foreground">Review Queue</h1>
-          <Badge variant="secondary" className="font-mono">
-            {selectMode ? `${selectedDrafts.size} selected` : `${currentIndex + 1} / ${drafts.length}`}
-          </Badge>
+      <header className="flex items-center justify-between px-6 h-16 border-b border-white/10 bg-black/20 backdrop-blur-md">
+        <div className="flex items-center gap-4">
+          <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+            <Inbox className="w-5 h-5 text-purple-400" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-white tracking-tight">Review Queue</h1>
+            <p className="text-xs text-zinc-500 font-mono">
+              {selectMode ? `${selectedDrafts.size} selected` : `PENDING: ${drafts.length}`}
+            </p>
+          </div>
+
+          {currentDraft && !selectMode && (
+            <div className="flex items-center gap-2 ml-4 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-300">
+              {getChannelIcon(currentDraft.channel)}
+              <span className="uppercase tracking-wider font-medium">{currentDraft.channel || "EMAIL"}</span>
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-3">
           {/* Bulk Actions */}
           {selectMode ? (
-            <>
+            <div className="flex items-center gap-2 bg-white/5 p-1 rounded-lg border border-white/10">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={selectedDrafts.size === drafts.length ? deselectAllDrafts : selectAllDrafts}
-                className="text-xs"
+                className="text-xs text-zinc-400 hover:text-white"
               >
                 {selectedDrafts.size === drafts.length ? "Deselect All" : "Select All"}
               </Button>
+              <div className="w-px h-4 bg-white/10" />
               <Button
-                variant="default"
                 size="sm"
                 onClick={handleBulkApprove}
                 disabled={selectedDrafts.size === 0 || isActioning}
-                className="gap-1 bg-success hover:bg-success/90"
+                className="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20 h-7 text-xs"
               >
-                <CheckCheck className="w-3.5 h-3.5" />
+                <CheckCheck className="w-3.5 h-3.5 mr-1.5" />
                 Approve ({selectedDrafts.size})
               </Button>
               <Button
-                variant="destructive"
                 size="sm"
                 onClick={() => setShowBulkRejectDialog(true)}
                 disabled={selectedDrafts.size === 0 || isActioning}
-                className="gap-1"
+                className="bg-red-500/10 text-red-400 hover:bg-red-500/20 border-red-500/20 h-7 text-xs"
               >
-                <XCircle className="w-3.5 h-3.5" />
+                <XCircle className="w-3.5 h-3.5 mr-1.5" />
                 Reject ({selectedDrafts.size})
               </Button>
-              <Button variant="ghost" size="sm" onClick={toggleSelectMode}>
-                Cancel
+              <Button variant="ghost" size="sm" onClick={toggleSelectMode} className="text-zinc-400 hover:text-white h-7 text-xs">
+                Exit
               </Button>
-            </>
+            </div>
           ) : (
             <>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={toggleSelectMode}
-                className="text-xs"
+                className="bg-transparent border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
               >
                 Multi-Select
               </Button>
+
+              <div className="flex items-center bg-white/5 rounded-lg border border-white/10 p-0.5 ml-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handlePrev}
+                  disabled={currentIndex === 0}
+                  className="h-8 w-8 text-zinc-400 hover:text-white"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <div className="w-px h-4 bg-white/10 mx-1" />
+                <span className="text-xs font-mono text-zinc-500 min-w-[3rem] text-center">
+                  {currentIndex + 1} / {drafts.length}
+                </span>
+                <div className="w-px h-4 bg-white/10 mx-1" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleNext}
+                  disabled={currentIndex === drafts.length - 1}
+                  className="h-8 w-8 text-zinc-400 hover:text-white"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground hover:text-destructive"
+                className="ml-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/5 transition-colors"
                 onClick={async () => {
                   if (confirm("Are you sure you want to clear all pending drafts?")) {
                     setIsActioning(true);
@@ -410,23 +524,6 @@ export default function ReviewQueue() {
               >
                 Clear All
               </Button>
-              <div className="w-px h-4 bg-border mx-2" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handlePrev}
-                disabled={currentIndex === 0}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleNext}
-                disabled={currentIndex === drafts.length - 1}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
             </>
           )}
         </div>
@@ -435,11 +532,11 @@ export default function ReviewQueue() {
       {/* Split View */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Prospect List (in select mode) or Single Prospect */}
-        <div className="w-1/2 border-r border-border overflow-auto bg-card/30">
+        <div className="w-1/2 border-r border-white/10 overflow-auto bg-black/20">
           {selectMode ? (
             <div className="p-4 space-y-2">
-              <p className="text-sm text-muted-foreground mb-4">
-                Select drafts to approve or reject in bulk:
+              <p className="text-xs font-medium text-zinc-500 uppercase tracking-widest mb-4 px-2">
+                Select Drafts
               </p>
               {drafts.map((draft, idx) => {
                 const draftId = draft.id || draft._id;
@@ -448,20 +545,29 @@ export default function ReviewQueue() {
                   <div
                     key={draftId}
                     onClick={() => toggleDraftSelection(draftId)}
-                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all border ${isSelected
-                      ? "bg-primary/10 border-primary/50"
-                      : "bg-secondary/30 border-transparent hover:bg-secondary/50"
-                      }`}
+                    className={cn(
+                      "flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border",
+                      isSelected
+                        ? "bg-primary/10 border-primary/40 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
+                        : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10"
+                    )}
                   >
                     <Checkbox
                       checked={isSelected}
                       onCheckedChange={() => toggleDraftSelection(draftId)}
+                      className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{draft.name || "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground truncate">{draft.company || "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground truncate mt-1">
-                        Subject: {draft.subject?.slice(0, 40)}...
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-medium text-sm text-zinc-200 truncate">{draft.name || "Unknown"}</p>
+                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-white/10 text-zinc-500">
+                          {draft.channel || 'email'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-zinc-500 truncate">{draft.company || "Unknown"}</p>
+                      <p className="text-xs text-zinc-400 mt-2 line-clamp-1">
+                        <span className="text-zinc-600 mr-2">SUBJECT:</span>
+                        {draft.subject}
                       </p>
                     </div>
                   </div>
@@ -482,25 +588,45 @@ export default function ReviewQueue() {
           )}
         </div>
 
-        {/* Right: Email Draft */}
-        <div className="w-1/2 overflow-auto">
+        {/* Right: Dynamic Content Editor based on Channel */}
+        <div className="w-1/2 overflow-auto bg-black/10">
           {!selectMode && currentDraft && (
-            <EmailEditor
+            <ReviewCardRenderer
+              channel={currentDraft.channel || "email"}
               subject={currentEdits?.subject || currentDraft.subject || ""}
               body={currentEdits?.body || currentDraft.body || ""}
+              draftId={currentDraftId}
+              metadata={{
+                // LinkedIn metadata
+                recipientName: currentDraft.name,
+                recipientTitle: currentDraft.company,
+                messageType: currentDraft.metadata?.messageType,
+                // Reddit metadata
+                subreddit: currentDraft.metadata?.subreddit,
+                postType: currentDraft.metadata?.postType,
+                // Slack metadata
+                slackChannel: currentDraft.metadata?.slackChannel,
+                threadTs: currentDraft.metadata?.threadTs,
+                // Email attachments
+                attachments: currentDraft.attachments,
+              }}
               onSubjectChange={handleSubjectChange}
               onBodyChange={handleBodyChange}
               onRegenerate={handleRegenerate}
+              onAttachmentsChange={handleAttachmentsChange}
+              onLoadAssets={handleLoadAssets}
               isRegenerating={isRegenerating}
             />
           )}
           {selectMode && (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              <div className="text-center">
-                <CheckCheck className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                <p>Select drafts from the left panel</p>
-                <p className="text-sm mt-2">Then use bulk actions in the header</p>
+            <div className="flex flex-col items-center justify-center h-full text-zinc-500">
+              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-6">
+                <CheckCheck className="w-8 h-8 opacity-50" />
               </div>
+              <h3 className="text-lg font-medium text-zinc-300 mb-2">Bulk Selection Mode</h3>
+              <p className="text-sm max-w-xs text-center leading-relaxed">
+                Select multiple drafts from the list on the left to approve or reject them in a single batch.
+              </p>
             </div>
           )}
         </div>
@@ -508,10 +634,10 @@ export default function ReviewQueue() {
 
       {/* Action Footer */}
       {!selectMode && (
-        <footer className="flex items-center justify-between px-6 py-4 border-t border-border bg-card">
+        <footer className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-black/40 backdrop-blur-xl absolute bottom-0 left-0 right-0 z-10">
           <Button
-            variant="secondary"
-            className="gap-2"
+            variant="ghost"
+            className="gap-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10"
             onClick={handleReject}
             disabled={isActioning}
           >
@@ -521,14 +647,15 @@ export default function ReviewQueue() {
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
-              className="gap-2"
+              className="gap-2 border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white"
               onClick={handleSkip}
               disabled={isActioning || currentIndex === drafts.length - 1}
             >
-              Skip for Now
+              Skip
+              <ChevronRight className="w-3.5 h-3.5 opacity-50" />
             </Button>
             <Button
-              className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
+              className="gap-2 bg-primary hover:bg-primary/90 text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] border-0"
               onClick={handleApprove}
               disabled={isActioning}
             >
@@ -537,7 +664,11 @@ export default function ReviewQueue() {
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  Approve & Send
+                  {currentDraft?.channel === "twitter" ? "Approve & Tweet" :
+                    currentDraft?.channel === "reddit" ? "Approve & Post" :
+                      currentDraft?.channel === "linkedin" ? "Approve & Send" :
+                        currentDraft?.channel === "slack" ? "Approve & Send" :
+                          "Approve & Send"}
                 </>
               )}
             </Button>

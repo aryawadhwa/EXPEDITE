@@ -1,11 +1,13 @@
-import { SignedIn, UserProfile } from "@clerk/clerk-react";
+import { SignedIn, useUser, useClerk } from "@clerk/clerk-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check } from "lucide-react";
+import { Check, Mail, Calendar, User, Shield, ExternalLink, Smartphone, MapPin, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 export default function Profile() {
+    const { user } = useUser();
+    const { openUserProfile } = useClerk();
     const [currency, setCurrency] = useState<'USD' | 'INR'>('USD');
 
     const subscriptionPlans = [
@@ -53,49 +55,114 @@ export default function Profile() {
         },
     ];
 
+    if (!user) return null;
+
     return (
         <div className="h-full p-6 lg:p-8 overflow-auto max-w-7xl mx-auto">
             <div className="flex flex-col gap-8">
 
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl lg:text-4xl font-serif font-bold text-white mb-2">
-                            Profile & Subscription
-                        </h1>
-                        <p className="text-muted-foreground text-sm">
-                            Manage your account and subscription
-                        </p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                            <span>My Account</span>
+                            <span>/</span>
+                            <span className="text-white">Profile</span>
+                        </div>
                     </div>
                 </div>
 
-                <Card className="glass-card p-0 w-full overflow-hidden">
-                    <SignedIn>
-                        <UserProfile
-                            appearance={{
-                                variables: {
-                                    colorPrimary: "#FCA311",
-                                    colorBackground: "#050505",
-                                    colorText: "#E5E5E5",
-                                    colorTextSecondary: "#9CA3AF",
-                                    fontFamily: "Inter, sans-serif",
-                                    borderRadius: "0.5rem",
-                                },
-                                elements: {
-                                    rootBox: "w-full shadow-none",
-                                    card: "shadow-none bg-transparent w-full max-w-none rounded-none border-none",
-                                    scrollBox: "w-full max-w-none p-6",
-                                    page: "w-full max-w-none",
-                                    navbar: "hidden",
-                                    headerTitle: "text-white font-serif",
-                                    headerSubtitle: "text-muted-foreground",
-                                    socialButtonsIconButton: "border-[#14213D] hover:bg-[#14213D]",
-                                    formButtonPrimary: "bg-primary text-black hover:bg-primary/90",
-                                    formFieldInput: "bg-black/50 border-[#14213D] text-white",
-                                }
+                {/* Custom Profile Layout */}
+                <div className="grid grid-cols-1 gap-8">
+                    {/* Header Card */}
+                    <div className="relative overflow-hidden rounded-2xl bg-[#0A0A0A] border border-white/5 p-8 flex flex-col md:flex-row items-center md:items-end gap-6">
+                        {/* Grid Pattern Background */}
+                        <div className="absolute inset-0 opacity-20 pointer-events-none"
+                            style={{
+                                backgroundImage: 'linear-gradient(to right, #333 1px, transparent 1px), linear-gradient(to bottom, #333 1px, transparent 1px)',
+                                backgroundSize: '40px 40px'
                             }}
                         />
-                    </SignedIn>
-                </Card>
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] to-transparent pointer-events-none" />
+
+                        <div className="relative z-10">
+                            <div className="relative inline-block">
+                                <img
+                                    src={user.imageUrl}
+                                    alt={user.fullName || "User"}
+                                    className="w-32 h-32 rounded-full border-4 border-[#0A0A0A] shadow-xl object-cover"
+                                />
+                                <div className="absolute bottom-2 right-2 bg-blue-500 text-white p-1 rounded-full border-4 border-[#0A0A0A]">
+                                    <Check className="w-4 h-4" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="relative z-10 flex-1 text-center md:text-left translate-y-[-10px]">
+                            <h1 className="text-3xl font-bold text-white mb-1 flex items-center justify-center md:justify-start gap-2">
+                                {user.fullName}
+                            </h1>
+                            <p className="text-zinc-400 font-medium">{user.primaryEmailAddress?.emailAddress}</p>
+                        </div>
+
+                        <div className="relative z-10 flex gap-3">
+                            <Button onClick={() => openUserProfile()} variant="outline" className="bg-white/5 border-white/10 hover:bg-white/10 hover:text-white">
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                Manage Account
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Personal Details Card */}
+                    <Card className="bg-[#0A0A0A] border-white/5 p-0 overflow-hidden rounded-2xl">
+                        <div className="px-6 py-4 border-b border-white/5 bg-white/[0.02]">
+                            <h3 className="text-lg font-semibold text-white">Personal details</h3>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
+                                <div>
+                                    <label className="text-sm text-zinc-500 block mb-1">Full Name</label>
+                                    <div className="text-zinc-200 font-medium">{user.fullName || "Not set"}</div>
+                                </div>
+                                <div>
+                                    <label className="text-sm text-zinc-500 block mb-1">Email</label>
+                                    <div className="text-zinc-200 font-medium">{user.primaryEmailAddress?.emailAddress}</div>
+                                </div>
+                                <div>
+                                    <label className="text-sm text-zinc-500 block mb-1">User ID</label>
+                                    <div className="text-zinc-200 font-medium font-mono text-sm">{user.id}</div>
+                                </div>
+                                <div>
+                                    <label className="text-sm text-zinc-500 block mb-1">Joined Date</label>
+                                    <div className="text-zinc-200 font-medium">
+                                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-sm text-zinc-500 block mb-1">Last Active</label>
+                                    <div className="text-zinc-200 font-medium">
+                                        {user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString() : 'N/A'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-sm text-zinc-500 block mb-1">Authentication Method</label>
+                                    <div className="flex gap-2">
+                                        {user.externalAccounts.length > 0 ? (
+                                            user.externalAccounts.map(acc => (
+                                                <Badge key={acc.id} variant="secondary" className="bg-white/10 text-zinc-300 hover:bg-white/20 capitalize">
+                                                    {acc.providerTitle || "External"}
+                                                </Badge>
+                                            ))
+                                        ) : (
+                                            <Badge variant="secondary" className="bg-white/10 text-zinc-300">
+                                                Email/Password
+                                            </Badge>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
 
 
                 <div className="mt-8 pb-10">
