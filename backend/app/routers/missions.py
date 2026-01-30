@@ -6,8 +6,68 @@ from app.core.agent import run_mission_agent
 from app.core.config import settings
 from pydantic import BaseModel
 import asyncio
+import re
 
 router = APIRouter()
+
+def sanitize_json_string(content: str) -> str:
+    """
+    Sanitize a JSON string by properly escaping control characters.
+    LLMs often generate JSON with unescaped newlines/tabs in string values.
+    """
+    # First, extract JSON from markdown code blocks if present
+    if "```json" in content:
+        content = content.split("```json")[1].split("```")[0].strip()
+    elif "```" in content:
+        content = content.replace("```", "").strip()
+    
+    # Replace actual control characters inside string values with escaped versions
+    # This regex finds strings and escapes control characters within them
+    def escape_string_content(match):
+        s = match.group(0)
+        # Replace unescaped control characters
+        s = s.replace('\n', '\\n')
+        s = s.replace('\r', '\\r')
+        s = s.replace('\t', '\\t')
+        return s
+    
+    # Match JSON string values (between quotes, handling escaped quotes)
+    # This is a simplified approach - replace control chars globally first
+    content = content.replace('\r\n', '\\n').replace('\r', '\\n')
+    
+    # Handle newlines that are inside JSON string values
+    # Find content between quotes and escape newlines
+    result = []
+    in_string = False
+    escape_next = False
+    
+    for char in content:
+        if escape_next:
+            result.append(char)
+            escape_next = False
+            continue
+            
+        if char == '\\':
+            result.append(char)
+            escape_next = True
+            continue
+            
+        if char == '"':
+            in_string = not in_string
+            result.append(char)
+            continue
+        
+        if in_string:
+            if char == '\n':
+                result.append('\\n')
+            elif char == '\t':
+                result.append('\\t')
+            else:
+                result.append(char)
+        else:
+            result.append(char)
+    
+    return ''.join(result)
 
 class MissionCreate(BaseModel):
     objective: str
@@ -15,9 +75,9 @@ class MissionCreate(BaseModel):
 
 # Direct action patterns - bypass agent workflow for these
 DIRECT_ACTION_PATTERNS = {
-    "twitter_post": ["post on twitter", "tweet this", "create a tweet", "post a tweet", "tweet:", "post to twitter", "send tweet", "twitter post"],
-    "reddit_post": ["post on reddit", "create a reddit post", "post to reddit", "post in r/", "submit to reddit", "reddit post", "post to r/"],
-    "linkedin_post": ["post on linkedin", "create a linkedin post", "share on linkedin", "linkedin post", "post to linkedin"],
+    "twitter_post": ["post on twitter", "tweet this", "create a tweet", "post a tweet", "tweet:", "post to twitter", "send tweet", "twitter post", "publish a tweet", "publish on twitter"],
+    "reddit_post": ["post on reddit", "create a reddit post", "post to reddit", "post in r/", "submit to reddit", "reddit post", "post to r/", "post a reddit", "publish a reddit", "publish on reddit", "publish to reddit", "reddit about", "in r/"],
+    "linkedin_post": ["post on linkedin", "create a linkedin post", "share on linkedin", "linkedin post", "post to linkedin", "post a linkedin", "publish on linkedin", "publish a linkedin"],
     "slack_message": ["send to slack", "slack message", "post to slack", "message on slack", "notify slack"],
     "gmail_send": ["send email", "send an email", "email to", "compose email", "mail to"],
 }
@@ -135,11 +195,7 @@ Set ready=false if recipient email is unclear.{rag_injection}"""),
             return None
         
         ex_res = await extract_llm.ainvoke(extraction_prompt)
-        content_str = ex_res.content
-        if "```json" in content_str:
-            content_str = content_str.split("```json")[1].split("```")[0].strip()
-        elif "```" in content_str:
-            content_str = content_str.replace("```", "").strip()
+        content_str = sanitize_json_string(ex_res.content)
         
         action_data = json.loads(content_str)
         
@@ -622,6 +678,167 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
     import re
     force_draft = False
     
+    # CHECK FOR SUBREDDIT NAME (follow-up to Reddit post request)
+    # Matches r/SomeName or just SomeName when mission is about Reddit
+    subreddit_regex = r"^r/(\w+)$|^(\w+)$"
+    subreddit_match = re.match(subreddit_regex, chat.message.strip(), re.IGNORECASE)
+    
+    # Check if mission objective mentions Reddit and this looks like a subreddit response
+    if subreddit_match and ("reddit" in mission.objective.lower() or "r/" in mission.objective.lower()):
+        # User is providing a subreddit for a Reddit post
+        subreddit_name = subreddit_match.group(1) or subreddit_match.group(2)
+        
+        # Generate the Reddit post content using the mission objective
+        try:
+            from langchain_groq import ChatGroq
+            from langchain_core.messages import SystemMessage, HumanMessage
+            import json
+            
+            gen_llm = ChatGroq(
+                temperature=0.7, 
+                groq_api_key=settings.GROQ_API_KEY, 
+                model_name="llama-3.3-70b-versatile"
+            )
+            
+            gen_prompt = [
+                SystemMessage(content=f"""Generate a Reddit post for r/{subreddit_name}.
+Create engaging, authentic content that matches the subreddit culture.
+Return JSON only: {{"title": "post title", "body": "post content"}}
+Make the content informative and valuable to the community."""),
+                HumanMessage(content=f"Topic from user's mission: {mission.objective}")
+            ]
+            
+            gen_res = await gen_llm.ainvoke(gen_prompt)
+            content_str = sanitize_json_string(gen_res.content)
+            post_data = json.loads(content_str)
+            
+            # Check if user has Reddit connected
+            reddit_conn = user.other_connections.get("reddit") if user.other_connections else None
+            
+            if not reddit_conn:
+                # Create pending action and ask to connect
+                pending = PendingAction(
+                    user_id=user.clerk_id,
+                    mission_id=mission_id,
+                    action_type="reddit_post",
+                    action_data={
+                        "subreddit": subreddit_name,
+                        "title": post_data.get("title", ""),
+                        "body": post_data.get("body", ""),
+                        "ready": True
+                    },
+                    tool="reddit"
+                )
+                await pending.insert()
+                
+                # Generate OAuth URL for Reddit
+                import httpx
+                auth_config_id = "ac_2_IjyXggGH8F"
+                frontend_base = "http://localhost:5173"
+                redirect_url = f"{frontend_base}/chat/{mission_id}?pending_action={pending.id}"
+                
+                try:
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.post(
+                            "https://backend.composio.dev/api/v3/auth/create-url",
+                            json={
+                                "authConfigId": auth_config_id,
+                                "redirectUrl": redirect_url,
+                                "entityId": user.clerk_id
+                            },
+                            headers={"x-api-key": settings.COMPOSIO_API_KEY}
+                        )
+                        if resp.status_code == 200:
+                            composio_redirect = resp.json().get("url")
+                            msg = f"I've drafted your Reddit post for r/{subreddit_name}. Please connect your Reddit account first to post."
+                            await MissionLog(
+                                mission_id=mission_id, 
+                                role="agent", 
+                                content=msg, 
+                                log_type="action",
+                                metadata={"action": "connect_tool", "tool": "reddit", "connect_url": composio_redirect, "pending_action_id": str(pending.id)}
+                            ).insert()
+                            return {"message": msg, "role": "agent", "type": "action", "metadata": {"connect_url": composio_redirect}}
+                except Exception as e:
+                    print(f"Failed to get Reddit OAuth URL: {e}")
+                
+                return {"message": "Please connect your Reddit account to post.", "role": "agent", "type": "action"}
+            
+            # Reddit is connected - create draft with Post Now button
+            from app.models import Prospect, Draft, DraftStatus
+            
+            # Create prospect for this post (Reddit post target)
+            prospect = Prospect(
+                mission_id=mission_id,
+                name=f"Reddit: r/{subreddit_name}",
+                company="Reddit",
+                context_source="Reddit Post",
+                public_contact=f"r/{subreddit_name}",
+                relevance_reason="User requested Reddit post",
+                relevance_score=1.0
+            )
+            await prospect.insert()
+            
+            # Create draft
+            draft = Draft(
+                prospect_id=str(prospect.id),
+                channel="reddit",
+                subject=post_data.get("title", ""),
+                body=post_data.get("body", ""),
+                status=DraftStatus.PENDING,
+                metadata={"subreddit": subreddit_name}
+            )
+            await draft.insert()
+            
+            # Create pending action linked to draft
+            pending = PendingAction(
+                user_id=user.clerk_id,
+                mission_id=mission_id,
+                action_type="reddit_post",
+                action_data={
+                    "subreddit": subreddit_name,
+                    "title": post_data.get("title", ""),
+                    "body": post_data.get("body", ""),
+                    "draft_id": str(draft.id),
+                    "ready": True
+                },
+                tool="reddit"
+            )
+            await pending.insert()
+            
+            # Log with draft preview action
+            preview_msg = f"📝 **Reddit Post for r/{subreddit_name}**\n\n**Title:** {post_data.get('title', '')}\n\n{post_data.get('body', '')[:500]}..."
+            await MissionLog(
+                mission_id=mission_id,
+                role="agent",
+                content=preview_msg,
+                log_type="action",
+                metadata={
+                    "action": "draft_preview",
+                    "draft_id": str(draft.id),
+                    "channel": "reddit",
+                    "pending_action_id": str(pending.id)
+                }
+            ).insert()
+            
+            return {
+                "message": preview_msg,
+                "role": "agent",
+                "type": "action",
+                "metadata": {
+                    "action": "draft_preview",
+                    "draft_id": str(draft.id),
+                    "channel": "reddit",
+                    "pending_action_id": str(pending.id)
+                }
+            }
+            
+        except Exception as e:
+            print(f"Reddit post generation failed: {e}")
+            error_msg = f"Failed to generate Reddit post: {str(e)[:100]}"
+            await MissionLog(mission_id=mission_id, role="agent", content=error_msg, log_type="error").insert()
+            return {"message": error_msg, "role": "agent", "type": "error"}
+    
     # CHECK FOR LINKEDIN URL
     linkedin_regex = r"(https?://(?:www\.)?linkedin\.com/in/[a-zA-Z0-9_-]+/?)"
     found_linkedin = re.findall(linkedin_regex, chat.message)
@@ -650,11 +867,7 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
             ]
             ex_res = await extract_llm.ainvoke(extraction_prompt)
             import json
-            content_str = ex_res.content
-            if "```json" in content_str:
-                content_str = content_str.split("```json")[1].split("```")[0].strip()
-            elif "```" in content_str:
-                content_str = content_str.replace("```", "").strip()
+            content_str = sanitize_json_string(ex_res.content)
             ex_data = json.loads(content_str)
             if ex_data.get("name") and ex_data["name"] not in ["null", "None", ""]:
                 extracted_name = ex_data["name"]
@@ -733,11 +946,7 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
              import json
              ex_data = {}
              try:
-                 content_str = ex_res.content
-                 if "```json" in content_str:
-                     content_str = content_str.split("```json")[1].split("```")[0].strip()
-                 elif "```" in content_str:
-                     content_str = content_str.replace("```", "").strip()
+                 content_str = sanitize_json_string(ex_res.content)
                  ex_data = json.loads(content_str)
                  if ex_data.get("name") and ex_data["name"] not in ["null", "None", ""]:
                      extracted_name = ex_data["name"]
@@ -1153,11 +1362,7 @@ Set ready=false if repo, title, or description is unclear."""),
             
             ex_res = await extract_llm.ainvoke(extraction_prompt)
             import json
-            content_str = ex_res.content
-            if "```json" in content_str:
-                content_str = content_str.split("```json")[1].split("```")[0].strip()
-            elif "```" in content_str:
-                content_str = content_str.replace("```", "").strip()
+            content_str = sanitize_json_string(ex_res.content)
             
             action_data = json.loads(content_str)
             

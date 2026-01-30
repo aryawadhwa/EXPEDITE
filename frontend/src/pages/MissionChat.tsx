@@ -424,7 +424,8 @@ export default function MissionChat() {
                     role: "agent",
                     content: response.message,
                     timestamp: new Date(),
-                    status: response.type === "error" ? "error" : "complete"
+                    status: response.type === "error" ? "error" : "complete",
+                    metadata: response.metadata  // Include metadata for action buttons
                 }]);
             } else {
                 // Create new mission from input with attachments

@@ -436,13 +436,28 @@ async def resolve_channel_identity(state: AgentState) -> Dict:
                 await log_event(mission_id, user_id, f"Saved {channel_key} for {person_name}", "success")
             continue
         
-        # If this is a READ/QUERY operation, we may not need person identifier
+        # Check intents to determine if we need a person identifier
         intents = state.get("intents", [])
+        
+        # For READ/QUERY operations, we may not need person identifier
         if "read" in intents or "query" in intents:
             # For read operations on user's own accounts, no target identifier needed
             continue
+        
+        # For PUBLISH (public posts), we don't need a person identifier
+        # Public posts go to platforms (subreddit, timeline), not to specific people
+        if "publish" in intents:
+            # For Reddit, we might have a subreddit in the objective
+            if channel_key == "reddit":
+                # Extract subreddit from objective (e.g., "r/SaaS" or "in r/startups")
+                import re
+                subreddit_match = re.search(r'r/(\w+)', objective.lower())
+                if subreddit_match:
+                    channel_identities[channel] = f"r/{subreddit_match.group(1)}"
+            # Twitter, LinkedIn posts don't need a target - they go to user's own feed
+            continue
             
-        # Missing identifier for WRITE operation
+        # Missing identifier for OUTREACH (DM/direct message) operation
         if state.get("draft_required"):
             missing_identities.append(channel)
     
