@@ -152,8 +152,8 @@ export function LiveBrainSidebar({ isOpen, onToggle }: LiveBrainSidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "flex flex-col h-full bg-terminal border-l border-border transition-all duration-300",
-          isOpen ? "w-80" : "w-0 overflow-hidden"
+          "flex flex-col h-full bg-terminal border-l border-border transition-all duration-300 group",
+          isOpen ? "w-80 hover:w-[480px]" : "w-0 overflow-hidden"
         )}
       >
         {/* Header */}
