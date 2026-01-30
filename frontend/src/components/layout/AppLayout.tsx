@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, Brain } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { OnboardingTour } from "@/components/OnboardingTour";
+import { ShaderGradientBackground } from "@/components/ui/shader-gradient-background";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -20,7 +21,8 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   if (isMobile) {
     return (
-      <div className="flex flex-col h-screen bg-background">
+      <div className="flex flex-col h-screen bg-black relative">
+        <ShaderGradientBackground />
         {tour}
         {/* Mobile Header */}
         <header className="flex items-center justify-between h-14 px-4 border-b border-border bg-sidebar">
@@ -56,7 +58,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-black overflow-hidden relative">
+      <ShaderGradientBackground />
       {tour}
       {/* Left Navigation */}
       <NavigationSidebar

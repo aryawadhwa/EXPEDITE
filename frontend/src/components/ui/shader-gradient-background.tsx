@@ -3,7 +3,7 @@ import { ShaderGradientCanvas, ShaderGradient } from '@shadergradient/react';
 
 export function ShaderGradientBackground() {
   return (
-    <div className="fixed inset-0 w-full h-full z-0 opacity-60">
+    <div className="fixed inset-0 w-full h-full z-0 opacity-40 pointer-events-none">
       <ShaderGradientCanvas
         style={{
           position: 'absolute',
@@ -12,12 +12,14 @@ export function ShaderGradientBackground() {
           width: '100%',
           height: '100%',
         }}
+        pixelDensity={0.5}
+        fov={60}
       >
         <ShaderGradient
           animate="on"
-          brightness={1.8}
+          brightness={1.5}
           cAzimuthAngle={180}
-          cDistance={2.59}
+          cDistance={3}
           cPolarAngle={90}
           cameraZoom={1}
           color1="#000088"
@@ -29,16 +31,17 @@ export function ShaderGradientBackground() {
           positionX={-1.4}
           positionY={0}
           positionZ={0}
-          reflection={0.3}
+          reflection={0.2}
           rotationX={0}
           rotationY={10}
           rotationZ={50}
           type="waterPlane"
-          uAmplitude={2}
-          uDensity={1.3}
-          uFrequency={5.5}
-          uSpeed={0.4}
-          uStrength={6}
+          uAmplitude={1.5}
+          uDensity={1.1}
+          uFrequency={4}
+          uSpeed={0.3}
+          uStrength={3}
+          wireframe={false}
         />
       </ShaderGradientCanvas>
     </div>
