@@ -158,28 +158,32 @@ export function EmailReviewCard({
         </div>
 
         <div>
-          <label className="text-xs text-muted-foreground uppercase tracking-wider mb-1.5 block">
+          <label className="text-xs text-muted-foreground uppercase tracking-wider mb-2 block">
             Subject Line
             <span className="float-right font-mono text-[10px]">{subject.length}/100</span>
           </label>
           <Input
             value={subject}
             onChange={(e) => handleSubjectChange(e.target.value)}
-            className="bg-secondary border-transparent focus:border-primary/50 font-medium"
+            className="bg-background border border-border/50 focus:border-primary/50 font-medium"
             maxLength={100}
           />
         </div>
       </div>
 
       {/* Body Editor */}
-      <div className="flex-1 p-5">
-        <label className="text-xs text-muted-foreground uppercase tracking-wider mb-1.5 block">
+      <div className="flex-1 p-5 overflow-auto">
+        <label className="text-xs text-muted-foreground uppercase tracking-wider mb-2 block">
           Email Body
         </label>
         <Textarea
           value={body}
           onChange={(e) => handleBodyChange(e.target.value)}
-          className="h-full min-h-[300px] resize-none bg-secondary border-transparent focus:border-primary/50 text-sm leading-relaxed"
+          className="w-full resize-none bg-background border border-border/50 focus:border-primary/50 text-sm leading-relaxed rounded-lg p-4"
+          style={{
+            minHeight: '200px',
+            height: `${Math.max(200, body.split('\n').length * 24 + 40)}px`
+          }}
         />
       </div>
 
@@ -298,7 +302,7 @@ export function EmailReviewCard({
             Ready to Send
           </Badge>
         </div>
-        <div className="flex flex-wrap gap-2 mt-4 pb-16">
+        <div className="flex flex-wrap gap-2 mt-4">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
             💡 Keep subject under 50 chars for mobile
           </span>

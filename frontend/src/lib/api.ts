@@ -25,6 +25,8 @@ export interface Mission {
     objective: string;
     status: string;
     created_at: string;
+    prospects_count?: number;
+    drafts_count?: number;
 }
 
 interface MissionLog {

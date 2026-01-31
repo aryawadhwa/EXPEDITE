@@ -542,7 +542,7 @@ export default function MissionChat() {
     };
 
     return (
-        <div className="h-full flex flex-col bg-black">
+        <div className="h-full flex flex-col bg-black bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]">
             {/* Header */}
             <header className="flex items-center gap-4 px-6 h-14 border-b border-border bg-card/50">
                 <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
@@ -604,13 +604,13 @@ export default function MissionChat() {
                                         : "bg-card border border-border"
                             )}>
                                 {message.role === "agent" || message.role === "system" ? (
-                                    <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 text-foreground prose-p:text-foreground prose-li:text-foreground prose-headings:text-foreground">
+                                    <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 text-white prose-p:text-white prose-li:text-white prose-headings:text-white prose-strong:text-white">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                             {message.content}
                                         </ReactMarkdown>
                                     </div>
                                 ) : (
-                                    <p className="text-sm">{message.content}</p>
+                                    <p className="text-sm text-white">{message.content}</p>
                                 )}
                                 {(() => {
                                     // Check for connect_url in metadata (direct OAuth link)
@@ -660,7 +660,7 @@ export default function MissionChat() {
                                                         className="w-full gap-2 animate-in fade-in zoom-in duration-300 shadow-md"
                                                         onClick={() => handleConnect(toolMatch)}
                                                     >
-                                                        <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                                        <div className="w-2 h-2 rounded-full bg-white" />
                                                         Connect {displayName}
                                                     </Button>
                                                 )}

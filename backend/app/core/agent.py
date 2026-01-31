@@ -118,10 +118,12 @@ def extract_identifiers_from_objective(objective: str) -> Dict[str, str]:
     if twitter_match:
         identifiers["twitter"] = twitter_match.group(1)
     
-    # Email
-    email_match = re.search(r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", objective)
+    # Email - specific capture
+    # Handles standard patterns and mailto: links
+    email_pattern = r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})"
+    email_match = re.search(email_pattern, objective, re.IGNORECASE)
     if email_match:
-        identifiers["gmail"] = email_match.group(1)
+        identifiers["gmail"] = email_match.group(1).lower()
     
     # GitHub username (from URL or mention)
     github_match = re.search(r"github\.com/([a-zA-Z0-9_-]+)", objective)

@@ -224,7 +224,27 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
             
     elif channel == "reddit":
         connection_id = user.other_connections.get("reddit") if user.other_connections else None
-        if connection_id:
+        
+        if not connection_id:
+            # ❌ NOT CONNECTED - Show clear error
+            error_msg = "Reddit account not connected. Please connect Reddit in Settings → Integrations."
+            print(f"ERROR: {error_msg}")
+            
+            execution_result = {"success": False, "error": error_msg}
+            
+            # Update draft to show error
+            await db.drafts.update_one(
+                {"_id": draft_id},
+                {
+                    "$set": {
+                        "status": "failed",
+                        "error_message": error_msg,
+                        "updated_at": datetime.utcnow()
+                    }
+                }
+            )
+        else:
+            # ✅ CONNECTED - Proceed with posting
             from app.integrations import reddit
             # Extract subreddit from metadata, recipient, or use default
             metadata = getattr(draft, 'metadata', {}) or {}
@@ -241,8 +261,20 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
                 draft.body
             )
             print(f"Reddit result: {execution_result}")
-        else:
-            execution_result = {"success": False, "error": "Reddit not connected"}
+            
+            # Check if posting failed
+            if not execution_result.get("success"):
+                error_msg = execution_result.get("error", "Unknown error")
+                await db.drafts.update_one(
+                    {"_id": draft_id},
+                    {
+                        "$set": {
+                            "status": "failed",
+                            "error_message": f"Reddit API error: {error_msg}",
+                            "updated_at": datetime.utcnow()
+                        }
+                    }
+                )
             
     elif channel == "slack":
         # Get slack channel from metadata or recipient

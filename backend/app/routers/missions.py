@@ -608,8 +608,8 @@ Return ONLY: INFORMATION_REQUEST or ACTION_REQUEST"""
                         verified = cand.get('email_verified', False)
                         
                         # Badges
-                        score_badge = f"🟢 **{score}/10**" if score >= 8 else f"🟡 **{score}/10**" if score >= 6 else f"🔴 **{score}/10**"
-                        email_display = f"`{email}` {'✅' if verified else '📧'}" if email else "❌ Not Available"
+                        score_badge = f"**{score}/10**"
+                        email_display = f"`{email}` {'(Verified)' if verified else ''}" if email else "Not Available"
                         linkedin_link = f"[View Profile]({linkedin})" if linkedin else "Not available"
                         
                         results_message += f"""---
@@ -624,6 +624,37 @@ Return ONLY: INFORMATION_REQUEST or ACTION_REQUEST"""
 - **Why Relevant:** {reason}
 
 """
+                        # Save to Database
+                        try:
+                            from app.models import Prospect
+                            # Always save result
+                            p_doc = Prospect(
+                                mission_id=mid,
+                                name=name,
+                                company=company,
+                                context_source="Deep Research",
+                                public_contact=email,
+                                linkedin_url=linkedin,
+                                relevance_score=score/10.0,
+                                relevance_reason=reason,
+                                scraped_data=cand
+                            )
+                            await p_doc.insert()
+                            
+                            # Also add to Neo4j if possible
+                            try:
+                                from app.services.neo4j import neo4j_service
+                                if name and name != 'Unknown':
+                                    neo4j_service.resolve_person(name)
+                                    if email:
+                                        neo4j_service.add_contact_method(name, 'email', email)
+                                    if linkedin:
+                                        neo4j_service.add_contact_method(name, 'linkedin_profile', linkedin)
+                            except Exception as neo_err:
+                                print(f"Neo4j sync error: {neo_err}")
+                                
+                        except Exception as db_err:
+                            print(f"Failed to save prospect {name}: {db_err}")
                     
                     await manager.send_to_user(uid, {
                         "message": results_message,
@@ -641,7 +672,7 @@ Return ONLY: INFORMATION_REQUEST or ACTION_REQUEST"""
                 await MissionLog(
                     mission_id=mid,
                     role="system",
-                    content=f"✅ Research complete. Found {len(candidates)} prospects.",
+                    content=f"Research complete. Found {len(candidates)} prospects.",
                     log_type="success"
                 ).insert()
             except Exception as e:
@@ -665,24 +696,53 @@ Return ONLY: INFORMATION_REQUEST or ACTION_REQUEST"""
 async def list_missions(user: User = Depends(get_current_user)):
     from app.models import Prospect, Draft, DraftStatus
     
-    missions = await Mission.find(Mission.user_id == user.clerk_id).to_list()
+    # 1. Fetch all user missions
+    missions = await Mission.find(Mission.user_id == user.clerk_id).sort("-created_at").to_list()
     
-    # Enrich with counts
+    if not missions:
+        return []
+        
+    mission_ids = [str(m.id) for m in missions]
+    
+    # 2. Fetch all prospects for these missions in one go
+    # We only need mission_id to group them
+    prospects = await Prospect.find({"mission_id": {"$in": mission_ids}}).to_list()
+    
+    # Group prospect IDs by mission
+    mission_prospect_map = {}
+    all_prospect_ids = []
+    
+    for p in prospects:
+        mid = p.mission_id
+        if mid not in mission_prospect_map:
+            mission_prospect_map[mid] = []
+        mission_prospect_map[mid].append(str(p.id))
+        all_prospect_ids.append(str(p.id))
+        
+    # 3. Fetch all pending drafts for these prospects in one go
+    # Only check drafts if we have prospects
+    prospect_draft_count = {}
+    if all_prospect_ids:
+        pending_drafts = await Draft.find(
+            {"prospect_id": {"$in": all_prospect_ids}, "status": DraftStatus.PENDING}
+        ).to_list()
+        
+        # Group drafts by prospect_id for easy counting
+        for d in pending_drafts:
+            pid = d.prospect_id
+            prospect_draft_count[pid] = prospect_draft_count.get(pid, 0) + 1
+        
+    # 4. Assembly
     result = []
     for mission in missions:
-        mission_id = str(mission.id)
+        mid = str(mission.id)
+        mission_prospect_ids = mission_prospect_map.get(mid, [])
         
-        # Count prospects for this mission
-        prospects_count = await Prospect.find(Prospect.mission_id == mission_id).count()
+        # Count prospects
+        prospects_count = len(mission_prospect_ids)
         
-        # Count pending drafts for this mission (via prospect_id lookup)
-        prospects = await Prospect.find(Prospect.mission_id == mission_id).to_list()
-        prospect_ids = [str(p.id) for p in prospects]
-        drafts_count = 0
-        if prospect_ids:
-            drafts_count = await Draft.find(
-                {"prospect_id": {"$in": prospect_ids}, "status": DraftStatus.PENDING}
-            ).count()
+        # Count drafts (sum of drafts for each prospect in this mission)
+        drafts_count = sum(prospect_draft_count.get(pid, 0) for pid in mission_prospect_ids)
         
         result.append({
             "_id": str(mission.id),
@@ -1795,6 +1855,39 @@ GUIDELINES:
             "type": "error"
         }
 
+class ChatRequest(BaseModel):
+    message: str
+
+@router.post("/{mission_id}/chat")
+async def chat_with_mission(
+    mission_id: str,
+    chat: ChatRequest,
+    user: User = Depends(get_current_user)
+):
+    """Send a message to the mission agent"""
+    mission = await Mission.get(mission_id)
+    if not mission or mission.user_id != user.clerk_id:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    
+    # 1. Log user message
+    await MissionLog(
+        mission_id=mission_id,
+        role="user",
+        content=chat.message,
+        log_type="chat"
+    ).insert()
+    
+    # 2. Trigger agent
+    # We treat the chat message as a NEW objective/refinement for the agent
+    # The agent's memory (LangGraph checkpoint) will handle context
+    asyncio.create_task(run_mission_agent(mission_id, chat.message, user.clerk_id, []))
+    
+    return {
+        "message": "I'm analyzing your request...",
+        "role": "agent",
+        "type": "thinking",
+        "status": "processing"
+    }
 @router.delete("/{mission_id}")
 async def delete_mission(mission_id: str, user: User = Depends(get_current_user)):
     """Delete a mission and its logs, drafts, and prospects"""

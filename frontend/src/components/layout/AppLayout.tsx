@@ -25,10 +25,6 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: `
-            radial-gradient(circle at 90% 10%, rgba(88, 28, 135, 0.15) 0%, transparent 40%),
-            radial-gradient(circle at 10% 90%, rgba(255, 255, 255, 0.05) 0%, transparent 40%)
-          `,
             backgroundColor: '#000000'
           }}
         />
@@ -48,7 +44,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           <div className="flex items-center gap-2">
             <Logo className="h-8 w-8 text-primary" />
-
+            <span className="font-bold text-lg hidden md:block">Expedite</span>
           </div>
 
           <Sheet>
@@ -76,10 +72,6 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div
         className="absolute inset-0 pointer-events-none z-0"
         style={{
-          background: `
-            radial-gradient(circle at 90% 10%, rgba(88, 28, 135, 0.15) 0%, transparent 40%),
-            radial-gradient(circle at 10% 90%, rgba(255, 255, 255, 0.05) 0%, transparent 40%)
-          `,
           backgroundColor: '#000000'
         }}
       />

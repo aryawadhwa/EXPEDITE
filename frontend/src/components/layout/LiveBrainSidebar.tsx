@@ -291,23 +291,7 @@ export function LiveBrainSidebar({ isOpen, onToggle }: LiveBrainSidebarProps) {
           </div>
         </ScrollArea>
 
-        {/* Footer Stats */}
-        <div className="p-3 border-t border-border">
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div>
-              <p className="font-mono text-lg text-foreground">{stats.active}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Active</p>
-            </div>
-            <div>
-              <p className="font-mono text-lg text-success">{stats.processed}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Processed</p>
-            </div>
-            <div>
-              <p className="font-mono text-lg text-warning">{stats.queue}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Queue</p>
-            </div>
-          </div>
-        </div>
+
       </aside>
     </>
   );

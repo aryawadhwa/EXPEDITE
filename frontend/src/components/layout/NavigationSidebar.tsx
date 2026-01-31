@@ -54,7 +54,7 @@ export function NavigationSidebar({ isCollapsed, onToggle }: NavigationSidebarPr
         {!isCollapsed && (
           <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <Logo className="h-8 w-8 text-primary" />
-            <span className="font-bold text-lg tracking-tight text-white">ExpenditeAI</span>
+            <span className="font-bold text-lg tracking-tight text-white">Expedite</span>
           </Link>
         )}
         {isCollapsed && (
