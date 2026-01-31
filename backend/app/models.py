@@ -35,6 +35,8 @@ class Mission(Document):
     user_id: str # Link to User.clerk_id or User.id
     objective: str
     status: str = "running"
+    autonomous: bool = False
+    max_autonomous_actions: int = 10
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
@@ -206,8 +208,7 @@ class ContactHistory(Document):
     last_reply_at: Optional[datetime] = None
     
     # Status
-    status: str = "contacted"  # contacted, replied, bounced, unsubscribed
-    
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     

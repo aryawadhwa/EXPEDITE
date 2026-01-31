@@ -1359,7 +1359,8 @@ Make the content informative and valuable to the community."""),
                 return {"message": success_msg, "role": "agent", "type": "success"}
     
     # CHECK FOR CREATE DRAFT COMMAND
-    create_draft_keywords = ["create draft", "regenerate draft", "generate draft", "new draft", "draft again", "make another draft", "proceed", "proceed and create", "yes create", "go ahead", "make draft", "write draft"]
+    # CHECK FOR CREATE DRAFT COMMAND
+    create_draft_keywords = ["create draft", "regenerate draft", "generate draft", "new draft", "draft again", "make another draft", "proceed", "proceed and create", "yes create", "go ahead", "make draft", "write draft", "draft mail", "draft email", "draft message", "prepare draft"]
     if force_draft or any(k in msg_lower for k in create_draft_keywords):
         # Find existing prospects for this mission
         prospects = await Prospect.find(Prospect.mission_id == mission_id).to_list()
@@ -1811,8 +1812,8 @@ Mission Objective: {mission.objective}
 GUIDELINES:
 - Address the user's question about the mission.
 - If they ask for status, say "Agents are active".
-- Do NOT generate sample emails here.
-- If they want to change the strategy, acknowledge it (but actual config update is manual for now).
+- If they ask to draft/write content, GUIDE them to use the specific keywords if needed, or simply confirm you will pass it to the agent.
+- If they want to change the strategy, acknowledge it.
 """
 
         messages = [

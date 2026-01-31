@@ -468,6 +468,42 @@ export default function ReviewQueue() {
             </div>
           ) : (
             <>
+              {/* Approve All Button - only show when there are multiple drafts */}
+              {drafts.length > 1 && filterMissionId && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={async () => {
+                    if (!confirm(`Approve and send all ${drafts.length} drafts?`)) return;
+                    
+                    setIsActioning(true);
+                    try {
+                      const result = await api.approveAllDrafts(filterMissionId);
+                      toast.success("All Drafts Approved!", {
+                        description: `${result.sent_count} emails queued for sending`,
+                      });
+                      // Refresh drafts
+                      await fetchDrafts();
+                      setCurrentIndex(0);
+                    } catch (e) {
+                      toast.error("Failed to approve all", {
+                        description: (e as Error).message
+                      });
+                    } finally {
+                      setIsActioning(false);
+                    }
+                  }}
+                  disabled={isActioning}
+                  className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-md"
+                >
+                  {isActioning ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <CheckCheck className="w-4 h-4 mr-2" />
+                  )}
+                  Approve All ({drafts.length})
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

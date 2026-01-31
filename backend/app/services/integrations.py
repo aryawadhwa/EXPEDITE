@@ -1,6 +1,8 @@
 """
 Integration Service Layer - Hunter.io Only
 Simplified architecture using only Hunter.io for prospect research
+
+ENHANCED: Now includes web scraping capabilities from hiring-cafe and email extraction
 """
 
 import httpx
@@ -12,6 +14,9 @@ from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Import enhanced scraper
+from app.services.web_scraper import enhanced_scraper, EmailScraper, JobBoardScraper
 
 # ==================================================
 # BASE INTEGRATION CLASS
@@ -310,10 +315,13 @@ class ProspectPipeline:
     """
     Complete prospect research pipeline using ONLY Hunter.io
     Flow: LLM suggests companies → Hunter domain search → Filter by title
+    
+    ENHANCED: Now includes web scraping for additional data sources
     """
     
     def __init__(self):
         self.llm = LLMService()
+        self.web_scraper = enhanced_scraper
     
     async def find_prospects(
         self, 
@@ -321,7 +329,8 @@ class ProspectPipeline:
         titles: List[str] = None,
         industries: List[str] = None,
         max_results: int = 10,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable] = None,
+        use_web_scraping: bool = True  # NEW: Enable web scraping
     ) -> List[Dict]:
         """
         Find prospects using Hunter.io only

@@ -669,6 +669,82 @@ export default function MissionChat() {
                                     }
                                     return null;
                                 })()}
+                                {/* Create Drafts Button for bulk prospect workflow */}
+                                {message.metadata?.action === "prospects_found" && message.metadata?.prospect_ids && (
+                                    <div className="mt-3">
+                                        <Button
+                                            variant="default"
+                                            size="sm"
+                                            className="w-full gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-md"
+                                            onClick={async () => {
+                                                const prospectIds = message.metadata?.prospect_ids as string[];
+                                                if (!prospectIds || !missionId) return;
+
+                                                // Show loading state
+                                                setMessages(prev => prev.map(m =>
+                                                    m.id === message.id
+                                                        ? { ...m, metadata: { ...m.metadata, creating: true } }
+                                                        : m
+                                                ));
+
+                                                try {
+                                                    const result = await api.createBulkDrafts(missionId, prospectIds);
+                                                    
+                                                    setMessages(prev => {
+                                                        const updated = prev.map(m =>
+                                                            m.id === message.id
+                                                                ? { ...m, metadata: { ...m.metadata, creating: false, created: true } }
+                                                                : m
+                                                        );
+                                                        return [...updated, {
+                                                            id: `result-${Date.now()}`,
+                                                            role: "agent" as const,
+                                                            content: result.message,
+                                                            timestamp: new Date(),
+                                                            status: "complete" as const
+                                                        }];
+                                                    });
+
+                                                    toast.success("Drafts Created!", {
+                                                        description: `${result.created_count} personalized drafts ready for review`,
+                                                    });
+
+                                                    // Navigate to review queue after a short delay
+                                                    setTimeout(() => {
+                                                        navigate(`/review?mission_id=${missionId}`);
+                                                    }, 1500);
+                                                } catch (e: unknown) {
+                                                    setMessages(prev => prev.map(m =>
+                                                        m.id === message.id
+                                                            ? { ...m, metadata: { ...m.metadata, creating: false } }
+                                                            : m
+                                                    ));
+                                                    toast.error("Failed to create drafts", {
+                                                        description: (e as Error).message
+                                                    });
+                                                }
+                                            }}
+                                            disabled={message.metadata?.creating || message.metadata?.created}
+                                        >
+                                            {message.metadata?.creating ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    Creating Drafts...
+                                                </>
+                                            ) : message.metadata?.created ? (
+                                                <>
+                                                    <CheckCircle className="w-4 h-4" />
+                                                    Drafts Created!
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Send className="w-4 h-4" />
+                                                    Create Drafts for All ({message.metadata?.count || 0})
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
+                                )}
                                 {/* Social Media Draft Preview with Post Now + Edit buttons */}
                                 {message.metadata?.action === "draft_preview" && (
                                     <div className="mt-3 flex gap-2">

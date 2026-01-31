@@ -5,21 +5,9 @@ https://docs.composio.dev/reference/sdk-reference/python
 """
 
 from typing import Dict, Optional
-from app.core.config import settings
-from composio import Composio
+from app.core.composio_config import get_composio_client, get_auth_config_id
 
-REDDIT_AUTH_CONFIG_ID = "ac_2_IjyXggGH8F"
-
-# Lazy initialization
-_composio_client = None
-
-def get_composio_client():
-    global _composio_client
-    if _composio_client is None:
-        if not settings.COMPOSIO_API_KEY:
-            raise ValueError("COMPOSIO_API_KEY is not set")
-        _composio_client = Composio(api_key=settings.COMPOSIO_API_KEY)
-    return _composio_client
+REDDIT_AUTH_CONFIG_ID = get_auth_config_id("reddit")
 
 
 async def search_posts(user_id: str, query: str, subreddit: Optional[str] = None, limit: int = 25) -> Dict:

@@ -5,21 +5,9 @@ https://docs.composio.dev/reference/sdk-reference/python
 """
 
 from typing import Dict, Optional
-from app.core.config import settings
-from composio import Composio
+from app.core.composio_config import get_composio_client, get_auth_config_id
 
-TWITTER_AUTH_CONFIG_ID = "ac_46x65PoeAWsM"
-
-# Lazy initialization
-_composio_client = None
-
-def get_composio_client():
-    global _composio_client
-    if _composio_client is None:
-        if not settings.COMPOSIO_API_KEY:
-            raise ValueError("COMPOSIO_API_KEY is not set")
-        _composio_client = Composio(api_key=settings.COMPOSIO_API_KEY)
-    return _composio_client
+TWITTER_AUTH_CONFIG_ID = get_auth_config_id("twitter")
 
 
 async def post_tweet(user_id: str, text: str, reply_to_id: Optional[str] = None) -> Dict:

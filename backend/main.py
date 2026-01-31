@@ -63,6 +63,10 @@ from app.routers import timeline
 app.include_router(timeline.router, prefix="/api/v1", tags=["timeline"])
 from app.routers import settings as settings_router
 app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["settings"])
+from app.routers import scraper
+app.include_router(scraper.router, prefix="/api/v1/scraper", tags=["scraper"])
+from app.routers import sales_agent
+app.include_router(sales_agent.router, prefix="/api/v1/sales-agent", tags=["sales-agent"])
 
 
 from app.core.socket import manager

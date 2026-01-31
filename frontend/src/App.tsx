@@ -17,6 +17,7 @@ import Calendar from "./pages/Calendar";
 import ContactHistory from "./pages/ContactHistory";
 import { Integrations } from "./pages/Integrations";
 import Profile from "./pages/Profile";
+import ProspectResearch from "./pages/ProspectResearch";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { useState, useEffect } from "react";
 
@@ -54,6 +55,18 @@ const AppContent = () => {
             <SignedIn>
               <AppLayout>
                 <Dashboard />
+              </AppLayout>
+            </SignedIn>
+            <SignedOut>
+              <RedirectToSignIn />
+            </SignedOut>
+          </>
+        } />
+        <Route path="/launchpad" element={
+          <>
+            <SignedIn>
+              <AppLayout>
+                <Launchpad />
               </AppLayout>
             </SignedIn>
             <SignedOut>
@@ -162,6 +175,18 @@ const AppContent = () => {
             <SignedIn>
               <AppLayout>
                 <Profile />
+              </AppLayout>
+            </SignedIn>
+            <SignedOut>
+              <RedirectToSignIn />
+            </SignedOut>
+          </>
+        } />
+        <Route path="/research" element={
+          <>
+            <SignedIn>
+              <AppLayout>
+                <ProspectResearch />
               </AppLayout>
             </SignedIn>
             <SignedOut>

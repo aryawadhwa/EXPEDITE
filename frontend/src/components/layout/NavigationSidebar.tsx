@@ -13,6 +13,8 @@ import {
   Puzzle,
   Coins,
   ArrowLeft,
+  Activity,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
@@ -24,8 +26,10 @@ import {
 import { useUser } from "@clerk/clerk-react";
 
 const navItems = [
-  { icon: Rocket, label: "Launchpad", path: "/dashboard", id: "sidebar-launchpad" },
+  { icon: Rocket, label: "Launchpad", path: "/launchpad", id: "sidebar-launchpad" },
+  { icon: Activity, label: "Dashboard", path: "/dashboard", id: "sidebar-dashboard" },
   { icon: MessageSquare, label: "Missions", path: "/chat/new", id: "sidebar-mission-chat" },
+  { icon: Search, label: "Research", path: "/research", id: "sidebar-research" },
   { icon: Calendar, label: "Calendar", path: "/calendar", id: "sidebar-calendar" },
   { icon: ClipboardCheck, label: "Review Queue", path: "/review", id: "sidebar-review-queue" },
   { icon: Bot, label: "Active Agents", path: "/agents", id: "sidebar-active-agents" },

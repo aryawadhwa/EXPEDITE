@@ -3,6 +3,7 @@ from typing import Optional, Dict
 from app.api.deps import get_current_user
 from app.models import User, PendingAction
 from app.core.config import settings
+from app.core.composio_config import TOOL_CONFIG_MAP, get_auth_config_id
 import httpx
 import urllib.parse
 
@@ -148,22 +149,6 @@ async def get_slack_status(user: User = Depends(get_current_user)):
     
     return {"status": "INACTIVE"}
 
-# Generic Integration Handler
-TOOL_CONFIG_MAP = {
-    "gmail": settings.COMPOSIO_AUTH_CONFIG_ID,
-    "slack": "ac_YPQ1Q5xomR5i",
-    "discord": "ac_OGB7yIAcaMvY", 
-    "discord_bot": "ac_FaFbZvKQhqj7",
-    "telegram": "ac_ktmRNM3mDtJP",
-    "github": "ac_UE__S2Ls9sMT",
-    "reddit": "ac_2_IjyXggGH8F",
-    "perplexity": "ac_9u_yICXpCVs4",
-    "google_sheets": "ac_E9vuh1t4AzEu",
-    "sheets": "ac_E9vuh1t4AzEu", # Alias
-    "linkedin": "ac_SdzD1ondK6Zi",
-    "twitter": "ac_46x65PoeAWsM"
-}
-
 from pydantic import BaseModel
 class ConnectRequest(BaseModel):
     tool: str
@@ -176,7 +161,7 @@ async def connect_tool(req: ConnectRequest, user: User = Depends(get_current_use
     Returns Composio redirect URL.
     """
     tool = req.tool.lower()
-    auth_config_id = TOOL_CONFIG_MAP.get(tool)
+    auth_config_id = get_auth_config_id(tool)
     
     auth_mode = "unknown"
 

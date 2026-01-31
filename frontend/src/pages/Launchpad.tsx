@@ -128,66 +128,6 @@ const Launchpad = () => {
         <HeroInput />
       </section>
 
-      {/* Live Brain Network */ }
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-        <div className="lg:col-span-2 relative group overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/50 p-6 backdrop-blur-sm">
-           <div className="absolute top-0 right-0 p-4 opacity-50">
-             <div className="flex gap-2 text-xs font-mono text-zinc-500">
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/> ONLINE</span>
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500"/> APOLLO</span>
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500"/> FIRECRAWL</span>
-             </div>
-           </div>
-           <h3 className="text-sm font-medium text-zinc-400 mb-4 flex items-center gap-2">
-             <Zap className="w-4 h-4 text-purple-400"/> LIVE NEURAL FEED
-           </h3>
-           <div className="space-y-3 font-mono text-sm max-h-[150px] overflow-y-auto no-scrollbar mask-gradient-b">
-             <div className="flex gap-3 text-zinc-300">
-               <span className="text-zinc-600">[18:12:04]</span> 
-               <span><span className="text-blue-400">ScoutAgent</span> starting search for "Product Managers in Fintech"...</span>
-             </div>
-             <div className="flex gap-3 text-zinc-300">
-               <span className="text-zinc-600">[18:12:06]</span> 
-               <span><span className="text-emerald-400">Apollo</span> found 12 verified contacts using <span className="bg-white/10 px-1 rounded">api/v1/search</span></span>
-             </div>
-             <div className="flex gap-3 text-zinc-300">
-               <span className="text-zinc-600">[18:12:09]</span> 
-               <span><span className="text-orange-400">Firecrawl</span> visiting stripe.com/careers...</span>
-             </div>
-             <div className="flex gap-3 text-zinc-300">
-                <span className="text-zinc-600">[18:12:12]</span> 
-                <span><span className="text-purple-400">DrafterNode</span> generating personalized hook for Jane Doe...</span>
-             </div>
-             <div className="flex gap-3 text-zinc-500 italic">
-                <span>Waiting for next command...</span>
-             </div>
-           </div>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 bg-zinc-900/50 p-6 backdrop-blur-sm flex flex-col justify-between">
-           <div>
-              <h3 className="text-sm font-medium text-zinc-400 mb-2">Platform Status</h3>
-              <div className="space-y-4 mt-4">
-                 <div className="flex justify-between items-center text-sm">
-                    <span className="text-zinc-300">Hybrid Search</span>
-                    <span className="text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded text-xs">ACTIVE</span>
-                 </div>
-                 <div className="flex justify-between items-center text-sm">
-                    <span className="text-zinc-300">Email Verification</span>
-                    <span className="text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded text-xs">ENABLED</span>
-                 </div>
-                 <div className="flex justify-between items-center text-sm">
-                    <span className="text-zinc-300">Daily Limit</span>
-                    <span className="text-zinc-400">45/500</span>
-                 </div>
-              </div>
-           </div>
-           <button className="w-full mt-4 py-2 border border-white/10 rounded-lg text-xs hover:bg-white/5 transition-colors">
-              View System Logs
-           </button>
-        </div>
-      </section>
-
       {/* Quick Recipes */}
       <section>
         <div className="flex items-center justify-between mb-8 px-2">
