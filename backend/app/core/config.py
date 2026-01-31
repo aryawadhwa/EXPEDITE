@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     FIRECRAWL_API_KEY: Optional[str] = None
     COMPOSIO_API_KEY: Optional[str] = None
     COMPOSIO_AUTH_CONFIG_ID: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
+    APOLLO_API_KEY: Optional[str] = None
+    HUNTER_API_KEY: Optional[str] = None  # Email verification
 
     # Neo4j Settings
     NEO4J_URI: Optional[str] = None

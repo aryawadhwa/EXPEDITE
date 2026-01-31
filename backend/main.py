@@ -17,8 +17,18 @@ async def lifespan(app: FastAPI):
     if not settings.MONGODB_URI:
         raise ValueError("MONGODB_URI environment variable is required")
     
-    client = AsyncIOMotorClient(settings.MONGODB_URI, tlsAllowInvalidCertificates=True)
+    client = AsyncIOMotorClient(
+        settings.MONGODB_URI,
+        tlsAllowInvalidCertificates=True,
+        maxPoolSize=50,  # Connection pooling
+        minPoolSize=10
+    )
     await init_beanie(database=client.outbound_ai, document_models=[User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory, PendingAction])
+    
+    # Validate all integrations
+    from app.core.healthcheck import startup_validation
+    await startup_validation()
+    
     yield
     # Shutdown
 
@@ -26,7 +36,12 @@ app = FastAPI(title="OutboundAI", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Already allows all origins
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:8080",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8080",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,3 +79,19 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
         manager.disconnect(websocket, user_id)
 
 
+
+# Healthcheck endpoint
+@app.get("/health")
+async def healthcheck_endpoint():
+    """Check health of all integrations"""
+    from app.core.healthcheck import validate_all_integrations
+    from datetime import datetime
+    
+    health = await validate_all_integrations()
+    all_ok = all('OK' in v for v in health.values())
+    
+    return {
+        "status": "healthy" if all_ok else "degraded",
+        "services": health,
+        "timestamp": datetime.utcnow().isoformat()
+    }

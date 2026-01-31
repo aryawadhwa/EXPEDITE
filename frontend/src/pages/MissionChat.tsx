@@ -604,7 +604,7 @@ export default function MissionChat() {
                                         : "bg-card border border-border"
                             )}>
                                 {message.role === "agent" || message.role === "system" ? (
-                                    <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 text-white prose-p:text-white prose-li:text-white prose-headings:text-white">
+                                    <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 text-foreground prose-p:text-foreground prose-li:text-foreground prose-headings:text-foreground">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                             {message.content}
                                         </ReactMarkdown>

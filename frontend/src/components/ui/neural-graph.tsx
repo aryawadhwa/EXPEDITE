@@ -21,55 +21,70 @@ export function NeuralGraph() {
   const [scale, setScale] = useState(1);
   const observerRef = useRef<IntersectionObserver | null>(null);
   
-  // Optimized node layout for better visual flow
+  // Design Constants
+  const CANVAS_WIDTH = 1200;
+  const CANVAS_HEIGHT = 600;
+  const GRID_COLS = 6; // 0 to 5
+  const GRID_ROWS = 5; // 0 to 4
+  const COL_WIDTH = CANVAS_WIDTH / GRID_COLS;
+  const ROW_HEIGHT = CANVAS_HEIGHT / GRID_ROWS;
+
+  // Helper to get grid coordinates
+  const getGridPos = (col: number, row: number) => ({
+    x: col * COL_WIDTH + COL_WIDTH / 2,
+    y: row * ROW_HEIGHT + ROW_HEIGHT / 2
+  });
+
+  // Strict Grid Layout
   const nodes: Node[] = [
-    { id: '0', x: 100, y: 300, label: "Mission Definition", type: "input" },
-    
-    // Discovery Layer - Vertically split
-    { id: '1', x: 300, y: 150, label: "Prospect Discovery", type: "process" },
-    { id: '2', x: 300, y: 450, label: "Market Analysis", type: "process" },
-    
-    // Intelligence Layer - Staggered
-    { id: '3', x: 600, y: 300, label: "Context Engine", type: "hub" },
-    { id: '4', x: 500, y: 100, label: "Verification", type: "process" },
-    { id: '5', x: 500, y: 500, label: "News Monitor", type: "process" },
-    
-    // Action Layer
-    { id: '6', x: 800, y: 200, label: "Draft Gen", type: "process" },
-    { id: '7', x: 800, y: 400, label: "Personalize", type: "process" },
-    
-    // Review & Output
-    { id: '8', x: 1000, y: 300, label: "Review Queue", type: "output" },
-    { id: '9', x: 1150, y: 300, label: "Analytics", type: "end" }
+    // Layer 0: Start
+    { id: '0', ...getGridPos(0, 2), label: "Mission Definition", type: "input" }, // Center Left
+
+    // Layer 1: Discovery (Split)
+    { id: '1', ...getGridPos(1.5, 1), label: "Prospect Discovery", type: "process" }, // Top
+    { id: '2', ...getGridPos(1.5, 3), label: "Market Analysis", type: "process" },   // Bottom
+
+    // Layer 2: Intelligence (Hub & Spoke)
+    { id: '3', ...getGridPos(2.5, 2), label: "Context Engine", type: "hub" },     // CENTER HUB
+    { id: '4', ...getGridPos(2.5, 0.5), label: "Verification", type: "process" },   // Top Top
+    { id: '5', ...getGridPos(2.5, 3.5), label: "News Monitor", type: "process" },   // Bottom Bottom
+
+    // Layer 3: Action (Output from Hub)
+    { id: '6', ...getGridPos(3.5, 1), label: "Draft Gen", type: "process" },      // Top
+    { id: '7', ...getGridPos(3.5, 3), label: "Personalize", type: "process" },    // Bottom
+
+    // Layer 4: Review
+    { id: '8', ...getGridPos(4.5, 2), label: "Review Queue", type: "output" },    // Center
+
+    // Layer 5: End
+    { id: '9', ...getGridPos(5.2, 2), label: "Analytics", type: "end" }           // Far Right
   ];
 
   const connections: Connection[] = [
-    // Input to Discovery
+    // Stage 1: Definition -> Discovery
     { from: '0', to: '1' },
     { from: '0', to: '2' },
     
-    // Discovery to Intelligence
+    // Stage 2: Discovery -> Context Hub
     { from: '1', to: '3' },
     { from: '2', to: '3' },
+
+    // Stage 3: Hub Integrations (Two-way conceptually, drawn as input to hub usually, but let's show flow)
     { from: '1', to: '4' }, // Prospect -> Verification
+    { from: '4', to: '3' }, // Verification -> Hub
+    
     { from: '2', to: '5' }, // Market -> News
+    { from: '5', to: '3' }, // News -> Hub
     
-    // Intelligence Interconnectivity
-    { from: '4', to: '3' },
-    { from: '5', to: '3' },
+    // Stage 4: Hub -> Content Creation
+    { from: '3', to: '6' }, // Hub -> Draft
+    { from: '3', to: '7' }, // Hub -> Personalize
     
-    // Intelligence to Action
-    { from: '3', to: '6' }, // Context -> Draft
-    { from: '3', to: '7' }, // Context -> Personalize
-    
-    // Action Cross-talk
-    { from: '6', to: '7' },
-    
-    // Action to Review
+    // Stage 5: Content -> Review
     { from: '6', to: '8' },
     { from: '7', to: '8' },
     
-    // Review to Final
+    // Stage 6: Review -> Analytics
     { from: '8', to: '9' }
   ];
 
@@ -77,41 +92,29 @@ export function NeuralGraph() {
     const updateScale = () => {
       if (containerRef.current) {
         const { width } = containerRef.current.getBoundingClientRect();
-        // Calculate scale to fit width, but cap it at 1 for larger screens
-        // and allow it to go small for mobile
-        const newScale = Math.min(width / 1200, 1); 
+        const newScale = Math.min(width / CANVAS_WIDTH, 1); 
         setScale(newScale);
       }
     };
 
-    // Initial scale
     updateScale();
-
     window.addEventListener('resize', updateScale);
     return () => window.removeEventListener('resize', updateScale);
   }, []);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const canvas = containerRef.current?.querySelector('canvas'); // Use direct selector as backup
+    if (!canvas || !canvasRef.current) return;
 
-    // Intersection Observer to pause animation when not visible
     observerRef.current = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
-          setIsVisible(entry.isIntersecting);
-        });
+        setIsVisible(entries[0].isIntersecting);
       },
       { threshold: 0.1 }
     );
+    observerRef.current.observe(canvasRef.current);
 
-    observerRef.current.observe(canvas);
-
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
-    };
+    return () => observerRef.current?.disconnect();
   }, []);
 
   useEffect(() => {
@@ -122,173 +125,166 @@ export function NeuralGraph() {
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    // Fix canvas dimensions to the design size
-    const width = 1200;
-    const height = 600;
     
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
+    canvas.width = CANVAS_WIDTH * dpr;
+    canvas.height = CANVAS_HEIGHT * dpr;
     
     ctx.scale(dpr, dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
+    canvas.style.width = `${CANVAS_WIDTH}px`;
+    canvas.style.height = `${CANVAS_HEIGHT}px`;
 
     let animationFrame: number;
     let time = 0;
-    let lastFrameTime = 0;
-    const targetFPS = 30; // Reduced from 60fps for better performance
-    const frameInterval = 1000 / targetFPS;
+    
+    // Particle System
+    const particles: { 
+      connectionIndex: number, 
+      progress: number, 
+      speed: number,
+      offset: number 
+    }[] = [];
 
-    const animate = (currentTime: number) => {
-      const deltaTime = currentTime - lastFrameTime;
+    // Initialize particles: 2-3 per connection
+    connections.forEach((_, idx) => {
+      for(let i=0; i<2; i++) {
+        particles.push({
+          connectionIndex: idx,
+          progress: Math.random(),
+          speed: 0.005 + Math.random() * 0.005,
+          offset: Math.random() * 10 // Random sideways shimmer
+        });
+      }
+    });
 
-      if (deltaTime >= frameInterval) {
-        lastFrameTime = currentTime - (deltaTime % frameInterval);
+    const animate = () => {
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      time += 0.02;
+
+      // 1. Draw Connections (Lines)
+      ctx.lineCap = 'round';
+      connections.forEach(conn => {
+        const start = nodes.find(n => n.id === conn.from)!;
+        const end = nodes.find(n => n.id === conn.to)!;
+
+        // Gradient Line
+        const grad = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
+        grad.addColorStop(0, 'rgba(139, 92, 246, 0.1)');
+        grad.addColorStop(0.5, 'rgba(139, 92, 246, 0.3)');
+        grad.addColorStop(1, 'rgba(139, 92, 246, 0.1)');
+
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+      });
+
+      // 2. Draw Moving Particles
+      particles.forEach(p => {
+        p.progress += p.speed;
+        if(p.progress >= 1) p.progress = 0;
+
+        const conn = connections[p.connectionIndex];
+        const start = nodes.find(n => n.id === conn.from)!;
+        const end = nodes.find(n => n.id === conn.to)!;
+
+        const currentX = start.x + (end.x - start.x) * p.progress;
+        const currentY = start.y + (end.y - start.y) * p.progress;
+
+        // Trail effect
+        const tailLength = 0.1;
+        const grad = ctx.createLinearGradient(
+          currentX - (end.x - start.x) * tailLength,
+          currentY - (end.y - start.y) * tailLength,
+          currentX,
+          currentY
+        );
+        grad.addColorStop(0, 'rgba(167, 139, 250, 0)');
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0.8)');
+
+        ctx.beginPath();
+        ctx.moveTo(currentX - (end.x - start.x) * tailLength, currentY - (end.y - start.y) * tailLength);
+        ctx.lineTo(currentX, currentY);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = grad;
+        ctx.stroke();
+
+        // Lead dot
+        ctx.beginPath();
+        ctx.arc(currentX, currentY, 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+      });
+
+      // 3. Draw Nodes
+      nodes.forEach(node => {
+        // Outer Glow
+        const pulse = Math.sin(time * 2 + parseInt(node.id)) * 0.1 + 1; // Slight size pulse
+        const glow = ctx.createRadialGradient(node.x, node.y, 10, node.x, node.y, 40);
+        glow.addColorStop(0, 'rgba(139, 92, 246, 0.3)');
+        glow.addColorStop(1, 'rgba(139, 92, 246, 0)');
         
-        ctx.clearRect(0, 0, width, height);
-        time += 0.015; // Slightly slower animation
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 40 * pulse, 0, Math.PI * 2);
+        ctx.fill();
 
-        // Draw connections with animated flow
-        connections.forEach((conn, index) => {
-          const fromNode = nodes.find(n => n.id === conn.from);
-          const toNode = nodes.find(n => n.id === conn.to);
-          
-          if (!fromNode || !toNode) return;
+        // Node Body
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 12, 0, Math.PI * 2);
+        ctx.fillStyle = '#1e1b4b'; // dark violet bg
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(167, 139, 250, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
-          // Base connection line
-          ctx.strokeStyle = 'rgba(139, 92, 246, 0.15)';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(fromNode.x, fromNode.y);
-          
-          const midX = (fromNode.x + toNode.x) / 2;
-          const midY = (fromNode.y + toNode.y) / 2;
-          ctx.quadraticCurveTo(midX, midY - 30, toNode.x, toNode.y);
-          ctx.stroke();
+        // Inner Core
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 6, 0, Math.PI * 2);
+        
+        // Color coding by type
+        if (node.type === 'hub') ctx.fillStyle = '#f472b6'; // pink
+        else if (node.type === 'input') ctx.fillStyle = '#60a5fa'; // blue
+        else if (node.type === 'output') ctx.fillStyle = '#a78bfa'; // violet
+        else if (node.type === 'end') ctx.fillStyle = '#34d399'; // emerald
+        else ctx.fillStyle = '#8b5cf6'; // violet default
 
-          // Animated gradient flow (fewer particles for performance)
-          const offset = (time + index * 0.5) % 1;
-          
-          // Single flowing particle per connection
-          const t = offset;
-          const particleX = fromNode.x + (toNode.x - fromNode.x) * t;
-          const particleY = fromNode.y + (toNode.y - fromNode.y) * t - 30 * Math.sin(t * Math.PI);
-          
-          // Particle glow
-          const particleGradient = ctx.createRadialGradient(particleX, particleY, 0, particleX, particleY, 8);
-          particleGradient.addColorStop(0, 'rgba(168, 85, 247, 0.9)');
-          particleGradient.addColorStop(1, 'rgba(168, 85, 247, 0)');
-          
-          ctx.fillStyle = particleGradient;
-          ctx.beginPath();
-          ctx.arc(particleX, particleY, 8, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Particle core
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-          ctx.beginPath();
-          ctx.arc(particleX, particleY, 3, 0, Math.PI * 2);
-          ctx.fill();
-        });
+        ctx.fill();
+      });
 
-        // Draw nodes
-        nodes.forEach((node) => {
-          const pulse = Math.sin(time * 1.5) * 0.15 + 0.85;
-          
-          // Outer glow (simplified)
-          const glowGradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, 35 * pulse);
-          glowGradient.addColorStop(0, `rgba(139, 92, 246, ${0.4 * pulse})`);
-          glowGradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
-          
-          ctx.fillStyle = glowGradient;
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, 35 * pulse, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Node circle with gradient
-          const nodeGradient = ctx.createRadialGradient(
-            node.x - 5, node.y - 5, 0,
-            node.x, node.y, 20
-          );
-          
-          if (node.type === 'input') {
-            nodeGradient.addColorStop(0, 'rgba(96, 165, 250, 1)'); // Blue
-            nodeGradient.addColorStop(1, 'rgba(59, 130, 246, 0.9)');
-          } else if (node.type === 'output') {
-            nodeGradient.addColorStop(0, 'rgba(192, 132, 252, 1)'); // Purple
-            nodeGradient.addColorStop(1, 'rgba(168, 85, 247, 0.9)');
-          } else if (node.type === 'hub') {
-            nodeGradient.addColorStop(0, 'rgba(244, 114, 182, 1)'); // Pink (Central Hub)
-            nodeGradient.addColorStop(1, 'rgba(244, 114, 182, 0.9)');
-          } else if (node.type === 'end') {
-            nodeGradient.addColorStop(0, 'rgba(52, 211, 153, 1)'); // Emerald (Success)
-            nodeGradient.addColorStop(1, 'rgba(52, 211, 153, 0.9)');
-          } else { // Default for 'process'
-            nodeGradient.addColorStop(0, 'rgba(167, 139, 250, 1)'); // Violet
-            nodeGradient.addColorStop(1, 'rgba(139, 92, 246, 0.9)');
-          }
-          
-          ctx.fillStyle = nodeGradient;
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, 18, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Node border
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          
-          // Inner highlight
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-          ctx.beginPath();
-          ctx.arc(node.x - 4, node.y - 4, 6, 0, Math.PI * 2);
-          ctx.fill();
-        });
-      }
-
-      if (isVisible) {
-        animationFrame = requestAnimationFrame(animate);
-      }
+      animationFrame = requestAnimationFrame(animate);
     };
 
     animationFrame = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
-      }
-    };
+    return () => cancelAnimationFrame(animationFrame);
   }, [isVisible]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full flex items-center justify-center overflow-hidden">
       <div 
         style={{ 
-          width: 1200, 
-          height: 600,
+          width: CANVAS_WIDTH, 
+          height: CANVAS_HEIGHT,
           transform: `scale(${scale})`,
-          transformOrigin: 'center center' // Scale from center
+          transformOrigin: 'center center'
         }} 
-        className="relative shrink-0" // shrink-0 ensures it keeps its size
+        className="relative shrink-0"
       >
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0"
-        />
+        <canvas ref={canvasRef} className="absolute inset-0" />
         
-        {/* Node Labels with better positioning */}
         {nodes.map((node) => (
           <motion.div
             key={node.id}
-            className="absolute text-sm sm:text-xs md:text-sm font-medium text-white/90 pointer-events-none whitespace-nowrap"
+            className="absolute text-sm font-medium text-white/90 whitespace-nowrap bg-black/50 px-3 py-1 rounded-full backdrop-blur-sm border border-white/10"
             style={{
               left: node.x,
               top: node.y,
-              transform: 'translate(-50%, 35px)', // Center below the node
+              transform: 'translate(-50%, 30px)', // Fixed offset below node
             }}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 + (parseInt(node.id) * 0.1) }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
           >
             {node.label}
           </motion.div>

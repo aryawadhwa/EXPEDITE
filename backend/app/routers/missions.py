@@ -71,6 +71,7 @@ def sanitize_json_string(content: str) -> str:
 
 class MissionCreate(BaseModel):
     objective: str
+    mode: Optional[str] = "task" # "task" or "auto"
     attachments: Optional[List[Dict]] = []  # List of {asset_id, filename, content_type}
 
 # Direct action patterns - bypass agent workflow for these
@@ -448,6 +449,45 @@ async def create_mission(mission_in: MissionCreate, user: User = Depends(get_cur
     )
     await initial_log.insert()
     
+    Mission(user_id=user.clerk_id, objective=mission_in.objective)
+    # If mode is explicitly "auto", skip direct action detection and go straight to Scout
+    if mission_in.mode == "auto":
+        await MissionLog(
+          mission_id=mission_id, 
+          role="system", 
+          content="🚀 Starting Auto-Pilot Mode (Deep Research)...", 
+          log_type="thinking"
+        ).insert()
+        
+        # Trigger Scout Agent (Auto-Pilot)
+        from app.agents.scout_agent import scout_app
+        # We need to run this like the Scout endpoint logic
+        from app.routers.agents import start_scout, ScoutRequest
+        # Re-using the logic via internal call or duplicating slightly for now to be safe
+        # Ideally we refactor 'start_scout' logic to be a shared service function
+        # For now, let's call the background task directly
+        
+        async def run_scout_wrapper(mid, obj, uid):
+             # This duplicates logic from routers/agents.py start_scout
+             # In a real app we'd move this to services/scout_service.py
+             try:
+                inputs = {
+                    "mission_id": mid, 
+                    "objective": obj,
+                    "status": "planning",
+                    "search_queries": [],
+                    "visited_urls": [],
+                    "prospect_candidates": [],
+                    "iteration": 0,
+                    "errors": []
+                }
+                await scout_app.ainvoke(inputs)
+             except Exception as e:
+                print(f"Auto-pilot error: {e}")
+
+        asyncio.create_task(run_scout_wrapper(mission_id, mission_in.objective, user.clerk_id))
+        return mission
+
     # Check if this is a direct action (post, tweet, etc.) - execute immediately
     action_result = await detect_and_execute_direct_action(
         mission_in.objective, 
@@ -460,7 +500,163 @@ async def create_mission(mission_in: MissionCreate, user: User = Depends(get_cur
         # Direct action was handled, don't start agent workflow
         return mission
     
-    # Not a direct action - trigger background agent for outreach workflow
+    # Classify intent: Information Request vs Action Request
+    from langchain_groq import ChatGroq
+    from langchain_core.messages import SystemMessage, HumanMessage
+    
+    intent_classifier = ChatGroq(
+        temperature=0.0,
+        groq_api_key=settings.GROQ_API_KEY,
+        model_name="llama-3.3-70b-versatile"
+    )
+    
+    intent_prompt = f"""You are analyzing a user's request to determine their TRUE INTENT, not just keywords.
+
+User Request: "{mission_in.objective}"
+
+Classify into ONE category:
+
+**INFORMATION_REQUEST**: The user's PRIMARY goal is to GET DATA or LEARN INFORMATION. They want to:
+- See a list of people/companies
+- Research or discover prospects
+- Get contact information
+- Understand who fits their criteria
+- Browse or explore options
+Examples: "Find CTOs in AI", "Show me recruiters at Google", "Who are the VPs at Series A startups?"
+
+**ACTION_REQUEST**: The user's PRIMARY goal is to TAKE ACTION or EXECUTE A WORKFLOW. They want to:
+- Send messages or emails
+- Draft outreach content
+- Run a campaign
+- Engage or contact people
+- Execute an automated workflow
+Examples: "Draft emails to CTOs", "Send LinkedIn messages to recruiters", "Run outreach to VPs", "Contact hiring managers"
+
+CRITICAL RULES:
+1. Focus on the PRIMARY INTENT, not just the presence of action words
+2. "Find X and draft emails" = ACTION_REQUEST (drafting is the goal)
+3. "Find X" alone = INFORMATION_REQUEST (just wants the data)
+4. "Show me X to contact" = INFORMATION_REQUEST (wants to see first, then decide)
+5. "Reach out to X" = ACTION_REQUEST (wants automated outreach)
+
+Return ONLY: INFORMATION_REQUEST or ACTION_REQUEST"""
+    
+    try:
+        intent_response = await intent_classifier.ainvoke([
+            SystemMessage(content="You are an intent classifier. Return only INFORMATION_REQUEST or ACTION_REQUEST."),
+            HumanMessage(content=intent_prompt)
+        ])
+        intent = intent_response.content.strip().upper()
+        
+        # Validate response
+        if "INFORMATION_REQUEST" in intent:
+            intent = "INFORMATION_REQUEST"
+        elif "ACTION_REQUEST" in intent:
+            intent = "ACTION_REQUEST"
+        else:
+            print(f"Invalid intent response: {intent}, defaulting to ACTION_REQUEST")
+            intent = "ACTION_REQUEST"
+            
+    except Exception as e:
+        print(f"Intent classification error: {e}")
+        intent = "ACTION_REQUEST"  # Default to action if classification fails
+    
+    if intent == "INFORMATION_REQUEST":
+        # Handle as data retrieval - use Apollo/Firecrawl to fetch and display
+        await MissionLog(
+            mission_id=mission_id,
+            role="system",
+            content="🔍 Processing information request...",
+            log_type="thinking"
+        ).insert()
+        
+        # Run Scout in "research-only" mode (no drafting)
+        from app.agents.scout_agent import scout_app
+        
+        async def run_research_only(mid, obj, uid):
+            try:
+                inputs = {
+                    "mission_id": mid,
+                    "objective": obj,
+                    "status": "planning",
+                    "search_queries": [],
+                    "visited_urls": [],
+                    "prospect_candidates": [],
+                    "iteration": 0,
+                    "errors": []
+                }
+                result = await scout_app.ainvoke(inputs)
+                
+                # Format and send results to chat
+                from app.core.socket import manager
+                candidates = result.get("prospect_candidates", [])
+                
+                if candidates:
+                    # Sort by score descending
+                    sorted_cands = sorted([c for c in candidates if c], key=lambda x: x.get("analysis", {}).get("score", 0), reverse=True)
+                    results_message = f"### 🎯 Found {len(sorted_cands)} Prospects\n\n"
+                    
+                    for i, cand in enumerate(sorted_cands[:10], 1):
+                        analysis = cand.get("analysis", {}) or {}
+                        name = analysis.get('person_name') or cand.get('name') or 'Unknown'
+                        title = cand.get('title') or 'N/A'
+                        company = analysis.get('company_name') or cand.get('company') or 'N/A'
+                        email = cand.get('email') or ''
+                        linkedin = cand.get('linkedin_url') or ''
+                        score = analysis.get('score', 0)
+                        reason = analysis.get('reason') or 'N/A'
+                        verified = cand.get('email_verified', False)
+                        
+                        # Badges
+                        score_badge = f"🟢 **{score}/10**" if score >= 8 else f"🟡 **{score}/10**" if score >= 6 else f"🔴 **{score}/10**"
+                        email_display = f"`{email}` {'✅' if verified else '📧'}" if email else "❌ Not Available"
+                        linkedin_link = f"[View Profile]({linkedin})" if linkedin else "Not available"
+                        
+                        results_message += f"""---
+
+#### {i}. {name}
+
+**{title}** at **{company}**
+
+- **Match Score:** {score_badge}
+- **Email:** {email_display}
+- **LinkedIn:** {linkedin_link}
+- **Why Relevant:** {reason}
+
+"""
+                    
+                    await manager.send_to_user(uid, {
+                        "message": results_message,
+                        "type": "success"
+                    })
+                else:
+                    try:
+                        await manager.send_to_user(uid, {
+                            "message": "No results found matching your criteria.",
+                            "type": "info"
+                        })
+                    except Exception as ws_error:
+                        print(f"WebSocket send error (no results): {ws_error}")
+                    
+                await MissionLog(
+                    mission_id=mid,
+                    role="system",
+                    content=f"✅ Research complete. Found {len(candidates)} prospects.",
+                    log_type="success"
+                ).insert()
+            except Exception as e:
+                print(f"Research error: {e}")
+                await MissionLog(
+                    mission_id=mid,
+                    role="system",
+                    content=f"❌ Research failed: {str(e)}",
+                    log_type="error"
+                ).insert()
+        
+        asyncio.create_task(run_research_only(mission_id, mission_in.objective, user.clerk_id))
+        return mission
+    
+    # ACTION_REQUEST: Run full workflow (existing logic)
     asyncio.create_task(run_mission_agent(mission_id, mission_in.objective, user.clerk_id, mission_in.attachments or []))
     
     return mission

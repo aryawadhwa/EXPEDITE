@@ -48,7 +48,7 @@ const Landing = () => {
           className="flex items-center gap-3"
         >
           <Logo className="w-8 h-8 text-white" />
-          <span className="text-lg font-bold tracking-tight text-white">Expedite AI</span>
+          <span className="text-lg font-bold tracking-tight text-white">Expedite</span>
         </motion.div>
 
         <div className="flex items-center gap-4">
@@ -79,10 +79,8 @@ const Landing = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-9xl font-black tracking-tighter mb-6 sm:mb-8 leading-[0.9] text-white px-2">
-              Your AI-Powered{" "}
-              <span className="pill-highlight">Outbound</span>{" "}
-              Team
+            <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-8xl font-black tracking-tighter mb-6 sm:mb-8 leading-[0.9] text-white px-2">
+              Your AI Powered <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-fuchsia-400 to-purple-400">Outbound</span> Team
             </h1>
           </motion.div>
 
@@ -90,7 +88,7 @@ const Landing = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
-            className="text-base sm:text-lg md:text-xl lg:text-2xl text-purple-200/80 max-w-3xl mx-auto mb-8 sm:mb-12 leading-relaxed px-4"
+            className="text-sm sm:text-base md:text-lg lg:text-xl text-purple-200/80 max-w-3xl mx-auto mb-8 sm:mb-12 leading-relaxed px-4"
           >
             Stop spending hours on manual prospecting. Let AI agents find, research,
             and craft personalized outreach while you focus on closing deals.
@@ -153,43 +151,36 @@ const Landing = () => {
           <BentoGrid>
             {[
               {
-                icon: <Search className="h-6 w-6" />,
                 title: "AI Powered Prospecting",
                 description: "Automatically find and qualify leads that match your ideal customer profile using advanced signals.",
                 className: "md:col-span-2",
               },
               {
-                icon: <Shield className="h-6 w-6" />,
                 title: "Human in the Loop",
                 description: "You stay in control. Review and approve every message before it sends.",
                 className: "md:col-span-1",
               },
               {
-                icon: <Mail className="h-6 w-6" />,
                 title: "Personalized Outreach",
                 description: "AI writes hyper-personalized emails using real context and company updates.",
                 className: "md:col-span-1",
               },
               {
-                icon: <Calendar className="h-6 w-6" />,
                 title: "Smart Scheduling",
                 description: "Agents negotiate times and book meetings directly to your calendar without back-and-forth.",
                 className: "md:col-span-2",
               },
               {
-                icon: <Layers className="h-6 w-6" />,
                 title: "Seamless Integrations",
                 description: "Connect instantly with Salesforce, HubSpot, LinkedIn, and your favorite tools.",
                 className: "md:col-span-1",
               },
               {
-                icon: <Rocket className="h-6 w-6" />,
                 title: "Agent Launchpad",
                 description: "Deploy specialized agent teams for specific campaigns and vertical markets.",
                 className: "md:col-span-1",
               },
               {
-                icon: <MessageSquare className="h-6 w-6" />,
                 title: "Interactive Strategy",
                 description: "Chat with your agents to refine targeting, adjust tone, and pivot strategies.",
                 className: "md:col-span-1",
@@ -199,7 +190,6 @@ const Landing = () => {
                 key={i}
                 title={feature.title}
                 description={feature.description}
-                icon={feature.icon}
                 className={feature.className}
               />
             ))}
@@ -283,7 +273,7 @@ const Landing = () => {
             </div>
           </div>
           <div className="border-t border-white/10 pt-8 text-center text-sm text-purple-200/50">
-            2026© ExpediteAI. All rights reserved.
+            2026© Expedite. All rights reserved.
           </div>
         </div>
       </footer>

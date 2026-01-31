@@ -185,7 +185,7 @@ export function HowItWorks() {
                     index % 2 !== 0 ? "md:order-3 md:text-left md:pl-8 md:pr-0" : ""
                   )}
                 >
-                  <div className="text-6xl font-black text-neutral-200/30 mb-2">{item.step}</div>
+                  <div className="text-[13rem] leading-none font-black text-white mb-4 opacity-100">{item.step}</div>
                   <h3 className="text-3xl font-bold text-white mb-4">{item.title}</h3>
                   <p className="text-purple-200/70 text-lg leading-relaxed">
                     {item.description}

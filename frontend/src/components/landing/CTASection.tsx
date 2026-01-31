@@ -48,7 +48,7 @@ export function CTASection() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 border-t border-white/10 pt-8 mt-8">
             <div className="max-w-md">
               <p className="text-base text-purple-200/60 leading-relaxed">
-                Join hundreds of forward-thinking teams using Expedite AI to automate their growth engine.
+                Join hundreds of forward-thinking teams using Expedite to automate their growth engine.
               </p>
             </div>
 

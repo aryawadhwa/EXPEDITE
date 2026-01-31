@@ -109,10 +109,11 @@
     font-family: 'JetBrains Mono', monospace;
   }
 
-  /* Global Scrollbar Styling */
+  /* Global Scrollbar Styling - Hidden as requested */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 0px;
+    height: 0px;
+    display: none;
   }
 
   ::-webkit-scrollbar-track {

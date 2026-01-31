@@ -176,7 +176,7 @@ export function Integrations() {
                     />
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                     {CATEGORIES.map((category) => {
                         const count =
                             category === "All"
@@ -280,15 +280,15 @@ function IntegrationCard({
 
             <div className="mt-auto pt-4">
                 {integration.status === "connected" ? (
-                    <div className="flex justify-between items-center w-full gap-2">
-                        <div className="h-8 px-3 flex-1 bg-emerald-500/10 text-emerald-600 rounded-md flex items-center justify-center text-xs font-medium gap-1.5 border border-emerald-500/20">
+                    <div className="flex flex-col w-full gap-2">
+                        <div className="h-8 px-3 w-full bg-emerald-500/10 text-emerald-600 rounded-md flex items-center justify-center text-xs font-medium gap-1.5 border border-emerald-500/20">
                             <Check className="w-3 h-3" />
                             Connected
                         </div>
                         <Button
                             variant="destructive"
                             size="sm"
-                            className="h-8 px-2 text-xs"
+                            className="h-8 px-2 text-xs w-full"
                             onClick={onDisconnect}
                             disabled={isConnecting}
                         >
