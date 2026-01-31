@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Brain, ChevronRight, ChevronLeft, Terminal } from "lucide-react";
+import { Brain, ChevronRight, ChevronLeft, Terminal, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,6 +31,46 @@ export function LiveBrainSidebar({ isOpen, onToggle }: LiveBrainSidebarProps) {
   const [stats, setStats] = useState({ active: 0, processed: 0, queue: 0 });
   const { userId } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
+  
+  // Resizable width state
+  const [width, setWidth] = useState(320); // Default width
+  const [isResizing, setIsResizing] = useState(false);
+  const minWidth = 280;
+  const maxWidth = 600;
+  
+  // Handle resize
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+  
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      // Calculate new width based on mouse position from right edge
+      const newWidth = window.innerWidth - e.clientX;
+      setWidth(Math.min(maxWidth, Math.max(minWidth, newWidth)));
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+    
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    }
+    
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing]);
 
   useEffect(() => {
     if (!userId) return;
@@ -152,10 +192,37 @@ export function LiveBrainSidebar({ isOpen, onToggle }: LiveBrainSidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "flex flex-col h-full bg-terminal border-l border-border transition-all duration-300",
-          isOpen ? "w-80" : "w-0 overflow-hidden"
+          "relative flex flex-col h-full bg-terminal border-l border-border transition-all",
+          isOpen ? "" : "w-0 overflow-hidden",
+          isResizing && "transition-none"
         )}
+        style={{ width: isOpen ? `${width}px` : 0 }}
       >
+        {/* Resize Handle - Drag to resize */}
+        <div
+          className={cn(
+            "absolute left-0 top-0 bottom-0 w-2 cursor-col-resize group z-10",
+            "hover:bg-primary/30 transition-colors",
+            isResizing && "bg-primary/50"
+          )}
+          onMouseDown={handleMouseDown}
+        >
+          {/* Visual indicator line */}
+          <div className={cn(
+            "absolute left-0 top-0 bottom-0 w-0.5 bg-border group-hover:bg-primary transition-colors",
+            isResizing && "bg-primary"
+          )} />
+          {/* Grip icon - visible on hover */}
+          <div className={cn(
+            "absolute left-1/2 top-1/2 -translate-y-1/2 -translate-x-1/2",
+            "p-1 rounded bg-secondary/80 border border-border",
+            "opacity-0 group-hover:opacity-100 transition-opacity",
+            isResizing && "opacity-100"
+          )}>
+            <GripVertical className="w-3 h-3 text-muted-foreground" />
+          </div>
+        </div>
+        
         {/* Header */}
         <div className="flex items-center justify-between h-14 px-4 border-b border-border">
           <div className="flex items-center gap-2">

@@ -7,9 +7,21 @@ import { useApi } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { CalendarEventCard } from "@/components/calendar/CalendarEventCard";
 
+interface CalendarItem {
+    _id?: string;
+    id?: string;
+    type: 'mission' | 'draft' | 'email' | 'agent_log';
+    date: Date;
+    scheduled_date?: string;
+    created_at?: string;
+    due_date?: string;
+    timestamp?: string;
+    [key: string]: unknown;
+}
+
 export default function Calendar() {
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [items, setItems] = useState<any[]>([]);
+    const [items, setItems] = useState<CalendarItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const api = useApi();
@@ -25,20 +37,20 @@ export default function Calendar() {
                 ]);
 
                 // Normalize items
-                const normalizedMissions = (missionsData || []).map((m: any) => ({
+                const normalizedMissions = (missionsData || []).map((m: CalendarItem) => ({
                     ...m,
                     type: 'mission',
                     date: new Date(m.scheduled_date || m.created_at)
                 }));
 
-                const normalizedDrafts = (draftsData || []).map((d: any) => ({
+                const normalizedDrafts = (draftsData || []).map((d: CalendarItem) => ({
                     ...d,
                     type: 'draft',
                     date: d.due_date ? new Date(d.due_date) : new Date() // Default to today if no due date
                 }));
 
                 // Normalize email events & agent logs
-                const timelineEvents = (emailTimeline || []).map((event: any) => ({
+                const timelineEvents = (emailTimeline || []).map((event: CalendarItem) => ({
                     ...event,
                     date: new Date(event.timestamp)
                 }));

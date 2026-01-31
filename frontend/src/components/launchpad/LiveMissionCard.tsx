@@ -8,7 +8,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Terminal, Users, Mail, MoreVertical, Square, Trash2, Activity, Clock } from "lucide-react";
+import { Terminal, Users, Mail, MoreVertical, Square, Trash2, Activity, Clock, Linkedin, Twitter, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 
@@ -87,37 +87,49 @@ export function LiveMissionCard({
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 animate-scan pointer-events-none" />
             )}
 
-            <div className="flex items-start justify-between mb-4 relative z-10">
-                <div className="flex-1 min-w-0 pr-4">
-                    <h4 className="font-mono text-sm uppercase tracking-wider text-zinc-400 mb-1">Target Objective</h4>
-                    <p className="font-medium text-zinc-100 truncate text-lg">{name}</p>
-                </div>
+            <div className="flex items-start justify-between mb-4 relative z-10 w-full">
+                <div className="w-full">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                            {(() => {
+                                const lowerName = name.toLowerCase();
+                                if (lowerName.includes("linkedin")) return <img src="https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg" alt="LinkedIn" className="w-5 h-5" />;
+                                if (lowerName.includes("twitter")) return <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Logo_of_Twitter.svg" alt="Twitter" className="w-5 h-5" />;
+                                if (lowerName.includes("reddit")) return <img src="https://www.vectorlogo.zone/logos/reddit/reddit-icon.svg" alt="Reddit" className="w-5 h-5" />;
+                                return <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg" alt="Gmail" className="w-5 h-5" />;
+                            })()}
+                            <span className="text-sm font-semibold text-zinc-200">
+                                {(() => {
+                                    const lowerName = name.toLowerCase();
+                                    if (lowerName.includes("linkedin")) return "LinkedIn Outreach";
+                                    if (lowerName.includes("twitter")) return "Twitter Outreach";
+                                    if (lowerName.includes("reddit")) return "Reddit Outreach";
+                                    return "Email Outreach";
+                                })()}
+                            </span>
+                        </div>
 
-                <div className="flex items-center gap-2">
-                    <div className={cn("px-2 py-1 rounded-md bg-black/40 border border-zinc-800 flex items-center gap-2", config.color)}>
-                        <div className={cn("w-2 h-2 rounded-full animate-pulse", config.dotClass, config.glow)} />
-                        <span className="text-xs font-bold tracking-wider">{config.label}</span>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild data-no-navigate>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-white -mr-2">
+                                    <MoreVertical className="w-4 h-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-zinc-300">
+                                {status === "running" && onStop && id && (
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStop(id); }} className="cursor-pointer hover:bg-zinc-800">
+                                        <Square className="w-4 h-4 mr-2" /> Stop Mission
+                                    </DropdownMenuItem>
+                                )}
+                                {onDelete && id && (
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(id); }} className="cursor-pointer text-red-400 hover:bg-red-400/10 hover:text-red-300">
+                                        <Trash2 className="w-4 h-4 mr-2" /> Delete Data
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
-
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild data-no-navigate>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-white">
-                                <MoreVertical className="w-4 h-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-zinc-300">
-                            {status === "running" && onStop && id && (
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStop(id); }} className="cursor-pointer hover:bg-zinc-800">
-                                    <Square className="w-4 h-4 mr-2" /> Stop Mission
-                                </DropdownMenuItem>
-                            )}
-                            {onDelete && id && (
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(id); }} className="cursor-pointer text-red-400 hover:bg-red-400/10 hover:text-red-300">
-                                    <Trash2 className="w-4 h-4 mr-2" /> Delete Data
-                                </DropdownMenuItem>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <p className="text-xs text-zinc-500 line-clamp-2 w-full">{name}</p>
                 </div>
             </div>
 

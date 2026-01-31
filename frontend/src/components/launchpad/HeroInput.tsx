@@ -7,9 +7,18 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 // Extend Window interface for Web Speech API
+interface Asset {
+  id: string;
+  filename: string;
+  content_type?: string;
+  [key: string]: unknown;
+}
+
 declare global {
   interface Window {
-    SpeechRecognition: any; // Using any to avoid conflicts, checking existence in runtime
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    SpeechRecognition: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     webkitSpeechRecognition: any;
   }
 }
@@ -20,8 +29,8 @@ export function HeroInput() {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [showAssetPicker, setShowAssetPicker] = useState(false);
-  const [availableAssets, setAvailableAssets] = useState<any[]>([]);
-  const [selectedAttachments, setSelectedAttachments] = useState<any[]>([]);
+  const [availableAssets, setAvailableAssets] = useState<Asset[]>([]);
+  const [selectedAttachments, setSelectedAttachments] = useState<Asset[]>([]);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const api = useApi();
   const navigate = useNavigate();
@@ -149,7 +158,7 @@ export function HeroInput() {
     }
   };
 
-  const handleSelectAsset = (asset: any) => {
+  const handleSelectAsset = (asset: Asset) => {
     if (!selectedAttachments.find((a) => a.id === asset.id)) {
       setSelectedAttachments((prev) => [...prev, asset]);
     }
@@ -301,9 +310,9 @@ export function HeroInput() {
             size="lg"
             disabled={!query.trim() || isLoading}
             className={cn(
-              "h-12 px-6 rounded-xl font-semibold transition-all shrink-0 gap-2",
+              "h-12 px-6 rounded-xl font-semibold transition-all shrink-0 gap-2 text-white",
               query.trim()
-                ? "bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg shadow-primary/25"
+                ? "bg-primary/80 hover:bg-primary shadow-lg shadow-primary/25"
                 : "bg-secondary text-muted-foreground"
             )}
           >

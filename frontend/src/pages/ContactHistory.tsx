@@ -6,11 +6,30 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Download, Mail, CheckCircle2, XCircle } from "lucide-react";
 import { format } from "date-fns";
 
+interface Contact {
+    _id: string;
+    prospect_email: string;
+    prospect_name?: string;
+    first_contacted_at: string;
+    last_contacted_at: string;
+    total_emails_sent: number;
+    has_replied: boolean;
+    status?: string;
+    [key: string]: unknown;
+}
+
+interface Stats {
+    total_contacts: number;
+    replied_contacts: number;
+    reply_rate: number;
+    [key: string]: unknown;
+}
+
 export default function ContactHistory() {
-    const [contacts, setContacts] = useState<any[]>([]);
+    const [contacts, setContacts] = useState<Contact[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
-    const [stats, setStats] = useState<any>(null);
+    const [stats, setStats] = useState<Stats | null>(null);
     const api = useApi();
 
     useEffect(() => {

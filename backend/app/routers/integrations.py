@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional, Dict
 from app.api.deps import get_current_user
-from app.models import User
+from app.models import User, PendingAction
 from app.core.config import settings
 import httpx
+import urllib.parse
 
 router = APIRouter()
 
@@ -158,7 +159,9 @@ TOOL_CONFIG_MAP = {
     "reddit": "ac_2_IjyXggGH8F",
     "perplexity": "ac_9u_yICXpCVs4",
     "google_sheets": "ac_E9vuh1t4AzEu",
-    "sheets": "ac_E9vuh1t4AzEu" # Alias
+    "sheets": "ac_E9vuh1t4AzEu", # Alias
+    "linkedin": "ac_SdzD1ondK6Zi",
+    "twitter": "ac_46x65PoeAWsM"
 }
 
 from pydantic import BaseModel
