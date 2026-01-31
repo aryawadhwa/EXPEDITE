@@ -8,7 +8,11 @@ export const GoogleGeminiEffect = ({
   description,
   className,
 }: {
+<<<<<<< HEAD
   pathLengths?: (number | MotionValue<number>)[];
+=======
+  pathLengths?: number[] | MotionValue<number>[];
+>>>>>>> 121a10c465cc9a1c726b10e3553215c7cba47c59
   title?: string;
   description?: string;
   className?: string;

@@ -99,9 +99,9 @@ export default function ReviewQueue() {
         initialEdits[id] = { subject: d.subject, body: d.body };
       });
       setDraftEdits(initialEdits);
-      
+
       setDraftEdits(initialEdits);
-      
+
       // If a specific draft_id was requested, navigate to it
       if (filterDraftId && data?.length) {
         const idx = data.findIndex((d: Draft) => (d.id || d._id) === filterDraftId);
@@ -414,23 +414,23 @@ export default function ReviewQueue() {
       <header className="flex items-center justify-between px-6 h-16 border-b border-white/10 bg-black/20 backdrop-blur-md">
         <div className="flex items-center gap-4">
           <div className="p-2 rounded-lg bg-white/5 border border-white/10">
-             <Inbox className="w-5 h-5 text-purple-400" />
+            <Inbox className="w-5 h-5 text-purple-400" />
           </div>
           <div>
             <h1 className="text-lg font-semibold text-white tracking-tight">Review Queue</h1>
-             <p className="text-xs text-zinc-500 font-mono">
-               {selectMode ? `${selectedDrafts.size} selected` : `PENDING: ${drafts.length}`}
-             </p>
+            <p className="text-xs text-zinc-500 font-mono">
+              {selectMode ? `${selectedDrafts.size} selected` : `PENDING: ${drafts.length}`}
+            </p>
           </div>
-          
+
           {currentDraft && !selectMode && (
             <div className="flex items-center gap-2 ml-4 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-300">
-               {getChannelIcon(currentDraft.channel)}
-               <span className="uppercase tracking-wider font-medium">{currentDraft.channel || "EMAIL"}</span>
+              {getChannelIcon(currentDraft.channel)}
+              <span className="uppercase tracking-wider font-medium">{currentDraft.channel || "EMAIL"}</span>
             </div>
           )}
         </div>
-        
+
         <div className="flex items-center gap-3">
           {/* Bulk Actions */}
           {selectMode ? (
@@ -476,31 +476,31 @@ export default function ReviewQueue() {
               >
                 Multi-Select
               </Button>
-              
+
               <div className="flex items-center bg-white/5 rounded-lg border border-white/10 p-0.5 ml-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handlePrev}
-                    disabled={currentIndex === 0}
-                    className="h-8 w-8 text-zinc-400 hover:text-white"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <div className="w-px h-4 bg-white/10 mx-1" />
-                  <span className="text-xs font-mono text-zinc-500 min-w-[3rem] text-center">
-                    {currentIndex + 1} / {drafts.length}
-                  </span>
-                  <div className="w-px h-4 bg-white/10 mx-1" />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleNext}
-                    disabled={currentIndex === drafts.length - 1}
-                    className="h-8 w-8 text-zinc-400 hover:text-white"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handlePrev}
+                  disabled={currentIndex === 0}
+                  className="h-8 w-8 text-zinc-400 hover:text-white"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <div className="w-px h-4 bg-white/10 mx-1" />
+                <span className="text-xs font-mono text-zinc-500 min-w-[3rem] text-center">
+                  {currentIndex + 1} / {drafts.length}
+                </span>
+                <div className="w-px h-4 bg-white/10 mx-1" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleNext}
+                  disabled={currentIndex === drafts.length - 1}
+                  className="h-8 w-8 text-zinc-400 hover:text-white"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
               </div>
 
               <Button
@@ -546,10 +546,10 @@ export default function ReviewQueue() {
                     key={draftId}
                     onClick={() => toggleDraftSelection(draftId)}
                     className={cn(
-                        "flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border",
-                        isSelected
-                          ? "bg-primary/10 border-primary/40 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
-                          : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10"
+                      "flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border",
+                      isSelected
+                        ? "bg-primary/10 border-primary/40 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
+                        : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10"
                     )}
                   >
                     <Checkbox
@@ -559,15 +559,15 @@ export default function ReviewQueue() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                          <p className="font-medium text-sm text-zinc-200 truncate">{draft.name || "Unknown"}</p>
-                          <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-white/10 text-zinc-500">
-                             {draft.channel || 'email'}
-                          </Badge>
+                        <p className="font-medium text-sm text-zinc-200 truncate">{draft.name || "Unknown"}</p>
+                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-white/10 text-zinc-500">
+                          {draft.channel || 'email'}
+                        </Badge>
                       </div>
                       <p className="text-xs text-zinc-500 truncate">{draft.company || "Unknown"}</p>
                       <p className="text-xs text-zinc-400 mt-2 line-clamp-1">
-                         <span className="text-zinc-600 mr-2">SUBJECT:</span> 
-                         {draft.subject}
+                        <span className="text-zinc-600 mr-2">SUBJECT:</span>
+                        {draft.subject}
                       </p>
                     </div>
                   </div>
@@ -620,13 +620,13 @@ export default function ReviewQueue() {
           )}
           {selectMode && (
             <div className="flex flex-col items-center justify-center h-full text-zinc-500">
-                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-6">
-                 <CheckCheck className="w-8 h-8 opacity-50" />
-                </div>
-                <h3 className="text-lg font-medium text-zinc-300 mb-2">Bulk Selection Mode</h3>
-                <p className="text-sm max-w-xs text-center leading-relaxed">
-                    Select multiple drafts from the list on the left to approve or reject them in a single batch.
-                </p>
+              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-6">
+                <CheckCheck className="w-8 h-8 opacity-50" />
+              </div>
+              <h3 className="text-lg font-medium text-zinc-300 mb-2">Bulk Selection Mode</h3>
+              <p className="text-sm max-w-xs text-center leading-relaxed">
+                Select multiple drafts from the list on the left to approve or reject them in a single batch.
+              </p>
             </div>
           )}
         </div>
@@ -655,7 +655,7 @@ export default function ReviewQueue() {
               <ChevronRight className="w-3.5 h-3.5 opacity-50" />
             </Button>
             <Button
-              className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] border-0"
+              className="gap-2 bg-primary hover:bg-primary/90 text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] border-0"
               onClick={handleApprove}
               disabled={isActioning}
             >
@@ -665,10 +665,10 @@ export default function ReviewQueue() {
                 <>
                   <Check className="w-4 h-4" />
                   {currentDraft?.channel === "twitter" ? "Approve & Tweet" :
-                   currentDraft?.channel === "reddit" ? "Approve & Post" :
-                   currentDraft?.channel === "linkedin" ? "Approve & Send" :
-                   currentDraft?.channel === "slack" ? "Approve & Send" :
-                   "Approve & Send"}
+                    currentDraft?.channel === "reddit" ? "Approve & Post" :
+                      currentDraft?.channel === "linkedin" ? "Approve & Send" :
+                        currentDraft?.channel === "slack" ? "Approve & Send" :
+                          "Approve & Send"}
                 </>
               )}
             </Button>

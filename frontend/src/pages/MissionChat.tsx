@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Logo } from "@/components/ui/logo";
 
 interface Attachment {
     asset_id: string;
@@ -243,12 +244,12 @@ export default function MissionChat() {
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                
+
                 // Skip messages targeted only for LiveBrain
                 if (data.target === "brain") {
                     return; // Don't add to chat messages, LiveBrain handles these
                 }
-                
+
                 setMessages(prev => [...prev, {
                     id: `ws-${Date.now()}`,
                     role: "agent",
@@ -321,7 +322,7 @@ export default function MissionChat() {
         const pendingActionId = searchParams.get("pending_action");
         if (pendingActionId && !pendingActionExecuted.current) {
             pendingActionExecuted.current = true;
-            
+
             // Small delay to ensure user profile is loaded
             const executePending = async () => {
                 // Show executing message
@@ -335,7 +336,7 @@ export default function MissionChat() {
 
                 try {
                     const result = await api.executePendingAction(pendingActionId);
-                    
+
                     // Remove the "executing" message and add the result
                     setMessages(prev => {
                         const filtered = prev.filter(m => !m.id.startsWith("executing-"));
@@ -542,7 +543,7 @@ export default function MissionChat() {
     };
 
     return (
-        <div className="h-full flex flex-col bg-background">
+        <div className="h-full flex flex-col bg-black">
             {/* Header */}
             <header className="flex items-center gap-4 px-6 h-14 border-b border-border bg-card/50">
                 <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
@@ -568,7 +569,7 @@ export default function MissionChat() {
                 <div className="max-w-3xl mx-auto space-y-4">
                     {messages.length === 0 && (
                         <div className="text-center py-20">
-                            <AppLogo className="w-16 h-16 text-primary mx-auto mb-4" />
+                            <Logo className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                             <h2 className="text-xl font-semibold text-foreground mb-2">
                                 What's your outbound mission?
                             </h2>
@@ -591,12 +592,12 @@ export default function MissionChat() {
                                     "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
                                     message.role === "agent" ? "bg-primary/20" : "bg-muted"
                                 )}>
-                                    <AppLogo className="w-5 h-5 text-primary" />
+                                    <Logo className="w-5 h-5 text-primary" />
                                 </div>
                             )}
 
                             <div className={cn(
-                                "max-w-[80%] rounded-xl px-4 py-3",
+                                "max-w-[80%] rounded-xl px-4 py-3 text-white",
                                 message.role === "user"
                                     ? "bg-primary text-primary-foreground"
                                     : message.role === "system"
@@ -604,13 +605,13 @@ export default function MissionChat() {
                                         : "bg-card border border-border"
                             )}>
                                 {message.role === "agent" || message.role === "system" ? (
-                                    <div className="text-sm text-foreground prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-p:text-foreground prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:text-foreground prose-headings:text-foreground prose-strong:text-foreground">
+                                    <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 text-white prose-p:text-white prose-li:text-white prose-headings:text-white">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                             {message.content}
                                         </ReactMarkdown>
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-foreground">{message.content}</p>
+                                    <p className="text-sm">{message.content}</p>
                                 )}
                                 {(() => {
                                     // Check for connect_url in metadata (direct OAuth link)
@@ -679,23 +680,23 @@ export default function MissionChat() {
                                             onClick={async () => {
                                                 const pendingId = message.metadata?.pending_action_id;
                                                 if (!pendingId) return;
-                                                
+
                                                 // Show loading state
-                                                setMessages(prev => prev.map(m => 
-                                                    m.id === message.id 
-                                                        ? {...m, metadata: {...m.metadata, posting: true}}
+                                                setMessages(prev => prev.map(m =>
+                                                    m.id === message.id
+                                                        ? { ...m, metadata: { ...m.metadata, posting: true } }
                                                         : m
                                                 ));
-                                                
+
                                                 try {
                                                     const result = await api.executePendingAction(pendingId);
-                                                    
+
                                                     // Add success/error message
                                                     setMessages(prev => {
                                                         // Update the original message to show posted
-                                                        const updated = prev.map(m => 
-                                                            m.id === message.id 
-                                                                ? {...m, metadata: {...m.metadata, posting: false, posted: result.success}}
+                                                        const updated = prev.map(m =>
+                                                            m.id === message.id
+                                                                ? { ...m, metadata: { ...m.metadata, posting: false, posted: result.success } }
                                                                 : m
                                                         );
                                                         // Add result message
@@ -707,16 +708,16 @@ export default function MissionChat() {
                                                             status: result.success ? "complete" as const : "error" as const
                                                         }];
                                                     });
-                                                    
+
                                                     if (result.success) {
                                                         toast.success("Posted!", { description: result.message });
                                                     } else {
                                                         toast.error("Failed", { description: result.message });
                                                     }
                                                 } catch (e: unknown) {
-                                                    setMessages(prev => prev.map(m => 
-                                                        m.id === message.id 
-                                                            ? {...m, metadata: {...m.metadata, posting: false}}
+                                                    setMessages(prev => prev.map(m =>
+                                                        m.id === message.id
+                                                            ? { ...m, metadata: { ...m.metadata, posting: false } }
                                                             : m
                                                     ));
                                                     toast.error("Error", { description: (e as Error).message });
@@ -779,9 +780,6 @@ export default function MissionChat() {
                                         </div>
                                     )}
                                 <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[10px] opacity-60">
-                                        {message.timestamp.toLocaleTimeString()}
-                                    </span>
                                     {message.status === "thinking" && (
                                         <Loader2 className="w-3 h-3 animate-spin" />
                                     )}

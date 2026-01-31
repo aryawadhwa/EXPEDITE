@@ -46,28 +46,24 @@ export function NavigationSidebar({ isCollapsed, onToggle }: NavigationSidebarPr
   return (
     <aside
       className={cn(
-        "flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-300",
+        "flex flex-col h-full bg-terminal border-r border-sidebar-border transition-all duration-300",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
       <div className="flex items-center gap-3 p-4 h-16 border-b border-sidebar-border/50">
-        {/* Logo - links to home */}
-        <Tooltip delayDuration={0}>
-          <TooltipTrigger asChild>
-            <a
-              href="http://localhost:8080"
-              className={cn(
-                "flex items-center gap-2 hover:opacity-80 transition-opacity",
-                isCollapsed && "justify-center w-full"
-              )}
-            >
+        {!isCollapsed && (
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Logo className="h-8 w-8 text-primary" />
+            <span className="font-bold text-lg tracking-tight text-white">ExpenditeAI</span>
+          </Link>
+        )}
+        {isCollapsed && (
+          <div className="flex justify-center w-full">
+            <Link to="/" className="hover:opacity-80 transition-opacity">
               <Logo className="h-8 w-8 text-primary" />
-            </a>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="bg-popover">
-            Back to Home
-          </TooltipContent>
-        </Tooltip>
+            </Link>
+          </div>
+        )}
         <Button
           variant="ghost"
           size="icon"

@@ -39,7 +39,8 @@ const Landing = () => {
       <ShaderGradientBackground />
 
       {/* Header with Logo */}
-      <header className="fixed top-0 left-0 z-50 p-6">
+      {/* Header with Logo and Actions */}
+      <header className="fixed top-0 left-0 right-0 z-50 p-6 flex justify-between items-center">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -49,6 +50,25 @@ const Landing = () => {
           <Logo className="w-8 h-8 text-white" />
           <span className="text-lg font-bold tracking-tight text-white">Expedite AI</span>
         </motion.div>
+
+        <div className="flex items-center gap-4">
+          <SignedIn>
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: "w-10 h-10 border-2 border-white/20"
+                }
+              }}
+            />
+          </SignedIn>
+          <SignedOut>
+            <SignInButton mode="modal">
+              <GlassButton size="sm" variant="outline" className="text-sm px-6 py-2">
+                Get Started
+              </GlassButton>
+            </SignInButton>
+          </SignedOut>
+        </div>
       </header>
 
       {/* Hero Section */}
@@ -59,8 +79,8 @@ const Landing = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-8 leading-[0.9] text-white">
-              Your AI Powered{" "}
+            <h1 className="text-7xl md:text-9xl font-black tracking-tighter mb-8 leading-[0.9] text-white">
+              Your AI-Powered{" "}
               <span className="pill-highlight">Outbound</span>{" "}
               Team
             </h1>
@@ -98,7 +118,11 @@ const Landing = () => {
                 </GlassButton>
               </SignInButton>
             </SignedOut>
-            <GlassButton size="lg" variant="outline">
+            <GlassButton
+              size="lg"
+              variant="outline"
+              onClick={() => window.location.href = 'https://youtu.be/iT05GTtRLig?si=bpNhVB9ELBmktolq'}
+            >
               Watch Demo
             </GlassButton>
           </motion.div>
@@ -117,7 +141,7 @@ const Landing = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-6 text-white">
+            <h2 className="text-6xl md:text-8xl font-black tracking-tighter mb-6 text-white">
               Everything You Need to{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">Scale</span>
             </h2>
@@ -193,7 +217,7 @@ const Landing = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-12"
           >
-            <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-6 text-white">
+            <h2 className="text-6xl md:text-8xl font-black tracking-tighter mb-6 text-white">
               AI <span className="pill-highlight">Workflow</span>
             </h2>
             <p className="text-xl text-purple-200/70 max-w-2xl mx-auto">
@@ -299,7 +323,7 @@ const CanvasRevealSection = () => {
   return (
     <section className="py-20 flex flex-col lg:flex-row items-center justify-center w-full gap-4 mx-auto px-8 relative z-10">
       <FeatureCard
-        title="AI Powered Prospecting"
+        title="AI-Powered Prospecting"
         icon={<Search className="h-10 w-10" />}
         colors={[[0, 255, 255]]}
         containerClassName="bg-emerald-900"
@@ -336,7 +360,7 @@ const FeatureCard = ({
   dotSize?: number;
 }) => {
   const [hovered, setHovered] = useState(false);
-  
+
   return (
     <div
       onMouseEnter={() => setHovered(true)}

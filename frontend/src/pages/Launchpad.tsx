@@ -52,6 +52,7 @@ interface Mission {
 const Launchpad = () => {
   const [activeMissions, setActiveMissions] = useState<Mission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState("all");
   const api = useApi();
   const navigate = useNavigate();
 
@@ -68,6 +69,8 @@ const Launchpad = () => {
     };
     fetchMissions();
   }, [api]);
+
+  const filteredMissions = activeMissions.filter(m => filterStatus === "all" ? true : m.status === filterStatus);
 
   const handleRecipeClick = async (query: string) => {
     try {
@@ -112,7 +115,7 @@ const Launchpad = () => {
       <section className="pt-8 pb-4 relative">
         <div className="text-center mb-12 relative z-10">
 
-          
+
           <h1 className="text-5xl lg:text-7xl font-bold text-white mb-6 tracking-tight">
             Launch Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Campaign</span>
           </h1>
@@ -149,26 +152,37 @@ const Launchpad = () => {
       {/* Active Missions */}
       <section className="pb-20">
         <div className="flex items-center justify-between mb-8 px-2">
-           <div className="space-y-1">
+          <div className="space-y-1">
             <h2 className="text-2xl font-semibold text-white">Active Missions</h2>
             <p className="text-sm text-zinc-500">Monitor your running campaigns</p>
           </div>
-          <span className="text-xs font-mono text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-3 py-1 rounded-full">
-            {activeMissions.filter((m) => m.status === "running").length} SYSTEM(S) ONLINE
-          </span>
+          <div className="flex items-center gap-2 bg-white/5 p-1 rounded-lg border border-white/10">
+            {["all", "running", "stopped", "completed"].map((status) => (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${filterStatus === status
+                  ? "bg-zinc-800 text-white shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                  }`}
+              >
+                {status.charAt(0).toUpperCase() + status.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-[240px] rounded-2xl border border-white/5 bg-white/5 animate-pulse" />
             ))
-          ) : activeMissions.length === 0 ? (
+          ) : filteredMissions.length === 0 ? (
             <div className="col-span-full py-20 text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
-              <p className="text-zinc-400 text-lg mb-2">No active missions</p>
+              <p className="text-zinc-400 text-lg mb-2">No {filterStatus === 'all' ? '' : filterStatus} missions found</p>
               <p className="text-zinc-600 text-sm">Launch your first campaign from the input above</p>
             </div>
           ) : (
-            activeMissions.map((mission) => (
+            filteredMissions.map((mission) => (
               <LiveMissionCard
                 key={mission._id || mission.id}
                 id={mission._id || mission.id}

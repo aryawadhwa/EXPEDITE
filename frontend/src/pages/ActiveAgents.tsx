@@ -198,63 +198,55 @@ export default function ActiveAgents() {
         ) : (
           agents.map((agent) => (
             <div key={agent.id} className="break-inside-avoid mb-4 p-5 bg-zinc-900/50 backdrop-blur-sm border border-white/10 rounded-xl hover:border-primary/50 transition-all hover:shadow-[0_0_20px_rgba(0,0,0,0.5)]">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center border border-white/5",
-                    typeConfig[agent.type]?.color || typeConfig.custom.color
-                  )}>
-                    <Bot className={cn(
-                      "w-5 h-5",
-                      typeConfig[agent.type]?.color.split(' ')[1] || typeConfig.custom.color.split(' ')[1]
-                    )} />
-                  </div>
-                  <div>
+              <div className="flex items-start justify-between mb-4 relative z-10 w-full">
+                <div className="w-full">
+                  <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-white">{agent.name}</h3>
-                      <Badge variant="secondary" className={cn("text-xs border-0", typeConfig[agent.type]?.color || typeConfig.custom.color)}>
-                        {typeConfig[agent.type]?.label || typeConfig.custom.label}
-                      </Badge>
+                      {(() => {
+                        const lowerName = (agent.mission || "").toLowerCase();
+                        if (lowerName.includes("linkedin")) return <img src="https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg" alt="LinkedIn" className="w-5 h-5" />;
+                        if (lowerName.includes("twitter")) return <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Logo_of_Twitter.svg" alt="Twitter" className="w-5 h-5" />;
+                        if (lowerName.includes("reddit")) return <img src="https://www.vectorlogo.zone/logos/reddit/reddit-icon.svg" alt="Reddit" className="w-5 h-5" />;
+                        return <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg" alt="Gmail" className="w-5 h-5" />;
+                      })()}
+                      <span className="text-sm font-semibold text-zinc-200">
+                        {(() => {
+                          const lowerName = (agent.mission || "").toLowerCase();
+                          if (lowerName.includes("linkedin")) return "LinkedIn Agent";
+                          if (lowerName.includes("twitter")) return "Twitter Agent";
+                          if (lowerName.includes("reddit")) return "Reddit Agent";
+                          return "Email Agent";
+                        })()}
+                      </span>
                     </div>
-                    <p className="text-xs text-zinc-500 font-mono">{agent.id}</p>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn("status-dot", statusConfig[agent.status]?.dotClass || "bg-muted-foreground")} />
-                    <span className="text-xs text-zinc-400">
-                      {statusConfig[agent.status]?.label || agent.status}
-                    </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/5 -mr-2">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white">
+                        <DropdownMenuItem onClick={() => setSelectedAgent(agent)} className="focus:bg-white/10 focus:text-white">
+                          View Workflow
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled className="text-zinc-500">Edit Configuration</DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-400 focus:bg-red-500/10 focus:text-red-400"
+                          onClick={() => handleDelete(agent.id)}
+                        >
+                          Terminate
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/5">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white">
-                      <DropdownMenuItem onClick={() => setSelectedAgent(agent)} className="focus:bg-white/10 focus:text-white">
-                        View Workflow
-                      </DropdownMenuItem>
-                      <DropdownMenuItem disabled className="text-zinc-500">Edit Configuration</DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-red-400 focus:bg-red-500/10 focus:text-red-400"
-                        onClick={() => handleDelete(agent.id)}
-                      >
-                        Terminate
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <p className="text-xs text-zinc-500 line-clamp-2 w-full">{agent.mission}</p>
                 </div>
               </div>
 
-              {/* Mission */}
               <div className="mb-4 p-3 rounded-lg bg-black/40 border border-white/5">
                 <p className="text-sm text-zinc-300">{agent.mission}</p>
               </div>
-
-              {/* Time and Date Information */}
               <div className="mb-4 flex items-center gap-4 text-xs text-zinc-500">
                 <div className="flex items-center gap-1.5">
                   <svg className="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">

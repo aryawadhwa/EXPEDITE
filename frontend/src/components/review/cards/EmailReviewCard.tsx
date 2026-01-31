@@ -64,7 +64,7 @@ export function EmailReviewCard({
   useEffect(() => {
     setBody(initialBody);
   }, [initialBody]);
-  
+
   useEffect(() => {
     setSelectedAssetIds(new Set(attachments.map(a => a.asset_id)));
   }, [attachments]);
@@ -193,9 +193,9 @@ export function EmailReviewCard({
             </label>
             <Dialog open={showAssetDialog} onOpenChange={setShowAssetDialog}>
               <DialogTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="gap-1.5 h-7 text-xs"
                   onClick={handleOpenAssetDialog}
                 >
@@ -224,16 +224,15 @@ export function EmailReviewCard({
                   ) : (
                     <div className="space-y-2">
                       {assets.map((asset) => (
-                        <div 
+                        <div
                           key={asset.id}
-                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                            selectedAssetIds.has(asset.id) 
-                              ? 'border-primary bg-primary/5' 
+                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedAssetIds.has(asset.id)
+                              ? 'border-primary bg-primary/5'
                               : 'border-border hover:bg-secondary'
-                          }`}
+                            }`}
                           onClick={() => toggleAsset(asset.id)}
                         >
-                          <Checkbox 
+                          <Checkbox
                             checked={selectedAssetIds.has(asset.id)}
                             onCheckedChange={() => toggleAsset(asset.id)}
                           />
@@ -263,9 +262,9 @@ export function EmailReviewCard({
           {attachments.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {attachments.map((att, i) => (
-                <Badge 
-                  key={i} 
-                  variant="outline" 
+                <Badge
+                  key={i}
+                  variant="outline"
                   className="gap-1.5 pr-1 hover:bg-secondary group"
                 >
                   <Paperclip className="w-3 h-3" />
@@ -286,7 +285,7 @@ export function EmailReviewCard({
           )}
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-6">
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <span className="font-mono">{body.split(/\s+/).filter(Boolean).length}</span> words
@@ -299,7 +298,7 @@ export function EmailReviewCard({
             Ready to Send
           </Badge>
         </div>
-        <div className="flex flex-wrap gap-2 mt-3">
+        <div className="flex flex-wrap gap-2 mt-4 pb-16">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
             💡 Keep subject under 50 chars for mobile
           </span>

@@ -22,16 +22,16 @@ export function AppLayout({ children }: AppLayoutProps) {
   if (isMobile) {
     return (
       <div className="flex flex-col h-screen bg-black relative">
-      <div 
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: `
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `
             radial-gradient(circle at 90% 10%, rgba(88, 28, 135, 0.15) 0%, transparent 40%),
             radial-gradient(circle at 10% 90%, rgba(255, 255, 255, 0.05) 0%, transparent 40%)
           `,
-          backgroundColor: '#000000'
-        }}
-      />
+            backgroundColor: '#000000'
+          }}
+        />
         {tour}
         {/* Mobile Header */}
         <header className="flex items-center justify-between h-14 px-4 border-b border-border bg-sidebar">
@@ -70,8 +70,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="flex h-screen bg-black overflow-hidden relative">
-      <div 
+    <div
+      className="flex h-screen bg-black overflow-hidden relative"
+    >
+      <div
         className="absolute inset-0 pointer-events-none z-0"
         style={{
           background: `
