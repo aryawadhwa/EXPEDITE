@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,11 +32,7 @@ export default function ContactHistory() {
     const [stats, setStats] = useState<Stats | null>(null);
     const api = useApi();
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
             const [contactsData, statsData] = await Promise.all([
                 api.getContactHistory(),
@@ -49,7 +45,11 @@ export default function ContactHistory() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [api]);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     const filteredContacts = contacts.filter(contact =>
         contact.prospect_email.toLowerCase().includes(searchQuery.toLowerCase()) ||

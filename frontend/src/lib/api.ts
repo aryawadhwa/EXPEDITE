@@ -53,6 +53,7 @@ export function useApi() {
 
     return useMemo(() => ({
         // Generic GET method
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         get: async <T = any>(url: string): Promise<T> => {
             const res = await fetchWithAuth(url);
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
