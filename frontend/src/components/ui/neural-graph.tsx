@@ -280,7 +280,7 @@ export function NeuralGraph() {
         {nodes.map((node) => (
           <motion.div
             key={node.id}
-            className="absolute text-xs font-medium text-white/80 pointer-events-none whitespace-nowrap"
+            className="absolute text-sm sm:text-xs md:text-sm font-medium text-white/90 pointer-events-none whitespace-nowrap"
             style={{
               left: node.x,
               top: node.y,

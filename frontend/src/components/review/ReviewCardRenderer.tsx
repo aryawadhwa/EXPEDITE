@@ -1,5 +1,4 @@
 import { EmailReviewCard } from "./cards/EmailReviewCard";
-import { LinkedInReviewCard } from "./cards/LinkedInReviewCard";
 import { TwitterReviewCard } from "./cards/TwitterReviewCard";
 import { RedditReviewCard } from "./cards/RedditReviewCard";
 import { InstagramReviewCard } from "./cards/InstagramReviewCard";
@@ -80,19 +79,6 @@ export function ReviewCardRenderer({
           onRegenerate={onRegenerate}
           onAttachmentsChange={onAttachmentsChange}
           onLoadAssets={onLoadAssets}
-          isRegenerating={isRegenerating}
-        />
-      );
-
-    case "linkedin":
-      return (
-        <LinkedInReviewCard
-          body={body}
-          messageType={metadata.messageType || "message"}
-          recipientName={metadata.recipientName}
-          recipientTitle={metadata.recipientTitle}
-          onBodyChange={onBodyChange}
-          onRegenerate={onRegenerate}
           isRegenerating={isRegenerating}
         />
       );

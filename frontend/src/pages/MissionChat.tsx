@@ -286,8 +286,7 @@ export default function MissionChat() {
                         // Load chat history
                         try {
                             const logs = await api.getMissionLogs(missionId);
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            const historyMessages: Message[] = logs.map((log: any) => ({
+                            const historyMessages: Message[] = logs.map((log) => ({
                                 id: log.id,
                                 role: log.role as "user" | "agent" | "system",
                                 content: log.content,

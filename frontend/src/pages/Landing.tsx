@@ -72,14 +72,14 @@ const Landing = () => {
       </header>
 
       {/* Hero Section */}
-      <section className="relative z-10 min-h-screen flex items-center justify-center px-6 py-20">
+      <section className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 py-20">
         <div className="relative z-10 max-w-6xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <h1 className="text-7xl md:text-9xl font-black tracking-tighter mb-8 leading-[0.9] text-white">
+            <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-9xl font-black tracking-tighter mb-6 sm:mb-8 leading-[0.9] text-white px-2">
               Your AI-Powered{" "}
               <span className="pill-highlight">Outbound</span>{" "}
               Team
@@ -90,7 +90,7 @@ const Landing = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
-            className="text-xl md:text-2xl text-purple-200/80 max-w-3xl mx-auto mb-12 leading-relaxed"
+            className="text-base sm:text-lg md:text-xl lg:text-2xl text-purple-200/80 max-w-3xl mx-auto mb-8 sm:mb-12 leading-relaxed px-4"
           >
             Stop spending hours on manual prospecting. Let AI agents find, research,
             and craft personalized outreach while you focus on closing deals.
@@ -100,7 +100,7 @@ const Landing = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 px-4"
           >
             <SignedIn>
               <Link to="/dashboard">
@@ -132,20 +132,20 @@ const Landing = () => {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 px-6 relative">
+      <section id="features" className="py-12 sm:py-20 px-4 sm:px-6 relative">
         <div className="max-w-7xl mx-auto relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8 }}
-            className="text-center mb-16"
+            className="text-center mb-12 sm:mb-16"
           >
-            <h2 className="text-6xl md:text-8xl font-black tracking-tighter mb-6 text-white">
+            <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-black tracking-tighter mb-4 sm:mb-6 text-white px-2">
               Everything You Need to{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">Scale</span>
             </h2>
-            <p className="text-xl text-purple-200/70 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl text-purple-200/70 max-w-2xl mx-auto px-4">
               Our AI agents handle the heavy lifting so you can focus on what matters most.
             </p>
           </motion.div>
@@ -208,19 +208,19 @@ const Landing = () => {
       </section>
 
       {/* Neural Graph - AI Workflow Visualization */}
-      <section className="py-20 px-6 relative">
+      <section className="py-12 sm:py-20 px-4 sm:px-6 relative">
         <div className="max-w-6xl mx-auto relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="text-center mb-12"
+            className="text-center mb-8 sm:mb-12"
           >
-            <h2 className="text-6xl md:text-8xl font-black tracking-tighter mb-6 text-white">
+            <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-black tracking-tighter mb-4 sm:mb-6 text-white px-2">
               AI <span className="pill-highlight">Workflow</span>
             </h2>
-            <p className="text-xl text-purple-200/70 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl text-purple-200/70 max-w-2xl mx-auto px-4">
               Watch how our AI agents work together to automate your outbound process
             </p>
           </motion.div>
@@ -230,7 +230,7 @@ const Landing = () => {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="glass-strong rounded-3xl p-8 h-[700px]"
+            className="glass-strong rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 h-[400px] sm:h-[500px] md:h-[600px] lg:h-[700px]"
           >
             <NeuralGraph />
           </motion.div>

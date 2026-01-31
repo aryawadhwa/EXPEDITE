@@ -91,20 +91,19 @@ export default function ActiveAgents() {
   const fetchAgents = useCallback(async () => {
     try {
       const data = await getAgents();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mappedAgents: AgentUI[] = data.map((item: any) => ({
-        id: item._id || item.id,
+      const mappedAgents: AgentUI[] = data.map((item) => ({
+        id: item.id || item._id || "unknown",
         name: item.name,
-        type: item.agent_type || "custom",
-        status: item.status || "inactive",
-        mission: item.description || "No mission assigned",
+        type: (item.role as AgentUI["type"]) || "custom",
+        status: item.status === "active" ? "active" : "inactive",
+        mission: item.system_prompt || "No mission assigned",
         progress: item.status === "active" ? 50 : 0,
         stats: {
-          processed: item.stats?.processed ?? 0,
-          queued: item.stats?.queued ?? 0,
-          errors: item.stats?.errors ?? 0
+          processed: 0,
+          queued: 0,
+          errors: 0
         },
-        uptime: item.uptime || "0h 0m"
+        uptime: "0h 0m"
       }));
       console.log("Mapped agents:", mappedAgents.map(a => ({ id: a.id, status: a.status })));
       setAgents(mappedAgents);

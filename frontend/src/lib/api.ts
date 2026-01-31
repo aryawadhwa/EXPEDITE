@@ -11,11 +11,29 @@ interface Attachment {
 
 interface Agent {
   id?: string;
+  _id?: string;
   name: string;
   role: string;
   capabilities: string[];
   system_prompt?: string;
   status: "active" | "inactive" | "training";
+}
+
+export interface Mission {
+    id?: string;
+    _id?: string;
+    objective: string;
+    status: string;
+    created_at: string;
+}
+
+interface MissionLog {
+  id: string;
+  role: string;
+  content: string;
+  timestamp: string;
+  type: "success" | "error" | "thinking" | "info";
+  metadata?: Record<string, unknown>;
 }
 
 export function useApi() {
@@ -34,6 +52,13 @@ export function useApi() {
     }, [getToken]);
 
     return useMemo(() => ({
+        // Generic GET method
+        get: async <T = any>(url: string): Promise<T> => {
+            const res = await fetchWithAuth(url);
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            return res.json();
+        },
+
         // User
         getUser: async () => {
             const res = await fetchWithAuth("/users/me");
@@ -53,13 +78,13 @@ export function useApi() {
             return res.json();
         },
 
-        listMissions: async () => {
+        listMissions: async (): Promise<Mission[]> => {
             const res = await fetchWithAuth("/missions/");
             if (!res.ok) throw new Error('Failed to fetch missions');
             return res.json();
         },
 
-        getMissionLogs: async (missionId: string) => {
+        getMissionLogs: async (missionId: string): Promise<MissionLog[]> => {
             const res = await fetchWithAuth(`/missions/${missionId}/logs`);
             if (!res.ok) throw new Error('Failed to fetch mission logs');
             return res.json();
@@ -196,7 +221,7 @@ export function useApi() {
         },
 
         // Agents
-        getAgents: async () => {
+        getAgents: async (): Promise<Agent[]> => {
             const res = await fetchWithAuth("/agents/");
             if (!res.ok) throw new Error('Failed to fetch agents');
             return res.json();
