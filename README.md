@@ -1,4 +1,4 @@
-# 🚀 Outbound AI
+# Outbound AI
 ### The Operating System for Autonomous Sales Teams
 
 ![Hero Image](https://placehold.co/1200x400/1e293b/ffffff?text=Outbound+AI+Mission+Control)
@@ -8,7 +8,7 @@
 
 ---
 
-## ⚡ Why Outbound AI?
+## Why Outbound AI?
 
 Sales teams are drowning in manual tasks—finding emails, researching leads, and writing personalized notes. **Outbound AI** replaces the grunt work with intelligent agents that act as your virtual salesforce.
 
@@ -18,28 +18,28 @@ Sales teams are drowning in manual tasks—finding emails, researching leads, an
 
 ---
 
-## 💎 Core Features
+## Core Features
 
-### 🧠 Spatial Mission Control
+### Spatial Mission Control
 Forget complex filters. Just talk to your AI.
 > _"Find me Series A founders in NYC who recently hired a VP of Sales."_
 Your AI understands natural language and launches a tailored mission immediately.
 
-### 🕵️‍♂️ Autonomous Agents
+### Autonomous Agents
 Watch as your army of agents goes to work. They:
 - Scrape web data via **Firecrawl**.
 - Verify contact details via **Search**.
 - Reason and plan via **LangGraph**.
 
-### ✅ Smart Review Queue
+### Smart Review Queue
 Quality assurance is built-in. Review high-stakes communications before they send, or let the AI run on autopilot for lower-risk tiers.
 
-### 🌐 The "Live Brain"
+### The "Live Brain"
 Real-time knowledge graph that learns from every interaction, keeping your prospect data fresh and your context relevant.
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 Built for speed, scalability, and developer joy.
 
@@ -53,7 +53,7 @@ Built for speed, scalability, and developer joy.
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 Launch your first mission involved setting up the "Brain" and the Interface.
 
@@ -75,7 +75,7 @@ cd outbound-ai
 # Make the start script executable
 chmod +x start_dev.sh
 
-# Ignite 🚀
+# Start the development servers
 ./start_dev.sh
 ```
 
@@ -84,5 +84,5 @@ The **Frontend** will be ready at `http://localhost:5173`.
 
 ---
 
-## 🛡️ License
+## License
 Private & Confidential.
