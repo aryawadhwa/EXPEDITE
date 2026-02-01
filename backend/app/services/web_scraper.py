@@ -9,6 +9,7 @@ Features:
 - Recursive link following
 - HTML cleaning and parsing
 - Rate limiting and error handling
+- Retry logic for transient failures
 """
 
 import re
@@ -18,8 +19,31 @@ from typing import List, Dict, Set, Optional
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 import logging
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log
+)
 
 logger = logging.getLogger(__name__)
+
+
+# Retry decorator for HTTP requests
+def retry_on_network_error():
+    """Decorator for retrying network operations"""
+    return retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((
+            httpx.TimeoutException,
+            httpx.NetworkError,
+            httpx.ConnectError,
+            ConnectionError
+        )),
+        before_sleep=before_sleep_log(logger, logging.WARNING)
+    )
 
 
 class EmailScraper:
@@ -114,6 +138,7 @@ class EmailScraper:
         
         return links
     
+    @retry_on_network_error()
     async def scrape_url(
         self, 
         url: str, 
@@ -121,7 +146,7 @@ class EmailScraper:
         client: Optional[httpx.AsyncClient] = None
     ) -> Set[str]:
         """
-        Recursively scrape a URL for emails.
+        Recursively scrape a URL for emails with retry logic.
         
         Args:
             url: URL to scrape
@@ -144,7 +169,7 @@ class EmailScraper:
         # Create client if not provided
         close_client = False
         if client is None:
-            client = httpx.AsyncClient(timeout=10.0, follow_redirects=True)
+            client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
             close_client = True
         
         try:
@@ -236,6 +261,7 @@ class JobBoardScraper:
             'Upgrade-Insecure-Requests': '1'
         }
     
+    @retry_on_network_error()
     async def scrape_hiring_cafe(
         self,
         search_term: str,
@@ -243,7 +269,7 @@ class JobBoardScraper:
         max_results: int = 100
     ) -> List[Dict]:
         """
-        Scrape jobs from Hiring.cafe API.
+        Scrape jobs from Hiring.cafe API with retry logic.
         
         Args:
             search_term: Job title or keyword to search

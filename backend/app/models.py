@@ -1,9 +1,10 @@
 
 from typing import Optional, List, Dict
 from beanie import Document, Indexed
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator, EmailStr
 from datetime import datetime
 from enum import Enum
+from email_validator import validate_email, EmailNotValidError
 
 class DraftStatus(str, Enum):
     PENDING = "PENDING"
@@ -27,6 +28,16 @@ class User(Document):
     slack_connection_id: Optional[str] = None 
     other_connections: Dict[str, str] = {} # Map tool_name -> connection_id
     settings: UserSettings = Field(default_factory=UserSettings)
+    
+    @validator('email')
+    def validate_email_format(cls, v):
+        if v:
+            try:
+                valid = validate_email(v)
+                return valid.email
+            except EmailNotValidError:
+                raise ValueError(f'Invalid email format: {v}')
+        return v
 
     class Settings:
         name = "users"
@@ -38,6 +49,24 @@ class Mission(Document):
     autonomous: bool = False
     max_autonomous_actions: int = 10
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    @validator('objective')
+    def validate_objective(cls, v):
+        if v:
+            v = v.strip()
+            if len(v) < 5:
+                raise ValueError('Objective too short (min 5 chars)')
+            if len(v) > 1000:
+                v = v[:1000]  # Truncate instead of rejecting
+        return v
+    
+    @validator('status')
+    def validate_status(cls, v):
+        valid_statuses = ['running', 'completed', 'failed', 'paused', 'stopped']
+        if v not in valid_statuses:
+            # Don't reject, just log warning
+            print(f"Warning: Unexpected status '{v}', allowing anyway")
+        return v
 
     class Settings:
         name = "missions"
@@ -57,6 +86,46 @@ class Prospect(Document):
     
     # Layer 3 is Draft/Outreach (separate model)
     scraped_data: Dict = {} # Legacy field, keeping for compatibility
+    
+    user_id: Optional[str] = None  # For data cleanup
+    linkedin_url: Optional[str] = None
+    
+    @validator('public_contact')
+    def validate_email_format(cls, v):
+        if v and v.strip():
+            # Check if it's a URL (skip validation)
+            if 'http' in v or 'linkedin.com' in v or 'twitter.com' in v:
+                return None  # Don't save URLs as email
+            try:
+                valid = validate_email(v)
+                return valid.email
+            except EmailNotValidError:
+                return None  # Return None for invalid emails
+        return v
+    
+    @validator('name')
+    def validate_name(cls, v):
+        if v:
+            v = v.strip()
+            if len(v) > 200:
+                v = v[:200]
+        return v
+    
+    @validator('company')
+    def validate_company(cls, v):
+        if v:
+            v = v.strip()
+            if len(v) > 200:
+                v = v[:200]
+        return v
+    
+    @validator('relevance_score')
+    def validate_score(cls, v):
+        if v < 0:
+            return 0.0
+        if v > 1:
+            return 1.0
+        return v
 
     class Settings:
         name = "prospects"
@@ -70,6 +139,30 @@ class Draft(Document):
     status: DraftStatus = DraftStatus.PENDING
     attachments: List[Dict] = []  # List of {"filename": str, "content_type": str, "asset_id": str}
     metadata: Dict = {}  # Channel-specific metadata (subreddit, message_type, etc.)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    @validator('subject')
+    def validate_subject(cls, v):
+        if v and len(v) > 500:
+            v = v[:500]  # Truncate instead of rejecting
+        return v
+    
+    @validator('body')
+    def validate_body(cls, v):
+        if v and len(v) > 50000:
+            v = v[:50000]  # Truncate instead of rejecting
+        # Allow empty body for now (some channels might not need it)
+        return v
+    
+    @validator('channel')
+    def validate_channel(cls, v):
+        valid_channels = ['email', 'linkedin', 'twitter', 'reddit', 'slack', 'instagram', 'github', 'gmail']
+        if v not in valid_channels:
+            # Don't reject, just normalize
+            if 'email' in v.lower() or 'gmail' in v.lower():
+                return 'email'
+            print(f"Warning: Unexpected channel '{v}', allowing anyway")
+        return v
 
     class Settings:
         name = "drafts"
@@ -81,6 +174,7 @@ class MissionLog(Document):
     metadata: Dict = {} # For structured actions like "connect_tool"
     log_type: str = "action"  # "thinking", "action", "success", "error"
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    user_id: Optional[str] = None  # For data cleanup
 
     class Settings:
         name = "mission_logs"

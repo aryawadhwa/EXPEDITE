@@ -626,7 +626,11 @@ export default function MissionChat() {
 
                                     if (toolMatch) {
                                         const displayName = toolMatch.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                                        const connected = isConnected(toolMatch);
+                                        
+                                        // If backend sent "connect_tool" action, connection is NOT active
+                                        // (even if conn_id exists in user profile - it might be expired)
+                                        const needsConnection = message.metadata?.action === "connect_tool";
+                                        const connected = !needsConnection && isConnected(toolMatch);
 
                                         return (
                                             <div className="mt-3">
@@ -640,27 +644,23 @@ export default function MissionChat() {
                                                         <CheckCircle className="w-4 h-4" />
                                                         {displayName} Connected
                                                     </Button>
-                                                ) : connectUrl ? (
-                                                    // Direct OAuth link - will redirect back with pending_action
+                                                ) : (
+                                                    // Always use Composio OAuth - blue button
                                                     <Button
                                                         variant="default"
                                                         size="sm"
-                                                        className="w-full gap-2 animate-in fade-in zoom-in duration-300 shadow-md bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                                                        className="w-full gap-2 animate-in fade-in zoom-in duration-300 shadow-md bg-blue-600 hover:bg-blue-700"
                                                         onClick={() => {
-                                                            window.location.href = connectUrl;
+                                                            // If we have a direct connect URL, use it
+                                                            if (connectUrl) {
+                                                                window.location.href = connectUrl;
+                                                            } else {
+                                                                // Otherwise, call handleConnect which will get the OAuth URL
+                                                                handleConnect(toolMatch);
+                                                            }
                                                         }}
                                                     >
                                                         <ExternalLink className="w-4 h-4" />
-                                                        Connect {displayName} & Post Automatically
-                                                    </Button>
-                                                ) : (
-                                                    <Button
-                                                        variant="default"
-                                                        size="sm"
-                                                        className="w-full gap-2 animate-in fade-in zoom-in duration-300 shadow-md"
-                                                        onClick={() => handleConnect(toolMatch)}
-                                                    >
-                                                        <div className="w-2 h-2 rounded-full bg-white" />
                                                         Connect {displayName}
                                                     </Button>
                                                 )}

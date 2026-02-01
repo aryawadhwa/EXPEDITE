@@ -8,41 +8,16 @@ from app.api.deps import get_current_user
 router = APIRouter()
 
 @router.get("/pending")
-async def get_pending_drafts(
-    mission_id: str = None,
-    skip: int = 0,
-    limit: int = 50,
-    user: User = Depends(get_current_user)
-):
-    """
-    Get pending drafts with pagination.
-    
-    Args:
-        mission_id: Optional mission ID to filter
-        skip: Number of records to skip (for pagination)
-        limit: Maximum number of records to return (max 100)
-        user: Current authenticated user
-        
-    Returns:
-        List of drafts (for backward compatibility) or paginated object
-    """
+async def get_pending_drafts(mission_id: str = None, user: User = Depends(get_current_user)):
     from app.models import Mission, Prospect
     from beanie.operators import In
-
-    # Enforce pagination limits
-    if limit > 100:
-        limit = 100
-    if limit < 1:
-        limit = 1
-    if skip < 0:
-        skip = 0
 
     # 1. Get missions for this user (optionally filtered)
     if mission_id:
         # Filter to specific mission
         mission = await Mission.get(mission_id)
         if not mission or mission.user_id != user.clerk_id:
-            return []  # Return empty array for backward compatibility
+            return []  # No access or not found
         missions = [mission]
     else:
         missions = await Mission.find(Mission.user_id == user.clerk_id).to_list()
@@ -55,14 +30,8 @@ async def get_pending_drafts(
     prospect_ids = [str(p.id) for p in prospects]
     prospect_map = {str(p.id): p for p in prospects}
     
-    # 3. Fetch pending drafts with pagination
-    drafts_query = Draft.find(
-        In(Draft.prospect_id, prospect_ids),
-        Draft.status == DraftStatus.PENDING
-    ).sort("-created_at")  # Newest first
-    
-    total = await drafts_query.count()
-    drafts = await drafts_query.skip(skip).limit(limit).to_list()
+    # 3. Fetch pending drafts for these prospects ONLY
+    drafts = await Draft.find(In(Draft.prospect_id, prospect_ids), Draft.status == DraftStatus.PENDING).to_list()
     
     result = []
     for draft in drafts:
@@ -87,8 +56,6 @@ async def get_pending_drafts(
         
         result.append(draft_dict)
     
-    # Return simple array for backward compatibility
-    # Frontend can be updated later to use pagination
     return result
 
 @router.delete("/pending")
@@ -116,144 +83,6 @@ async def clear_all_pending_drafts(user: User = Depends(get_current_user)):
     
     count = result.deleted_count if result else 0
     return {"status": "cleared", "count": count}
-
-@router.post("/approve-all")
-async def approve_all_drafts(mission_id: str = None, user: User = Depends(get_current_user)):
-    """
-    Approve and send all pending drafts for a mission or all missions.
-    
-    Args:
-        mission_id: Optional mission ID to filter drafts
-        user: Current authenticated user
-        
-    Returns:
-        Dict with sent_count, failed_count, and message
-    """
-    from app.models import Mission, Prospect
-    from beanie.operators import In
-    import re
-    
-    # Get missions
-    if mission_id:
-        mission = await Mission.get(mission_id)
-        if not mission or mission.user_id != user.clerk_id:
-            raise HTTPException(status_code=404, detail="Mission not found")
-        missions = [mission]
-    else:
-        missions = await Mission.find(Mission.user_id == user.clerk_id).to_list()
-    
-    mission_ids = [str(m.id) for m in missions]
-    
-    # Get prospects
-    prospects = await Prospect.find(In(Prospect.mission_id, mission_ids)).to_list()
-    prospect_ids = [str(p.id) for p in prospects]
-    prospect_map = {str(p.id): p for p in prospects}
-    
-    # Get pending drafts
-    drafts = await Draft.find(
-        In(Draft.prospect_id, prospect_ids),
-        Draft.status == DraftStatus.PENDING
-    ).to_list()
-    
-    if not drafts:
-        return {"sent_count": 0, "failed_count": 0, "message": "No pending drafts"}
-    
-    # Check Gmail connection
-    if not user.gmail_connection_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Gmail not connected. Please connect Gmail in Settings → Integrations"
-        )
-    
-    sent_count = 0
-    failed_count = 0
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    
-    from app.core.sender import send_email_via_composio
-    
-    print(f"\n{'='*60}")
-    print(f"BULK APPROVE: Processing {len(drafts)} drafts")
-    print(f"{'='*60}")
-    
-    for i, draft in enumerate(drafts, 1):
-        try:
-            prospect = prospect_map.get(draft.prospect_id)
-            if not prospect or not prospect.public_contact:
-                print(f"{i}/{len(drafts)} ✗ No email for prospect")
-                failed_count += 1
-                continue
-            
-            # Validate email
-            if not re.match(email_pattern, prospect.public_contact):
-                print(f"{i}/{len(drafts)} ✗ Invalid email: {prospect.public_contact}")
-                draft.status = DraftStatus.REJECTED
-                await draft.save()
-                failed_count += 1
-                continue
-            
-            print(f"{i}/{len(drafts)} → Sending to {prospect.name} ({prospect.public_contact})...")
-            
-            # Send email
-            result = await send_email_via_composio(
-                user_id=user.clerk_id,
-                recipient=prospect.public_contact,
-                subject=draft.subject,
-                body=draft.body,
-                attachments=getattr(draft, 'attachments', []) or []
-            )
-            
-            if result.get("success"):
-                draft.status = DraftStatus.SENT
-                await draft.save()
-                print(f"{i}/{len(drafts)} ✓ Sent successfully")
-                sent_count += 1
-                
-                # Update contact history
-                try:
-                    email = prospect.public_contact.lower().strip()
-                    existing_contact = await ContactHistory.find_one(
-                        ContactHistory.user_id == user.clerk_id,
-                        ContactHistory.prospect_email == email
-                    )
-                    
-                    if existing_contact:
-                        existing_contact.last_contacted_at = datetime.utcnow()
-                        existing_contact.last_mission_id = prospect.mission_id
-                        existing_contact.total_emails_sent += 1
-                        await existing_contact.save()
-                    else:
-                        new_contact = ContactHistory(
-                            user_id=user.clerk_id,
-                            prospect_email=email,
-                            prospect_name=prospect.name,
-                            first_mission_id=prospect.mission_id,
-                            last_mission_id=prospect.mission_id,
-                            total_emails_sent=1
-                        )
-                        await new_contact.insert()
-                except Exception as e:
-                    print(f"  ⚠ Contact history update failed: {e}")
-                    
-            else:
-                error_msg = result.get("error", "Unknown error")
-                print(f"{i}/{len(drafts)} ✗ Send failed: {error_msg}")
-                draft.status = DraftStatus.APPROVED
-                await draft.save()
-                failed_count += 1
-                
-        except Exception as e:
-            print(f"{i}/{len(drafts)} ✗ Exception: {e}")
-            failed_count += 1
-    
-    print(f"{'='*60}")
-    print(f"BULK APPROVE COMPLETE: {sent_count} sent, {failed_count} failed")
-    print(f"{'='*60}\n")
-    
-    return {
-        "sent_count": sent_count,
-        "failed_count": failed_count,
-        "message": f"Sent {sent_count} emails, {failed_count} failed"
-    }
 
 @router.post("/{id}/approve")
 async def approve_draft(id: str, subject: str = None, body: str = None, user: User = Depends(get_current_user)):

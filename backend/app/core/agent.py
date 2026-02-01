@@ -465,6 +465,13 @@ async def resolve_channel_identity(state: AgentState) -> Dict:
         # Check intents to determine if we need a person identifier
         intents = state.get("intents", [])
         
+        # For DISCOVERY + OUTREACH (bulk operations), we don't need identifiers upfront
+        # The prospects will have their own emails/contacts
+        if "discovery" in intents and "outreach" in intents:
+            # This is a bulk operation - find people first, then reach out
+            # No need for identifiers now
+            continue
+        
         # For READ/QUERY operations, we may not need person identifier
         if "read" in intents or "query" in intents:
             # For read operations on user's own accounts, no target identifier needed
@@ -609,11 +616,16 @@ async def discovery_flow(state: AgentState) -> Dict:
                     source = jp.get('source', 'Unknown')
                     sources_found[source] = sources_found.get(source, 0) + 1
                     
+                    # Only set public_contact if it's an actual email, not a URL
+                    contact = jp.get("apply_url", "")
+                    if contact and ("linkedin.com" in contact or "http" in contact):
+                        contact = ""  # Don't use URLs as email addresses
+                    
                     prospects.append({
                         "name": jp.get("title", "Unknown"),
                         "company": jp.get("company", "Unknown"),
                         "context_source": f"Job Board ({source})",
-                        "public_contact": jp.get("apply_url", ""),
+                        "public_contact": contact,  # Empty if no valid email
                         "snippet": jp.get("description", "")[:200],
                         "relevance_score": jp.get("relevance_score", 0.8),
                         "original_data": jp
@@ -622,10 +634,32 @@ async def discovery_flow(state: AgentState) -> Dict:
                 if prospects:
                     sources_str = ", ".join([f"{count} from {source}" for source, count in sources_found.items()])
                     
+                    # Try to enrich prospects with emails using Hunter.io
+                    await log_event(mission_id, user_id, "Finding contact emails...", "thinking", target="brain")
+                    
+                    from app.services.email_finder import email_finder
+                    enriched_count = 0
+                    
+                    for prospect in prospects[:10]:  # Enrich first 10 to save API quota
+                        if not prospect.get("public_contact") or "http" in prospect.get("public_contact", ""):
+                            enriched = await email_finder.enrich_prospect_with_email(prospect)
+                            if enriched.get("public_contact") and "@" in enriched.get("public_contact", ""):
+                                enriched_count += 1
+                                prospect.update(enriched)
+                    
+                    if enriched_count > 0:
+                        await log_event(
+                            mission_id, user_id,
+                            f"✓ Found {enriched_count} contact emails using Hunter.io",
+                            "success",
+                            target="brain"
+                        )
+                    
                     # Create detailed company list
                     company_list = []
                     for i, p in enumerate(prospects[:5], 1):  # Show first 5 in detail
-                        company_list.append(f"{i}. {p['company']} - {p['name']}")
+                        email_status = "✓ Email found" if p.get("public_contact") and "@" in p.get("public_contact", "") else "✗ No email"
+                        company_list.append(f"{i}. {p['company']} - {p['name']} ({email_status})")
                     
                     companies_text = "\n".join(company_list)
                     if len(prospects) > 5:
@@ -853,40 +887,102 @@ async def discovery_flow(state: AgentState) -> Dict:
             print(prospects_json_str)
             print("="*80 + "\n")
             
-            # If outreach is also intended, automatically create drafts for ALL prospects
+            # If outreach is also intended, fetch latest 10 prospects and create drafts
             if "outreach" in state.get("intents", []):
                 await log_event(
                     mission_id, user_id,
-                    f"📝 Generating draft emails for {len(clean_prospects_json)} prospects...",
+                    f"📝 Fetching latest 10 prospects from database...",
                     "thinking"
                 )
                 
-                # Create drafts for all prospects in bulk
-                drafts_created = 0
-                for prospect_data in clean_prospects_json:
-                    try:
-                        # Generate draft for this prospect using LLM
-                        draft_result = await generate_draft_for_prospect(
-                            mission_id=mission_id,
-                            user_id=user_id,
-                            objective=objective,
-                            prospect_data=prospect_data,
-                            channel="/gmail"
+                # Small delay to ensure prospects are saved
+                await asyncio.sleep(0.5)
+                
+                # Fetch latest 10 prospects from database (sorted by creation time, most recent first)
+                try:
+                    latest_prospects = await Prospect.find(
+                        Prospect.mission_id == mission_id
+                    ).sort("-_id").limit(10).to_list()
+                    
+                    print(f"DEBUG: Found {len(latest_prospects)} prospects for mission {mission_id}")
+                    
+                    if not latest_prospects:
+                        await log_event(
+                            mission_id, user_id,
+                            "❌ No prospects found in database to create drafts for.",
+                            "info"
                         )
+                        return {
+                            "prospects": prospects,
+                            "current_prospect": {}
+                        }
+                    
+                    await log_event(
+                        mission_id, user_id,
+                        f"✓ Found {len(latest_prospects)} prospects. Generating draft emails...",
+                        "thinking"
+                    )
+                    
+                    # Create drafts for latest 10 prospects
+                    drafts_created = 0
+                    for prospect in latest_prospects:
+                        # Only create draft if prospect has email
+                        if not prospect.public_contact:
+                            print(f"DEBUG: Skipping {prospect.name} - no email")
+                            continue
                         
-                        if draft_result:
-                            drafts_created += 1
+                        print(f"DEBUG: Creating draft for {prospect.name} ({prospect.public_contact})")
                             
-                    except Exception as e:
-                        print(f"Failed to create draft for {prospect_data['name']}: {e}")
-                
-                await log_event(
-                    mission_id, user_id,
-                    f"✓ Generated {drafts_created} draft emails (NOT SENT)\n\n📋 All drafts are in Review Queue waiting for your approval\n\n⚠️ IMPORTANT: Emails will NOT be sent until you:\n1. Go to Review Queue\n2. Review each draft\n3. Click 'Approve' to send\n\nNo emails have been sent yet.",
-                    "success"
-                )
-                
-                await update_agent_stats(user_id, queued=drafts_created)
+                        try:
+                            # Prepare prospect data for draft generation
+                            prospect_data = {
+                                "id": str(prospect.id),
+                                "name": prospect.name,
+                                "company": prospect.company,
+                                "email": prospect.public_contact,
+                                "title": prospect.name,
+                                "context": prospect.relevance_reason or f"Contact at {prospect.company}"
+                            }
+                            
+                            # Generate draft for this prospect using LLM
+                            draft_result = await generate_draft_for_prospect(
+                                mission_id=mission_id,
+                                user_id=user_id,
+                                objective=objective,
+                                prospect_data=prospect_data,
+                                channel="/gmail"
+                            )
+                            
+                            if draft_result:
+                                drafts_created += 1
+                                print(f"DEBUG: Draft created successfully - ID: {draft_result}")
+                            else:
+                                print(f"DEBUG: Draft creation returned None for {prospect.name}")
+                                
+                        except Exception as e:
+                            print(f"ERROR: Failed to create draft for {prospect.name}: {e}")
+                            import traceback
+                            traceback.print_exc()
+                    
+                    print(f"DEBUG: Total drafts created: {drafts_created}")
+                    
+                    await log_event(
+                        mission_id, user_id,
+                        f"✓ Generated {drafts_created} draft emails (NOT SENT)\n\n📋 All drafts are in Review Queue waiting for your approval\n\n⚠️ IMPORTANT: Emails will NOT be sent until you:\n1. Go to Review Queue\n2. Review each draft\n3. Click 'Approve' to send\n\nNo emails have been sent yet.",
+                        "success"
+                    )
+                    
+                    await update_agent_stats(user_id, queued=drafts_created)
+                    
+                except Exception as e:
+                    print(f"ERROR: Failed to fetch prospects or create drafts: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    await log_event(
+                        mission_id, user_id,
+                        f"❌ Failed to create drafts: {str(e)[:100]}",
+                        "error"
+                    )
                 
                 # Set current prospect to first one
                 current = prospects[0] if prospects else {}
@@ -930,6 +1026,132 @@ async def discovery_flow(state: AgentState) -> Dict:
         await log_event(mission_id, user_id, f"❌ Search failed: {str(e)[:100]}", "error")
     
     return {"prospects": [], "current_prospect": {}}
+
+
+# ==================================================
+# HELPER: GENERATE DRAFT FOR SINGLE PROSPECT
+# ==================================================
+
+async def generate_draft_for_prospect(
+    mission_id: str,
+    user_id: str,
+    objective: str,
+    prospect_data: Dict,
+    channel: str = "/gmail"
+) -> Optional[str]:
+    """
+    Generate and save a draft for a single prospect.
+    Returns draft_id if successful, None otherwise.
+    """
+    try:
+        llm = ChatGroq(
+            temperature=0.7, 
+            groq_api_key=settings.GROQ_API_KEY, 
+            model_name="llama-3.3-70b-versatile"
+        )
+        
+        # Load CV/Resume context if available
+        rag_context = ""
+        try:
+            from app.models import UserAsset
+            assets = await UserAsset.find(UserAsset.user_id == user_id).to_list()
+            cv_asset = next((a for a in assets if "resume" in a.filename.lower() or "cv" in a.filename.lower()), None)
+            if cv_asset:
+                rag_context = f"\nYOUR BACKGROUND (use to personalize):\n{cv_asset.file_data.decode('utf-8', errors='ignore')[:2000]}\n"
+        except Exception as e:
+            print(f"Failed to load CV context: {e}")
+        
+        system_prompt = f"""You are a professional outreach specialist writing personalized emails.
+
+Write a professional, personalized email that:
+- Is 6-10 sentences (2-3 paragraphs)
+- Has a compelling subject line relevant to the prospect's role/company
+- Opens with something specific about their company or role
+- Clearly explains the value proposition based on the mission objective
+- Has a clear call to action
+- Sounds warm and human, not generic or salesy
+
+MISSION OBJECTIVE: {objective}
+
+{rag_context}
+
+Return in this exact format:
+SUBJECT: [compelling subject line]
+BODY:
+[2-3 paragraph email]
+REASONING: [why this approach works for this prospect]"""
+
+        human_prompt = f"""Write a personalized email for:
+
+Name: {prospect_data.get('name', 'Unknown')}
+Company: {prospect_data.get('company', 'Unknown')}
+Email: {prospect_data.get('email', 'N/A')}
+Title/Role: {prospect_data.get('title', prospect_data.get('name', 'Unknown'))}
+Context: {prospect_data.get('context', 'Relevant prospect')}
+
+Make it specific to their company and role."""
+
+        response = await llm.ainvoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=human_prompt)
+        ])
+        
+        content = response.content
+        
+        # Parse response
+        subject = ""
+        body = content
+        reasoning = ""
+        
+        if "SUBJECT:" in content:
+            parts = content.split("BODY:")
+            subject = parts[0].replace("SUBJECT:", "").strip()
+            if len(parts) > 1:
+                remainder = parts[1]
+                if "REASONING:" in remainder:
+                    body_parts = remainder.split("REASONING:")
+                    body = body_parts[0].strip()
+                    reasoning = body_parts[1].strip() if len(body_parts) > 1 else ""
+                else:
+                    body = remainder.strip()
+        
+        # Get or create prospect in database
+        prospect_id = prospect_data.get("id")
+        if not prospect_id:
+            # Create prospect if it doesn't exist
+            p_doc = Prospect(
+                mission_id=mission_id,
+                name=prospect_data.get("name", "Unknown"),
+                company=prospect_data.get("company", "Unknown"),
+                context_source="Discovery",
+                public_contact=prospect_data.get("email", ""),
+                relevance_score=0.8,
+                relevance_reason=prospect_data.get("context", "")[:200],
+                original_data=prospect_data
+            )
+            await p_doc.insert()
+            prospect_id = str(p_doc.id)
+        
+        # Save Draft
+        d_doc = Draft(
+            prospect_id=prospect_id,
+            channel=channel.replace("/", ""),
+            subject=subject.replace("`", "").strip(),
+            body=body.replace("```", "").strip(),
+            ai_reasoning=reasoning,
+            status=DraftStatus.PENDING,
+            attachments=[],
+            metadata={"auto_generated": True, "bulk_creation": True}
+        )
+        await d_doc.insert()
+        
+        return str(d_doc.id)
+        
+    except Exception as e:
+        print(f"Failed to generate draft for prospect: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 # ==================================================

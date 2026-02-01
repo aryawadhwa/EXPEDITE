@@ -5,7 +5,7 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 // Create axios instance
 const apiClient = axios.create({
@@ -15,17 +15,19 @@ const apiClient = axios.create({
   },
 });
 
-// Helper to get Clerk token
-async function getClerkToken(): Promise<string | null> {
+// Add auth token interceptor
+apiClient.interceptors.request.use(async (config) => {
   try {
-    // Try to get token from Clerk's session
-    const { getToken } = await import('@clerk/clerk-react');
-    // This will be called from React components where useAuth is available
-    return null; // Will be set per request
-  } catch {
-    return null;
+    // Get token from Clerk session if available
+    const token = await (window as any).__clerk?.session?.getToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (error) {
+    console.warn('Failed to get auth token:', error);
   }
-}
+  return config;
+});
 
 export interface EmailScrapeRequest {
   url: string;
@@ -37,7 +39,17 @@ export interface EmailScrapeResponse {
   success: boolean;
   url: string;
   emails_found: number;
-  emails: string[];
+  valid_emails_count: number;
+  invalid_emails_count: number;
+  valid_emails: string[];
+  invalid_emails: string[];
+  verification_details: Array<{
+    email: string;
+    valid: boolean;
+    validation_type: string;
+    errors: string[];
+    mx_records: string[];
+  }>;
   pages_visited: number;
 }
 
@@ -92,6 +104,7 @@ export interface ScraperStatus {
     job_board_scraping: boolean;
     company_research: boolean;
     recursive_crawling: boolean;
+    multi_source_scraping: boolean;
   };
   sources: string[];
   limits: {
@@ -99,6 +112,49 @@ export interface ScraperStatus {
     max_pages_per_scrape: number;
     rate_limit: string;
   };
+  supported_job_portals: Array<{
+    name: string;
+    status: string;
+    type: string;
+    features: string[];
+  }>;
+}
+
+export interface EmailVerifyRequest {
+  email: string;
+  validation_level?: 'regex' | 'mx' | 'mx_blacklist' | 'smtp';
+}
+
+export interface EmailVerifyResponse {
+  success: boolean;
+  result: {
+    email: string;
+    valid: boolean;
+    validation_type: string;
+    errors: string[];
+    mx_records: string[];
+    smtp_check?: boolean;
+    disposable?: boolean;
+  };
+}
+
+export interface EmailVerifyBatchRequest {
+  emails: string[];
+  validation_level?: 'regex' | 'mx' | 'mx_blacklist' | 'smtp';
+}
+
+export interface EmailVerifyBatchResponse {
+  success: boolean;
+  total: number;
+  valid: number;
+  invalid: number;
+  results: Array<{
+    email: string;
+    valid: boolean;
+    validation_type: string;
+    errors: string[];
+    mx_records: string[];
+  }>;
 }
 
 /**
@@ -148,5 +204,31 @@ export async function researchCompany(
  */
 export async function getScraperStatus(): Promise<ScraperStatus> {
   const response = await apiClient.get('/scraper/scraper/status');
+  return response.data;
+}
+
+/**
+ * Verify a single email address
+ */
+export async function verifyEmail(
+  request: EmailVerifyRequest
+): Promise<EmailVerifyResponse> {
+  const response = await apiClient.post('/scraper/verify-email', {
+    email: request.email,
+    validation_level: request.validation_level || 'mx',
+  });
+  return response.data;
+}
+
+/**
+ * Verify multiple email addresses in batch
+ */
+export async function verifyEmailsBatch(
+  request: EmailVerifyBatchRequest
+): Promise<EmailVerifyBatchResponse> {
+  const response = await apiClient.post('/scraper/verify-emails-batch', {
+    emails: request.emails,
+    validation_level: request.validation_level || 'mx',
+  });
   return response.data;
 }

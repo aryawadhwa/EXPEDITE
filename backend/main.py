@@ -34,14 +34,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="OutboundAI", lifespan=lifespan)
 
+# CORS Configuration - Environment-based
+from app.core.config import settings
+
+# Determine allowed origins based on environment
+allowed_origins = [
+    "http://localhost:5173",
+    "http://localhost:8080",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8080",
+]
+
+# Add production frontend URL if configured
+if hasattr(settings, 'FRONTEND_URL') and settings.FRONTEND_URL:
+    allowed_origins.append(settings.FRONTEND_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:8080",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:8080",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

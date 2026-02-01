@@ -221,7 +221,7 @@ Set ready=false if recipient email is unclear.{rag_injection}"""),
         }
         tool = tool_map.get(detected_action)
         
-        # Check connection
+        # Check connection and verify it's active
         conn_id = None
         if tool == "slack":
             conn_id = user.slack_connection_id
@@ -230,7 +230,37 @@ Set ready=false if recipient email is unclear.{rag_injection}"""),
         else:
             conn_id = user.other_connections.get(tool) if user.other_connections else None
         
-        if not conn_id:
+        # Verify connection is active (not just that it exists)
+        connection_active = False
+        if conn_id:
+            try:
+                import httpx
+                url = f"https://backend.composio.dev/api/v3/connected_accounts/{conn_id}"
+                headers = {"x-api-key": settings.COMPOSIO_API_KEY}
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(url, headers=headers, timeout=10.0)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        status = data.get("status", "")
+                        connection_active = status in ["ACTIVE", "CONNECTED"]
+                        if not connection_active:
+                            print(f"{tool} connection exists but status is: {status}")
+            except Exception as e:
+                print(f"Failed to verify {tool} connection status: {e}")
+        
+        if not conn_id or not connection_active:
+            # Clear expired connection if it exists
+            if conn_id and not connection_active:
+                if tool == "slack":
+                    user.slack_connection_id = None
+                elif tool == "gmail":
+                    user.gmail_connection_id = None
+                else:
+                    if user.other_connections and tool in user.other_connections:
+                        del user.other_connections[tool]
+                await user.save()
+                print(f"Cleared expired {tool} connection")
+            
             # Create pending action and return connect prompt
             pending = PendingAction(
                 user_id=user.clerk_id,
@@ -265,38 +295,48 @@ Set ready=false if recipient email is unclear.{rag_injection}"""),
                 "redirect_uri": redirect_url
             }
             
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(url, json=payload, headers=headers, timeout=30.0)
-                if resp.status_code in [200, 201, 202]:
-                    data = resp.json()
-                    composio_redirect = data.get("redirectUrl") or data.get("redirect_url")
-                    connection_id = data.get("id") or data.get("connection_id")
-                    
-                    # Pre-save connection ID
-                    if connection_id:
-                        if tool == "slack":
-                            user.slack_connection_id = connection_id
-                        elif tool == "gmail":
-                            user.gmail_connection_id = connection_id
-                        else:
-                            if not user.other_connections:
-                                user.other_connections = {}
-                            user.other_connections[tool] = connection_id
-                        await user.save()
-                    
-                    msg = f"To post on {tool.title()}, please connect your account first. Click the button below to connect, and I'll publish automatically!"
-                    await MissionLog(
-                        mission_id=mission_id, 
-                        role="agent", 
-                        content=msg, 
-                        log_type="action",
-                        metadata={"action": "connect_tool", "tool": tool, "connect_url": composio_redirect, "pending_action_id": str(pending.id)}
-                    ).insert()
-                    return {"handled": True, "needs_connection": True}
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.post(url, json=payload, headers=headers, timeout=30.0)
+                    if resp.status_code in [200, 201, 202]:
+                        data = resp.json()
+                        composio_redirect = data.get("redirectUrl") or data.get("redirect_url")
+                        connection_id = data.get("id") or data.get("connection_id")
+                        
+                        # Pre-save connection ID
+                        if connection_id:
+                            if tool == "slack":
+                                user.slack_connection_id = connection_id
+                            elif tool == "gmail":
+                                user.gmail_connection_id = connection_id
+                            else:
+                                if not user.other_connections:
+                                    user.other_connections = {}
+                                user.other_connections[tool] = connection_id
+                            await user.save()
+                        
+                        msg = f"To post on {tool.title()}, please connect your account first. Click the button below to connect, and I'll publish automatically!"
+                        await MissionLog(
+                            mission_id=mission_id, 
+                            role="agent", 
+                            content=msg, 
+                            log_type="action",
+                            metadata={"action": "connect_tool", "tool": tool, "connect_url": composio_redirect, "pending_action_id": str(pending.id)}
+                        ).insert()
+                        return {"handled": True, "needs_connection": True}
+            except Exception as e:
+                print(f"OAuth URL generation failed: {e}")
+                msg = f"To post on {tool.title()}, please connect your account first in Settings → Integrations."
+                await MissionLog(
+                    mission_id=mission_id, 
+                    role="agent", 
+                    content=msg, 
+                    log_type="action",
+                    metadata={"action": "connect_tool", "tool": tool}
+                ).insert()
+                return {"handled": True, "needs_connection": True}
         
-        # Execute the action!
-        result = {"success": False, "error": "Unknown action"}
-        
+        # Connection exists - create draft preview for user confirmation
         # Instead of auto-posting, create a draft preview and let user confirm
         # Save the action data in PendingAction for later execution
         pending = PendingAction(

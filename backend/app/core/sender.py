@@ -1,8 +1,35 @@
 from app.core.composio_config import get_composio_client
 from typing import Optional
 import os
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log
+)
+import logging
+
+logger = logging.getLogger(__name__)
 
 
+# Custom exceptions for better error handling
+class ComposioAPIError(Exception):
+    """Raised when Composio API returns an error"""
+    pass
+
+
+class EmailSendError(Exception):
+    """Raised when email sending fails"""
+    pass
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    retry=retry_if_exception_type((ConnectionError, TimeoutError)),
+    before_sleep=before_sleep_log(logger, logging.WARNING)
+)
 async def send_email_via_composio(
     user_id: str,
     recipient: str,
