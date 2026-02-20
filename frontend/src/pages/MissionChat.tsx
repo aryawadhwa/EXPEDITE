@@ -328,7 +328,7 @@ export default function MissionChat() {
                 setMessages(prev => [...prev, {
                     id: `executing-${Date.now()}`,
                     role: "agent",
-                    content: "🔄 Connection successful! Executing your pending action...",
+                    content: " Connection successful! Executing your pending action...",
                     timestamp: new Date(),
                     status: "thinking"
                 }]);
@@ -439,7 +439,7 @@ export default function MissionChat() {
             setSelectedAttachments(prev => [...prev, asset]);
         }
         // Replace the # with the filename tag
-        setInput(prev => prev.replace(/#$/, `[📎 ${asset.filename}] `));
+        setInput(prev => prev.replace(/#$/, `[ ${asset.filename}] `));
         setShowAssetPicker(false);
     };
 
@@ -570,7 +570,7 @@ export default function MissionChat() {
                         <div className="text-center py-20">
                             <Logo className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                             <h2 className="text-xl font-semibold text-foreground mb-2">
-                                What's your outbound mission?
+                                What's your EXPEDITE mission?
                             </h2>
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Describe who you want to reach and I'll find prospects, research them, and draft personalized emails for your review.
@@ -901,7 +901,7 @@ export default function MissionChat() {
                         <div className="flex flex-wrap gap-2 mb-2">
                             {selectedAttachments.map(att => (
                                 <div key={att.id} className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">
-                                    <span>📎 {att.filename}</span>
+                                    <span> {att.filename}</span>
                                     <button onClick={() => handleRemoveAttachment(att.id)} className="ml-1 hover:bg-primary/20 rounded-full p-0.5">×</button>
                                 </div>
                             ))}
@@ -919,7 +919,7 @@ export default function MissionChat() {
                                         onClick={() => handleSelectAsset(asset)}
                                         className="w-full text-left px-3 py-2 hover:bg-secondary/50 flex items-center gap-2 text-sm"
                                     >
-                                        <span className="text-primary">📄</span>
+                                        <span className="text-primary"></span>
                                         <span className="truncate">{asset.filename}</span>
                                     </button>
                                 ))}
@@ -954,7 +954,7 @@ export default function MissionChat() {
                             value={input}
                             onChange={handleInputChange}
                             onKeyDown={(e) => e.key === "Enter" && !showAssetPicker && handleSend()}
-                            placeholder={isListening ? "Listening..." : "Describe your outbound mission..."}
+                            placeholder={isListening ? "Listening..." : "Describe your EXPEDITE mission..."}
                             className={cn(
                                 "flex-1 bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50",
                                 isListening && "border-red-500/50 placeholder:text-red-400"

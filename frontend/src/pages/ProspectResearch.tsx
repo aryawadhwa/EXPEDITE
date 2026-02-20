@@ -156,7 +156,7 @@ export default function ProspectResearch() {
               {emailResults.valid_emails && emailResults.valid_emails.length > 0 ? (
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-semibold text-green-600 mb-2">✓ Valid Emails ({emailResults.valid_emails_count})</h4>
+                    <h4 className="font-semibold text-green-600 mb-2"> Valid Emails ({emailResults.valid_emails_count})</h4>
                     <div className="space-y-2">
                       {emailResults.verification_details && emailResults.verification_details
                         .filter((detail: any) => detail.valid)
@@ -184,7 +184,7 @@ export default function ProspectResearch() {
 
                   {emailResults.invalid_emails && emailResults.invalid_emails.length > 0 && (
                     <div>
-                      <h4 className="font-semibold text-red-600 mb-2">✗ Invalid Emails ({emailResults.invalid_emails_count})</h4>
+                      <h4 className="font-semibold text-red-600 mb-2"> Invalid Emails ({emailResults.invalid_emails_count})</h4>
                       <div className="space-y-2">
                         {emailResults.verification_details && emailResults.verification_details
                           .filter((detail: any) => !detail.valid)

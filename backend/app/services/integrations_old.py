@@ -156,9 +156,9 @@ class HunterIntegration(BaseIntegration):
                 verified = bool(email and score >= 70 and status == "valid")
                 
                 if verified:
-                    self.log("info", f"✓ Verified: {email} (score: {score})")
+                    self.log("info", f" Verified: {email} (score: {score})")
                 else:
-                    self.log("info", f"✗ Not verified: {email} (score: {score}, status: {status})")
+                    self.log("info", f" Not verified: {email} (score: {score}, status: {status})")
                 
                 return {
                     "email": email,

@@ -283,7 +283,7 @@ export default function Dashboard() {
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
-                    <h4 className="font-medium mb-1">🎯 {mission.objective}</h4>
+                    <h4 className="font-medium mb-1"> {mission.objective}</h4>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Badge variant="secondary" className="text-xs">
                         {mission.status}

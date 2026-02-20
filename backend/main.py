@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from beanie import init_beanie
@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
         maxPoolSize=50,  # Connection pooling
         minPoolSize=10
     )
-    await init_beanie(database=client.outbound_ai, document_models=[User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory, PendingAction])
+    await init_beanie(database=client.expedite, document_models=[User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory, PendingAction])
     
     # Validate all integrations
     from app.core.healthcheck import startup_validation
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
 
-app = FastAPI(title="OutboundAI", lifespan=lifespan)
+app = FastAPI(title="EXPEDITE", lifespan=lifespan)
 
 # CORS Configuration - Environment-based
 from app.core.config import settings
@@ -53,9 +53,25 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
+
+# Global OPTIONS handler - MUST be registered BEFORE routers
+@app.options("/{full_path:path}")
+async def options_handler(full_path: str):
+    """Handle CORS preflight requests for all routes"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
 
 app.include_router(missions.router, prefix="/api/v1/missions", tags=["missions"])
 app.include_router(reviews.router, prefix="/api/v1/reviews", tags=["reviews"])

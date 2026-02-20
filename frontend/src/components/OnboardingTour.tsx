@@ -5,7 +5,7 @@ import "driver.js/dist/driver.css";
 export function OnboardingTour() {
   useEffect(() => {
     // Check if user has already seen the tour
-    const hasSeenTour = localStorage.getItem("outbound-ai-tour-seen");
+    const hasSeenTour = localStorage.getItem("expedite-tour-seen");
     
     if (!hasSeenTour) {
       const tour = driver({
@@ -41,7 +41,7 @@ export function OnboardingTour() {
           }
         ],
         onDestroyStarted: () => {
-          localStorage.setItem("outbound-ai-tour-seen", "true");
+          localStorage.setItem("expedite-tour-seen", "true");
           tour.destroy();
         },
       });

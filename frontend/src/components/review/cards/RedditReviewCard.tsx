@@ -162,9 +162,9 @@ export function RedditReviewCard({
             <div className="flex items-start gap-3">
               {/* Vote buttons preview */}
               <div className="flex flex-col items-center gap-1 text-muted-foreground">
-                <span className="text-lg">⬆</span>
+                <span className="text-lg"></span>
                 <span className="text-xs font-medium">0</span>
-                <span className="text-lg">⬇</span>
+                <span className="text-lg"></span>
               </div>
               
               {/* Post content */}
@@ -212,13 +212,13 @@ export function RedditReviewCard({
         {/* Tips */}
         <div className="flex flex-wrap gap-2">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Follow subreddit rules
+             Follow subreddit rules
           </span>
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Provide value, don't just self-promote
+             Provide value, don't just self-promote
           </span>
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Engage with comments
+             Engage with comments
           </span>
         </div>
       </div>

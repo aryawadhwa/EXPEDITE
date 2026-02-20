@@ -190,7 +190,7 @@ const MissionMapContent = () => {
             {nodes.length === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center z-5 pointer-events-none">
                     <div className="text-center text-zinc-600">
-                        <div className="text-4xl mb-3">🚀</div>
+                        <div className="text-4xl mb-3"></div>
                         <p className="text-sm font-mono">Type your mission to see the workflow...</p>
                         <p className="text-xs mt-2 text-zinc-700">Agents will appear as you describe your goal</p>
                     </div>

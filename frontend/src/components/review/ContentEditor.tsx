@@ -261,7 +261,7 @@ export function ContentEditor({
         <div className="flex flex-wrap gap-2">
           {config.tips.map((tip, i) => (
             <span key={i} className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-              💡 {tip}
+               {tip}
             </span>
           ))}
         </div>

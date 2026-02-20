@@ -122,7 +122,7 @@ async def detect_and_execute_direct_action(objective: str, mission_id: str, user
                 await MissionLog(
                     mission_id=mission_id,
                     role="agent", 
-                    content=f"📚 Using context from {len(asset_ids)} knowledge asset(s) to generate content...",
+                    content=f" Using context from {len(asset_ids)} knowledge asset(s) to generate content...",
                     log_type="thinking"
                 ).insert()
     
@@ -383,7 +383,7 @@ Set ready=false if recipient email is unclear.{rag_injection}"""),
             await pending.save()
             
             # Log to chat - direct user to Review Queue
-            preview_content = f"📧 **Email Draft Created**\n\n**To:** {action_data.get('to', '')}\n**Subject:** {action_data.get('subject', '')}\n\n{action_data.get('body', '')[:200]}..."
+            preview_content = f" **Email Draft Created**\n\n**To:** {action_data.get('to', '')}\n**Subject:** {action_data.get('subject', '')}\n\n{action_data.get('body', '')[:200]}..."
             await MissionLog(
                 mission_id=mission_id,
                 role="agent",
@@ -495,7 +495,7 @@ async def create_mission(mission_in: MissionCreate, user: User = Depends(get_cur
         await MissionLog(
           mission_id=mission_id, 
           role="system", 
-          content="🚀 Starting Auto-Pilot Mode (Deep Research)...", 
+          content=" Starting Auto-Pilot Mode (Deep Research)...", 
           log_type="thinking"
         ).insert()
         
@@ -606,7 +606,7 @@ Return ONLY: INFORMATION_REQUEST or ACTION_REQUEST"""
         await MissionLog(
             mission_id=mission_id,
             role="system",
-            content="🔍 Processing information request...",
+            content=" Processing information request...",
             log_type="thinking"
         ).insert()
         
@@ -634,7 +634,7 @@ Return ONLY: INFORMATION_REQUEST or ACTION_REQUEST"""
                 if candidates:
                     # Sort by score descending
                     sorted_cands = sorted([c for c in candidates if c], key=lambda x: x.get("analysis", {}).get("score", 0), reverse=True)
-                    results_message = f"### 🎯 Found {len(sorted_cands)} Prospects\n\n"
+                    results_message = f"###  Found {len(sorted_cands)} Prospects\n\n"
                     
                     for i, cand in enumerate(sorted_cands[:10], 1):
                         analysis = cand.get("analysis", {}) or {}
@@ -720,7 +720,7 @@ Return ONLY: INFORMATION_REQUEST or ACTION_REQUEST"""
                 await MissionLog(
                     mission_id=mid,
                     role="system",
-                    content=f"❌ Research failed: {str(e)}",
+                    content=f" Research failed: {str(e)}",
                     log_type="error"
                 ).insert()
         
@@ -928,18 +928,18 @@ async def execute_pending_action(action_id: str, user: User = Depends(get_curren
     # Log the result to the mission chat
     if result.get("success"):
         success_messages = {
-            "linkedin_post": "✅ LinkedIn post published successfully!",
-            "twitter_post": "✅ Tweet posted successfully!",
-            "reddit_post": f"✅ Posted to r/{action_data.get('subreddit', 'unknown')} successfully!",
-            "slack_message": f"✅ Message sent to Slack #{action_data.get('channel', 'general')}!",
-            "gmail_send": f"✅ Email sent to {action_data.get('to', 'recipient')}!",
-            "github_issue": f"✅ Issue created in {action_data.get('repo', 'repo')}!"
+            "linkedin_post": " LinkedIn post published successfully!",
+            "twitter_post": " Tweet posted successfully!",
+            "reddit_post": f" Posted to r/{action_data.get('subreddit', 'unknown')} successfully!",
+            "slack_message": f" Message sent to Slack #{action_data.get('channel', 'general')}!",
+            "gmail_send": f" Email sent to {action_data.get('to', 'recipient')}!",
+            "github_issue": f" Issue created in {action_data.get('repo', 'repo')}!"
         }
-        msg = success_messages.get(pending.action_type, "✅ Action completed successfully!")
+        msg = success_messages.get(pending.action_type, " Action completed successfully!")
         await MissionLog(mission_id=pending.mission_id, role="agent", content=msg, log_type="success").insert()
         return {"success": True, "message": msg, "mission_id": pending.mission_id}
     else:
-        error_msg = f"❌ Failed to execute: {result.get('error', 'Unknown error')}"
+        error_msg = f" Failed to execute: {result.get('error', 'Unknown error')}"
         await MissionLog(mission_id=pending.mission_id, role="agent", content=error_msg, log_type="error").insert()
         return {"success": False, "message": error_msg, "mission_id": pending.mission_id}
 
@@ -1103,7 +1103,7 @@ Make the content informative and valuable to the community."""),
             await pending.insert()
             
             # Log with draft preview action
-            preview_msg = f"📝 **Reddit Post for r/{subreddit_name}**\n\n**Title:** {post_data.get('title', '')}\n\n{post_data.get('body', '')[:500]}..."
+            preview_msg = f" **Reddit Post for r/{subreddit_name}**\n\n**Title:** {post_data.get('title', '')}\n\n{post_data.get('body', '')[:500]}..."
             await MissionLog(
                 mission_id=mission_id,
                 role="agent",

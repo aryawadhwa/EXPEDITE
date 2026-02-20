@@ -138,7 +138,7 @@ export default function Settings() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">Settings</h1>
-        <p className="text-zinc-400 mt-1">Configure your AI outbound machine</p>
+        <p className="text-zinc-400 mt-1">Configure your AI EXPEDITE machine</p>
       </div>
 
       {/* My Files */}

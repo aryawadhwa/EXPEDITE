@@ -80,7 +80,7 @@ const Landing = () => {
             transition={{ duration: 0.8, delay: 0.2 }}
           >
             <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-8xl font-black tracking-tighter mb-6 sm:mb-8 leading-[0.9] text-white px-2">
-              Your AI Powered <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-fuchsia-400 to-purple-400">Outbound</span> Team
+              Your AI Powered <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-fuchsia-400 to-purple-400">EXPEDITE</span> Team
             </h1>
           </motion.div>
 
@@ -211,7 +211,7 @@ const Landing = () => {
               AI <span className="pill-highlight">Workflow</span>
             </h2>
             <p className="text-base sm:text-lg md:text-xl text-purple-200/70 max-w-2xl mx-auto px-4">
-              Watch how our AI agents work together to automate your outbound process
+              Watch how our AI agents work together to automate your EXPEDITE process
             </p>
           </motion.div>
 

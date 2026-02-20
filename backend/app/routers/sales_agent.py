@@ -42,7 +42,7 @@ class ConversationMessageRequest(BaseModel):
 class AgentConfigRequest(BaseModel):
     salesperson_name: str = "Alex"
     salesperson_role: str = "Sales Development Representative"
-    company_name: str = "OutboundAI"
+    company_name: str = "EXPEDITE"
     conversation_purpose: str = "Qualify prospects and schedule demos"
     temperature: float = 0.7
 

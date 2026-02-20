@@ -179,13 +179,13 @@ async def approve_all_drafts(mission_id: str = None, user: User = Depends(get_cu
         try:
             prospect = prospect_map.get(draft.prospect_id)
             if not prospect or not prospect.public_contact:
-                print(f"{i}/{len(drafts)} ✗ No email for prospect")
+                print(f"{i}/{len(drafts)}  No email for prospect")
                 failed_count += 1
                 continue
             
             # Validate email
             if not re.match(email_pattern, prospect.public_contact):
-                print(f"{i}/{len(drafts)} ✗ Invalid email: {prospect.public_contact}")
+                print(f"{i}/{len(drafts)}  Invalid email: {prospect.public_contact}")
                 draft.status = DraftStatus.REJECTED
                 await draft.save()
                 failed_count += 1
@@ -205,7 +205,7 @@ async def approve_all_drafts(mission_id: str = None, user: User = Depends(get_cu
             if result.get("success"):
                 draft.status = DraftStatus.SENT
                 await draft.save()
-                print(f"{i}/{len(drafts)} ✓ Sent successfully")
+                print(f"{i}/{len(drafts)}  Sent successfully")
                 sent_count += 1
                 
                 # Update contact history
@@ -232,17 +232,17 @@ async def approve_all_drafts(mission_id: str = None, user: User = Depends(get_cu
                         )
                         await new_contact.insert()
                 except Exception as e:
-                    print(f"  ⚠ Contact history update failed: {e}")
+                    print(f"   Contact history update failed: {e}")
                     
             else:
                 error_msg = result.get("error", "Unknown error")
-                print(f"{i}/{len(drafts)} ✗ Send failed: {error_msg}")
+                print(f"{i}/{len(drafts)}  Send failed: {error_msg}")
                 draft.status = DraftStatus.APPROVED
                 await draft.save()
                 failed_count += 1
                 
         except Exception as e:
-            print(f"{i}/{len(drafts)} ✗ Exception: {e}")
+            print(f"{i}/{len(drafts)}  Exception: {e}")
             failed_count += 1
     
     print(f"{'='*60}")
@@ -315,7 +315,7 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
     draft.status = DraftStatus.APPROVED
     await draft.save()
     
-    print(f"✓ Draft approved for {prospect.name} ({recipient})")
+    print(f" Draft approved for {prospect.name} ({recipient})")
     
     # 7. Send email via Composio
     from app.core.sender import send_email_via_composio
@@ -337,7 +337,7 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
         if not execution_result.get("success"):
             # Email failed to send
             error_msg = execution_result.get("error", "Unknown error")
-            print(f"✗ Email send failed: {error_msg}")
+            print(f" Email send failed: {error_msg}")
             
             # Keep as APPROVED but don't mark as SENT
             return {
@@ -351,10 +351,10 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
         draft.status = DraftStatus.SENT
         await draft.save()
         
-        print(f"✓ Email sent successfully to {recipient}")
+        print(f" Email sent successfully to {recipient}")
         
     except Exception as e:
-        print(f"✗ Exception during email send: {e}")
+        print(f" Exception during email send: {e}")
         import traceback
         traceback.print_exc()
         
@@ -389,9 +389,9 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
             )
             await new_contact.insert()
         
-        print(f"✓ Contact history updated for {email}")
+        print(f" Contact history updated for {email}")
     except Exception as e:
-        print(f"⚠ Failed to update contact history: {e}")
+        print(f" Failed to update contact history: {e}")
     
     # 10. Update Neo4j Contact Graph
     try:
@@ -400,9 +400,9 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
             neo4j_service.resolve_person(prospect.name)
             if recipient:
                 neo4j_service.add_contact_method(prospect.name, "email", recipient)
-                print(f"✓ Neo4j: Linked {recipient} to {prospect.name}")
+                print(f" Neo4j: Linked {recipient} to {prospect.name}")
     except Exception as e:
-        print(f"⚠ Neo4j update failed: {e}")
+        print(f" Neo4j update failed: {e}")
     
     # 11. Create Active Agent (Workflow)
     try:
@@ -425,7 +425,7 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
             }
         )
         await new_agent.insert()
-        print(f"✓ Workflow agent created: {new_agent.name}")
+        print(f" Workflow agent created: {new_agent.name}")
         
         return {
             "status": "sent",
@@ -435,7 +435,7 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
             "recipient": recipient
         }
     except Exception as e:
-        print(f"⚠ Failed to create workflow agent: {e}")
+        print(f" Failed to create workflow agent: {e}")
         return {
             "status": "sent",
             "message": f"Email sent successfully to {recipient}",

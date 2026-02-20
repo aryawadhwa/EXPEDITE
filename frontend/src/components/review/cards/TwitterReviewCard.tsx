@@ -169,13 +169,13 @@ export function TwitterReviewCard({
         {/* Tips */}
         <div className="flex flex-wrap gap-2 mt-4">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Leave room for engagement
+             Leave room for engagement
           </span>
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Use hashtags sparingly (1-2 max)
+             Use hashtags sparingly (1-2 max)
           </span>
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Best times: 9am, 12pm, 5pm
+             Best times: 9am, 12pm, 5pm
           </span>
         </div>
       </div>

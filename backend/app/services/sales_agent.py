@@ -81,15 +81,15 @@ class SalesAgentConfig(BaseModel):
     """Configuration for the sales agent"""
     salesperson_name: str = "Alex"
     salesperson_role: str = "Sales Development Representative"
-    company_name: str = "OutboundAI"
+    company_name: str = "EXPEDITE"
     company_business: str = """
-        OutboundAI is an AI-powered sales automation platform that helps 
-        companies scale their outbound sales efforts. We provide intelligent 
+        EXPEDITE is an AI-powered sales automation platform that helps 
+        companies scale their EXPEDITE sales efforts. We provide intelligent 
         prospecting, personalized outreach, and automated follow-ups.
     """
     company_values: str = "Efficiency, Personalization, Results"
     conversation_purpose: str = "Qualify prospects and schedule demos"
-    conversation_type: str = "outbound"  # or "inbound"
+    conversation_type: str = "EXPEDITE"  # or "inbound"
     product_catalog: Optional[str] = None
     use_tools: bool = True
     model_name: str = "gpt-4o-mini"  # Optimized for GPT-4o mini
@@ -149,7 +149,7 @@ class SalesGPTAgent:
         
         # Default product knowledge
         return """
-        OutboundAI Platform:
+        EXPEDITE Platform:
         - AI-Powered Prospecting: $99/month - Find and qualify leads automatically
         - Smart Outreach: $199/month - Personalized email campaigns at scale
         - Enterprise Suite: $499/month - Full automation with CRM integration
@@ -386,7 +386,7 @@ Remember: You're having a conversation, not giving a presentation. Be human.
 # Factory function for easy instantiation
 def create_sales_agent(
     salesperson_name: str = "Alex",
-    company_name: str = "OutboundAI",
+    company_name: str = "EXPEDITE",
     conversation_purpose: str = "Qualify prospects and schedule demos",
     product_catalog: Optional[str] = None
 ) -> SalesGPTAgent:

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
 from typing import List, Dict
 from app.api.deps import get_current_user
 from app.models import User, UserAsset
@@ -6,43 +6,81 @@ import base64
 
 router = APIRouter()
 
+# CORS preflight handler for upload
+@router.options("/upload")
+async def options_upload():
+    """Handle CORS preflight for file upload"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
 @router.post("/upload")
 async def upload_asset(file: UploadFile = File(...), user: User = Depends(get_current_user)):
     """Upload a file to the user's asset library (MongoDB)"""
     
-    # Check size (Example limit: 10MB to be safe for Mongo 16MB doc limit)
-    MAX_SIZE = 10 * 1024 * 1024 # 10MB
+    # Check size (50MB limit for large documents)
+    MAX_SIZE = 50 * 1024 * 1024  # 50MB
     
-    # Read file content
-    content = await file.read()
-    size = len(content)
-    
-    if size > MAX_SIZE:
-        raise HTTPException(status_code=413, detail=f"File too large. Max size is 10MB.")
-    
-    # Check if duplicate name exists for user? (Optional, let's allow duplicates for now)
-    
-    asset = UserAsset(
-        user_id=user.clerk_id,
-        filename=file.filename,
-        content_type=file.content_type,
-        file_data=content,
-        size_bytes=size
-    )
-    await asset.insert()
-
-    
-    return {
-        "status": "success", 
-        "asset_id": str(asset.id),
-        "filename": asset.filename,
-        "size": asset.size_bytes
-    }
+    try:
+        # Read file content
+        content = await file.read()
+        size = len(content)
+        
+        if size > MAX_SIZE:
+            raise HTTPException(
+                status_code=413, 
+                detail=f"File too large. Max size is 50MB. Your file is {size / (1024*1024):.2f}MB."
+            )
+        
+        if size == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="File is empty"
+            )
+        
+        # Create asset
+        asset = UserAsset(
+            user_id=user.clerk_id,
+            filename=file.filename,
+            content_type=file.content_type,
+            file_data=content,
+            size_bytes=size
+        )
+        await asset.insert()
+        
+        return {
+            "status": "success", 
+            "asset_id": str(asset.id),
+            "filename": asset.filename,
+            "size": asset.size_bytes,
+            "content_type": asset.content_type
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload file: {str(e)}"
+        )
 
 @router.options("/")
 async def options_list():
-    from fastapi import Response
-    return Response(status_code=200)
+    """Handle CORS preflight requests"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
 
 @router.get("/")
 async def list_assets(user: User = Depends(get_current_user)):
@@ -151,10 +189,3 @@ async def build_rag_context(
         "asset_count": len(asset_ids),
         "context_length": len(context)
     }
-
-
-# Explicit options handler if needed for some environments (usually main CORSMiddleware handles this, but sometimes specific routers need help)
-from fastapi import Response
-@router.options("/upload")
-async def options_upload():
-    return Response(status_code=200)

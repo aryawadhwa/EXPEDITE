@@ -183,13 +183,13 @@ export function InstagramReviewCard({
         {/* Tips */}
         <div className="flex flex-wrap gap-2">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 First line is the hook - make it count
+             First line is the hook - make it count
           </span>
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Use 5-15 relevant hashtags
+             Use 5-15 relevant hashtags
           </span>
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Add a call-to-action
+             Add a call-to-action
           </span>
         </div>
       </div>

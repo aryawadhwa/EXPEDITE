@@ -1,8 +1,8 @@
-# Zenith Outbound AI
+# EXPEDITE
 
 ## The Operating System for Autonomous Sales Teams
 
-Zenith is an intelligent outbound sales platform that automates prospect discovery, enrichment, and personalized email outreach at scale. Using advanced AI agents, job board scraping, and human-in-the-loop approval, Zenith helps sales teams find and contact qualified prospects efficiently.
+EXPEDITE is an intelligent outbound sales platform that automates prospect discovery, enrichment, and personalized email outreach at scale. Using advanced AI agents, job board scraping, and human-in-the-loop approval, EXPEDITE helps sales teams find and contact qualified prospects efficiently.
 
 ---
 
@@ -25,7 +25,7 @@ Zenith is an intelligent outbound sales platform that automates prospect discove
 
 ## Overview
 
-Zenith automates the entire prospect outreach workflow:
+EXPEDITE automates the entire prospect outreach workflow:
 
 1. **Prospect Discovery** - Scrapes 4 job board sources to find companies actively hiring
 2. **Email Enrichment** - Uses Hunter.io to find verified email addresses (60-80% success rate)
@@ -262,24 +262,24 @@ Frontend (React + TypeScript)
 WebSocket (Real-time updates)
     ↓
 FastAPI Backend (Python 3.12+)
-    ├─ API Routes
-    ├─ LangGraph Agent (10 nodes)
-    └─ Services Layer
-        ├─ web_scraper.py (4 job boards)
-        ├─ email_finder.py (Hunter.io)
-        ├─ smtp_verifier.py (Email validation)
-        ├─ neo4j.py (Knowledge graph)
-        └─ direct_actions.py (Social media)
+     API Routes
+     LangGraph Agent (10 nodes)
+     Services Layer
+         web_scraper.py (4 job boards)
+         email_finder.py (Hunter.io)
+         smtp_verifier.py (Email validation)
+         neo4j.py (Knowledge graph)
+         direct_actions.py (Social media)
     ↓
 Databases
-    ├─ MongoDB (users, missions, prospects, drafts)
-    └─ Neo4j (people, companies, relationships)
+     MongoDB (users, missions, prospects, drafts)
+     Neo4j (people, companies, relationships)
     ↓
 External APIs
-    ├─ Hunter.io (email finding)
-    ├─ Composio (OAuth + sending)
-    ├─ Groq (LLM inference)
-    └─ LangSmith (tracing)
+     Hunter.io (email finding)
+     Composio (OAuth + sending)
+     Groq (LLM inference)
+     LangSmith (tracing)
 ```
 
 ---
@@ -302,8 +302,8 @@ External APIs
 
 **1. Clone Repository**
 ```bash
-git clone https://github.com/finalroundai/zenith_static.git
-cd zenith_static
+git clone https://github.com/finalroundai/EXPEDITE_static.git
+cd EXPEDITE_static
 ```
 
 **2. Backend Setup**
@@ -359,43 +359,43 @@ Frontend runs on: http://localhost:5173
 ## Project Structure
 
 ```
-zenith_static/
-├── backend/
-│   ├── app/
-│   │   ├── core/
-│   │   │   ├── agent.py              # LangGraph workflow
-│   │   │   ├── config.py             # Settings
-│   │   │   ├── sender.py             # Email sending
-│   │   │   └── socket.py             # WebSocket
-│   │   ├── services/
-│   │   │   ├── web_scraper.py        # Job board scraping
-│   │   │   ├── email_finder.py       # Hunter.io
-│   │   │   ├── smtp_verifier.py      # Email validation
-│   │   │   └── neo4j.py              # Knowledge graph
-│   │   ├── routers/
-│   │   │   ├── missions.py           # Mission CRUD
-│   │   │   ├── reviews.py            # Draft review
-│   │   │   └── scraper.py            # Scraper API
-│   │   └── models.py                 # MongoDB models
-│   ├── main.py                       # FastAPI entry
-│   ├── requirements.txt              # Dependencies
-│   └── .env                          # Configuration
-│
-├── frontend/
-│   ├── src/
-│   │   ├── components/               # React components
-│   │   ├── pages/                    # Page components
-│   │   ├── lib/                      # Utilities
-│   │   ├── App.tsx                   # Root component
-│   │   └── main.tsx                  # Entry point
-│   ├── package.json                  # Dependencies
-│   └── vite.config.ts                # Vite config
-│
-└── Documentation/
-    ├── README.md                     # This file
-    ├── TECHNICAL_ARCHITECTURE.md     # Complete technical guide
-    ├── LANGGRAPH_VISUALIZATION.md    # Workflow diagrams
-    └── PROJECT_STATUS.md             # Current status
+EXPEDITE_static/
+ backend/
+    app/
+       core/
+          agent.py              # LangGraph workflow
+          config.py             # Settings
+          sender.py             # Email sending
+          socket.py             # WebSocket
+       services/
+          web_scraper.py        # Job board scraping
+          email_finder.py       # Hunter.io
+          smtp_verifier.py      # Email validation
+          neo4j.py              # Knowledge graph
+       routers/
+          missions.py           # Mission CRUD
+          reviews.py            # Draft review
+          scraper.py            # Scraper API
+       models.py                 # MongoDB models
+    main.py                       # FastAPI entry
+    requirements.txt              # Dependencies
+    .env                          # Configuration
+
+ frontend/
+    src/
+       components/               # React components
+       pages/                    # Page components
+       lib/                      # Utilities
+       App.tsx                   # Root component
+       main.tsx                  # Entry point
+    package.json                  # Dependencies
+    vite.config.ts                # Vite config
+
+ Documentation/
+     README.md                     # This file
+     TECHNICAL_ARCHITECTURE.md     # Complete technical guide
+     LANGGRAPH_VISUALIZATION.md    # Workflow diagrams
+     PROJECT_STATUS.md             # Current status
 ```
 
 ---
@@ -476,15 +476,15 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 **Build Backend**
 ```bash
 cd backend
-docker build -t zenith-backend .
-docker run -p 8000:8000 zenith-backend
+docker build -t EXPEDITE-backend .
+docker run -p 8000:8000 EXPEDITE-backend
 ```
 
 **Build Frontend**
 ```bash
 cd frontend
-docker build -t zenith-frontend .
-docker run -p 5173:5173 zenith-frontend
+docker build -t EXPEDITE-frontend .
+docker run -p 5173:5173 EXPEDITE-frontend
 ```
 
 ### Production Deployment
@@ -564,7 +564,7 @@ Private & Confidential.
 
 ## Repository
 
-GitHub: https://github.com/finalroundai/zenith_static
+GitHub: https://github.com/finalroundai/EXPEDITE_static
 
 Branch: arya (development)
 Main: main (production)

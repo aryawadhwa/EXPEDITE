@@ -73,21 +73,21 @@ async def startup_validation():
     
     for service, status in health.items():
         if 'OK' in status:
-            logger.info(f"[STARTUP] ✅ {service.upper()}: {status}")
+            logger.info(f"[STARTUP]  {service.upper()}: {status}")
         elif 'WARN' in status:
-            logger.warning(f"[STARTUP] ⚠️  {service.upper()}: {status}")
+            logger.warning(f"[STARTUP] ️  {service.upper()}: {status}")
         else:
-            logger.error(f"[STARTUP] ❌ {service.upper()}: {status}")
+            logger.error(f"[STARTUP]  {service.upper()}: {status}")
     
     # Check critical services (Hunter and Groq only)
     critical = ['hunter', 'groq']
     failed_critical = [k for k in critical if 'OK' not in health.get(k, '')]
     
     if failed_critical:
-        logger.error(f"[STARTUP] ⚠️  CRITICAL services failed: {', '.join(failed_critical)}")
+        logger.error(f"[STARTUP] ️  CRITICAL services failed: {', '.join(failed_critical)}")
         logger.error("[STARTUP] System may not function correctly!")
     else:
-        logger.info("[STARTUP] ✅ All critical services operational")
+        logger.info("[STARTUP]  All critical services operational")
     
     logger.info("=" * 60)
     

@@ -304,10 +304,10 @@ export function EmailReviewCard({
         </div>
         <div className="flex flex-wrap gap-2 mt-4">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Keep subject under 50 chars for mobile
+             Keep subject under 50 chars for mobile
           </span>
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Personalize the first line
+             Personalize the first line
           </span>
         </div>
       </div>

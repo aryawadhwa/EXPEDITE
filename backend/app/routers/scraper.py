@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize email verifier
 email_verifier = EmailVerifier(
-    from_email="verify@outboundai.com",
+    from_email="verify@EXPEDITE.com",
     timeout=10,
     connection_attempts=2,
     smtp_safe_check=True

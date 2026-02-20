@@ -38,7 +38,7 @@ Return JSON: {{"titles": ["title1", "title2"], "industries": ["industry1"]}}"""
 # NODE: RESEARCHER
 async def research_node(state: ScoutState) -> Dict:
     """Execute prospect research pipeline"""
-    print("--- 🕵️ RESEARCHER ---")
+    print("--- ️ RESEARCHER ---")
     
     # Extract titles and industries from objective
     obj_lower = state["objective"].lower()

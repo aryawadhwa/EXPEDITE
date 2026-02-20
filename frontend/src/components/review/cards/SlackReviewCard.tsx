@@ -165,13 +165,13 @@ export function SlackReviewCard({
         {/* Tips */}
         <div className="flex flex-wrap gap-2">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Use *bold* and _italic_ for emphasis
+             Use *bold* and _italic_ for emphasis
           </span>
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 @mention people for important messages
+             @mention people for important messages
           </span>
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-1 rounded">
-            💡 Use threads for detailed discussions
+             Use threads for detailed discussions
           </span>
         </div>
       </div>

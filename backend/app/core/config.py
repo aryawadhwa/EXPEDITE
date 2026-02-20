@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "OutboundAI"
+    PROJECT_NAME: str = "EXPEDITE"
     MONGODB_URI: str
     VITE_CLERK_PUBLISHABLE_KEY: str # Actually not needed for backend verification usually, we check JWKS or Secret Key? 
     # Clerk usually verifies via JWKS using the Issuer URL. 

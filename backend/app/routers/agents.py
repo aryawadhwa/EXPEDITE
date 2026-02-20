@@ -127,7 +127,7 @@ async def start_scout(request: ScoutRequest, user: User = Depends(get_current_us
         await MissionLog(
             mission_id=mission_id,
             role="system",
-            content="🚀 Scout Agent activated. Starting autonomous research...",
+            content=" Scout Agent activated. Starting autonomous research...",
             log_type="thinking"
         ).insert()
         
@@ -182,7 +182,7 @@ async def start_scout(request: ScoutRequest, user: User = Depends(get_current_us
                         # Send draft to chat via WebSocket
                         from app.core.socket import manager
                         prospect_name = analysis.get("company_name", cand.get("title", "Unknown"))
-                        draft_message = f"""### 📧 Draft Generated for {prospect_name}
+                        draft_message = f"""###  Draft Generated for {prospect_name}
 
 **Subject:** {draft.subject}
 
@@ -211,7 +211,7 @@ async def start_scout(request: ScoutRequest, user: User = Depends(get_current_us
             await MissionLog(
                 mission_id=mission_id,
                 role="system",
-                content=f"✅ Scout finished. Found {saved_count} recruiters & generated personalized connection requests.",
+                content=f" Scout finished. Found {saved_count} recruiters & generated personalized connection requests.",
                 log_type="success"
             ).insert()
             
@@ -219,7 +219,7 @@ async def start_scout(request: ScoutRequest, user: User = Depends(get_current_us
             await MissionLog(
                 mission_id=mission_id,
                 role="system",
-                content=f"❌ Scout failed: {str(e)}",
+                content=f" Scout failed: {str(e)}",
                 log_type="error"
             ).insert()
             print(f"Scout error: {e}")

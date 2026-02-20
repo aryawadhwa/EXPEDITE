@@ -261,7 +261,7 @@ export function HeroInput() {
                     onClick={() => handleSelectAsset(asset)}
                     className="w-full text-left px-3 py-2 hover:bg-secondary/50 flex items-center gap-2 text-sm"
                   >
-                    <span className="text-primary">📄</span>
+                    <span className="text-primary"></span>
                     <span className="truncate">{asset.filename}</span>
                   </button>
                 ))}

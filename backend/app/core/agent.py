@@ -4,9 +4,9 @@ HARD CONTRACT - Fixed Graph Shape
 
 WORKFLOW:
 ENTRY → initial_triage → resolve_person → resolve_channel_identity → route_by_intent
-    ├─ discovery_flow
-    ├─ outreach_flow
-    └─ publish_flow
+     discovery_flow
+     outreach_flow
+     publish_flow
 → review_queue (ONLY if draft_required == true) → execute_action → post_action_update → END
 """
 
@@ -178,7 +178,7 @@ async def log_event(
         await manager.send_to_user(user_id, {
             "type": log_type,
             "message": content,
-            "agent": "OutboundAI",
+            "agent": "EXPEDITE",
             "mission_id": mission_id,
             "metadata": metadata,
             "target": target  # Frontend uses this to route to appropriate UI
@@ -257,7 +257,7 @@ async def initial_triage(state: AgentState) -> Dict:
     await log_event(mission_id, user_id, "Analyzing your request...", "thinking")
     
     try:
-        system_prompt = """You are an Intent Classification Agent for an outbound automation system.
+        system_prompt = """You are an Intent Classification Agent for an EXPEDITE automation system.
 
 CRITICAL WORKFLOW RULES:
 1. Prospects are discovered and structured as JSON (name + email only)
@@ -605,7 +605,7 @@ async def discovery_flow(state: AgentState) -> Dict:
                 if not job_prospects:
                     await log_event(
                         mission_id, user_id, 
-                        f"❌ No companies currently hiring for '{job_title}' in {location}\n\nSearched:\n• Hiring.cafe\n• Glassdoor\n• Monster.com\n• Indeed.com\n\nSuggestions:\n• Try broader job titles (e.g., 'Engineer' instead of 'Senior Backend Engineer')\n• Expand location to nearby cities\n• Check related job titles", 
+                        f" No companies currently hiring for '{job_title}' in {location}\n\nSearched:\n• Hiring.cafe\n• Glassdoor\n• Monster.com\n• Indeed.com\n\nSuggestions:\n• Try broader job titles (e.g., 'Engineer' instead of 'Senior Backend Engineer')\n• Expand location to nearby cities\n• Check related job titles", 
                         "info"
                     )
                     return {"prospects": [], "current_prospect": {}}
@@ -650,7 +650,7 @@ async def discovery_flow(state: AgentState) -> Dict:
                     if enriched_count > 0:
                         await log_event(
                             mission_id, user_id,
-                            f"✓ Found {enriched_count} contact emails using Hunter.io",
+                            f" Found {enriched_count} contact emails using Hunter.io",
                             "success",
                             target="brain"
                         )
@@ -658,7 +658,7 @@ async def discovery_flow(state: AgentState) -> Dict:
                     # Create detailed company list
                     company_list = []
                     for i, p in enumerate(prospects[:5], 1):  # Show first 5 in detail
-                        email_status = "✓ Email found" if p.get("public_contact") and "@" in p.get("public_contact", "") else "✗ No email"
+                        email_status = " Email found" if p.get("public_contact") and "@" in p.get("public_contact", "") else " No email"
                         company_list.append(f"{i}. {p['company']} - {p['name']} ({email_status})")
                     
                     companies_text = "\n".join(company_list)
@@ -667,13 +667,13 @@ async def discovery_flow(state: AgentState) -> Dict:
                     
                     await log_event(
                         mission_id, user_id, 
-                        f"✓ Found {len(prospects)} companies actively hiring for '{job_title}' in {location}\n\nCompanies:\n{companies_text}\n\nSources: {sources_str}\n\n📋 All prospects saved! To reach out:\n1. Go to Review Queue to see all prospects\n2. Or ask me to 'draft emails to these companies'\n3. Or say 'send personalized emails to all prospects'", 
+                        f" Found {len(prospects)} companies actively hiring for '{job_title}' in {location}\n\nCompanies:\n{companies_text}\n\nSources: {sources_str}\n\n All prospects saved! To reach out:\n1. Go to Review Queue to see all prospects\n2. Or ask me to 'draft emails to these companies'\n3. Or say 'send personalized emails to all prospects'", 
                         "success"
                     )
                     await update_agent_stats(user_id, processed=len(prospects))
             except Exception as e:
                 print(f"Job scraping error: {e}")
-                await log_event(mission_id, user_id, f"❌ Job board search failed: {str(e)[:100]}", "error")
+                await log_event(mission_id, user_id, f" Job board search failed: {str(e)[:100]}", "error")
         
         # 2. Email Scraping
         elif is_email_scrape:
@@ -691,7 +691,7 @@ async def discovery_flow(state: AgentState) -> Dict:
                     if not emails:
                         await log_event(
                             mission_id, user_id, 
-                            f"❌ No email addresses found on {url}\n\nSearched:\n• All pages up to 2 levels deep\n• Up to 20 pages total\n• Contact pages, about pages, footer\n\nThe website may:\n• Use contact forms instead of emails\n• Hide emails behind JavaScript\n• Not list public contact information", 
+                            f" No email addresses found on {url}\n\nSearched:\n• All pages up to 2 levels deep\n• Up to 20 pages total\n• Contact pages, about pages, footer\n\nThe website may:\n• Use contact forms instead of emails\n• Hide emails behind JavaScript\n• Not list public contact information", 
                             "info"
                         )
                         return {"prospects": [], "current_prospect": {}}
@@ -727,20 +727,20 @@ async def discovery_flow(state: AgentState) -> Dict:
                         
                         await log_event(
                             mission_id, user_id, 
-                            f"✓ Found and verified {len(valid_emails)} email addresses from {url}\n\nVerified Emails:\n{emails_text}\n\n{invalid_count} invalid emails were filtered out\n\n📋 All emails saved as prospects! To reach out:\n1. Go to Review Queue to see all contacts\n2. Or ask me to 'draft emails to these contacts'\n3. Or say 'send personalized emails to all'", 
+                            f" Found and verified {len(valid_emails)} email addresses from {url}\n\nVerified Emails:\n{emails_text}\n\n{invalid_count} invalid emails were filtered out\n\n All emails saved as prospects! To reach out:\n1. Go to Review Queue to see all contacts\n2. Or ask me to 'draft emails to these contacts'\n3. Or say 'send personalized emails to all'", 
                             "success"
                         )
                     else:
                         await log_event(
                             mission_id, user_id, 
-                            f"❌ Found {len(emails)} email addresses on {url} but none were valid\n\nReasons:\n• Invalid domain (doesn't exist)\n• Disposable email services (tempmail, etc.)\n• Fake/placeholder emails\n\nAll emails were verified using DNS/MX record validation.", 
+                            f" Found {len(emails)} email addresses on {url} but none were valid\n\nReasons:\n• Invalid domain (doesn't exist)\n• Disposable email services (tempmail, etc.)\n• Fake/placeholder emails\n\nAll emails were verified using DNS/MX record validation.", 
                             "info"
                         )
                         return {"prospects": [], "current_prospect": {}}
                         
                 except Exception as e:
                     print(f"Email scraping error: {e}")
-                    await log_event(mission_id, user_id, f"❌ Email scraping failed: {str(e)[:50]}", "error")
+                    await log_event(mission_id, user_id, f" Email scraping failed: {str(e)[:50]}", "error")
         
         # 3. Company Research
         elif is_company_research:
@@ -777,13 +777,13 @@ async def discovery_flow(state: AgentState) -> Dict:
                     
                     await log_event(
                         mission_id, user_id, 
-                        f"✓ Found {len(prospects)} contacts at {company_name}\n\nWebsite: {website}\n\nContacts:\n{contacts_text}\n\n📋 All contacts saved as prospects! To reach out:\n1. Go to Review Queue to see all contacts\n2. Or ask me to 'draft emails to these contacts'\n3. Or say 'send personalized emails to {company_name}'", 
+                        f" Found {len(prospects)} contacts at {company_name}\n\nWebsite: {website}\n\nContacts:\n{contacts_text}\n\n All contacts saved as prospects! To reach out:\n1. Go to Review Queue to see all contacts\n2. Or ask me to 'draft emails to these contacts'\n3. Or say 'send personalized emails to {company_name}'", 
                         "success"
                     )
                 else:
                     await log_event(
                         mission_id, user_id, 
-                        f"❌ No public contact emails found for {company_name}\n\nTry:\n• Visit their website directly\n• Check their LinkedIn company page\n• Look for a careers or contact page", 
+                        f" No public contact emails found for {company_name}\n\nTry:\n• Visit their website directly\n• Check their LinkedIn company page\n• Look for a careers or contact page", 
                         "info"
                     )
                     
@@ -891,7 +891,7 @@ async def discovery_flow(state: AgentState) -> Dict:
             if "outreach" in state.get("intents", []):
                 await log_event(
                     mission_id, user_id,
-                    f"📝 Fetching latest 10 prospects from database...",
+                    f" Fetching latest 10 prospects from database...",
                     "thinking"
                 )
                 
@@ -909,7 +909,7 @@ async def discovery_flow(state: AgentState) -> Dict:
                     if not latest_prospects:
                         await log_event(
                             mission_id, user_id,
-                            "❌ No prospects found in database to create drafts for.",
+                            " No prospects found in database to create drafts for.",
                             "info"
                         )
                         return {
@@ -919,7 +919,7 @@ async def discovery_flow(state: AgentState) -> Dict:
                     
                     await log_event(
                         mission_id, user_id,
-                        f"✓ Found {len(latest_prospects)} prospects. Generating draft emails...",
+                        f" Found {len(latest_prospects)} prospects. Generating draft emails...",
                         "thinking"
                     )
                     
@@ -968,7 +968,7 @@ async def discovery_flow(state: AgentState) -> Dict:
                     
                     await log_event(
                         mission_id, user_id,
-                        f"✓ Generated {drafts_created} draft emails (NOT SENT)\n\n📋 All drafts are in Review Queue waiting for your approval\n\n⚠️ IMPORTANT: Emails will NOT be sent until you:\n1. Go to Review Queue\n2. Review each draft\n3. Click 'Approve' to send\n\nNo emails have been sent yet.",
+                        f" Generated {drafts_created} draft emails (NOT SENT)\n\n All drafts are in Review Queue waiting for your approval\n\n️ IMPORTANT: Emails will NOT be sent until you:\n1. Go to Review Queue\n2. Review each draft\n3. Click 'Approve' to send\n\nNo emails have been sent yet.",
                         "success"
                     )
                     
@@ -980,7 +980,7 @@ async def discovery_flow(state: AgentState) -> Dict:
                     traceback.print_exc()
                     await log_event(
                         mission_id, user_id,
-                        f"❌ Failed to create drafts: {str(e)[:100]}",
+                        f" Failed to create drafts: {str(e)[:100]}",
                         "error"
                     )
                 
@@ -999,31 +999,31 @@ async def discovery_flow(state: AgentState) -> Dict:
             if is_job_search:
                 await log_event(
                     mission_id, user_id, 
-                    f"❌ No results found.\n\nSuggestions:\n• Try broader job titles (e.g., 'Software Engineer' instead of 'Senior React Developer')\n• Search in multiple locations\n• Check if the job title is commonly used", 
+                    f" No results found.\n\nSuggestions:\n• Try broader job titles (e.g., 'Software Engineer' instead of 'Senior React Developer')\n• Search in multiple locations\n• Check if the job title is commonly used", 
                     "info"
                 )
             elif is_email_scrape:
                 await log_event(
                     mission_id, user_id, 
-                    "❌ No valid email addresses found.\n\nThis could mean:\n• The website doesn't list public emails\n• Emails are behind contact forms\n• Try the company's LinkedIn or 'About' page", 
+                    " No valid email addresses found.\n\nThis could mean:\n• The website doesn't list public emails\n• Emails are behind contact forms\n• Try the company's LinkedIn or 'About' page", 
                     "info"
                 )
             elif is_company_research:
                 await log_event(
                     mission_id, user_id, 
-                    "❌ No contacts found for this company.\n\nTry:\n• Check the company website directly\n• Search for the company on LinkedIn\n• Look for their careers page", 
+                    " No contacts found for this company.\n\nTry:\n• Check the company website directly\n• Search for the company on LinkedIn\n• Look for their careers page", 
                     "info"
                 )
             else:
                 await log_event(
                     mission_id, user_id, 
-                    "❌ No prospects found.\n\nTips:\n• Be more specific about what you're looking for\n• Try different keywords\n• Provide a company name or website URL", 
+                    " No prospects found.\n\nTips:\n• Be more specific about what you're looking for\n• Try different keywords\n• Provide a company name or website URL", 
                     "info"
                 )
             
     except Exception as e:
         print(f"Discovery error: {e}")
-        await log_event(mission_id, user_id, f"❌ Search failed: {str(e)[:100]}", "error")
+        await log_event(mission_id, user_id, f" Search failed: {str(e)[:100]}", "error")
     
     return {"prospects": [], "current_prospect": {}}
 

@@ -187,9 +187,9 @@ class HunterIntegration(BaseIntegration):
                 )
                 
                 if verified:
-                    self.log("info", f"✓ Verified: {email} (score: {score}, status: {status})")
+                    self.log("info", f" Verified: {email} (score: {score}, status: {status})")
                 else:
-                    self.log("info", f"✗ Not verified: email={email}, score={score}, status={status}")
+                    self.log("info", f" Not verified: email={email}, score={score}, status={status}")
                 
                 return {
                     "email": email,

@@ -208,8 +208,8 @@ const ConditionNode = ({ id, data }: NodeProps<ConditionNodeType>) => {
                     }}
                 />
                 <div className="flex justify-between text-[10px] px-1">
-                    <span className="text-emerald-400 font-medium">✓ True</span>
-                    <span className="text-red-400 font-medium">✗ False</span>
+                    <span className="text-emerald-400 font-medium"> True</span>
+                    <span className="text-red-400 font-medium"> False</span>
                 </div>
             </div>
             {/* Input handle */}
