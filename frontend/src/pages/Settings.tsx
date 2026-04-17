@@ -91,8 +91,8 @@ export default function Settings() {
       setAssets(data);
     } catch (e) {
       console.error("Failed to fetch assets", e);
-                            <a
-                              href={buildApiUrl(`/assets/${asset.id}`)}
+    }
+  }, [api]);
 
   useEffect(() => {
     fetchAssets();
