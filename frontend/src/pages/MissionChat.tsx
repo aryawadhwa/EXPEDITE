@@ -730,7 +730,7 @@ export default function MissionChat() {
                                                     });
                                                 }
                                             }}
-                                            disabled={message.metadata?.creating || message.metadata?.created}
+                                            disabled={Boolean(message.metadata?.creating) || Boolean(message.metadata?.created)}
                                         >
                                             {message.metadata?.creating ? (
                                                 <>
