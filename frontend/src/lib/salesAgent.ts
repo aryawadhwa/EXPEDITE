@@ -4,8 +4,7 @@
  */
 
 import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import { API_BASE_URL } from '@/lib/env';
 
 // Create axios instance with auth interceptor
 const apiClient = axios.create({

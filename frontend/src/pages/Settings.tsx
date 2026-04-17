@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useApi } from "@/lib/api";
+import { buildApiUrl } from "@/lib/env";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -90,8 +91,8 @@ export default function Settings() {
       setAssets(data);
     } catch (e) {
       console.error("Failed to fetch assets", e);
-    }
-  }, [api]);
+                            <a
+                              href={buildApiUrl(`/assets/${asset.id}`)}
 
   useEffect(() => {
     fetchAssets();
@@ -181,7 +182,7 @@ export default function Settings() {
                     </div>
                     <div className="min-w-0">
                       <a
-                        href={`http://localhost:8000/api/v1/assets/${asset.id}`}
+                        href={buildApiUrl(`/assets/${asset.id}`)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm font-medium truncate text-zinc-300 hover:text-white cursor-pointer block"

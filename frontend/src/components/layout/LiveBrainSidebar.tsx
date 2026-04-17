@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@clerk/clerk-react";
+import { buildBrainWsUrl } from "@/lib/env";
 
 interface LogEntry {
   id: string;
@@ -80,7 +81,7 @@ export function LiveBrainSidebar({ isOpen, onToggle }: LiveBrainSidebarProps) {
 
     const connect = () => {
       // Connect to WebSocket
-      ws = new WebSocket(`ws://localhost:8000/ws/brain/${userId}`);
+      ws = new WebSocket(buildBrainWsUrl(userId));
       wsRef.current = ws;
 
       ws.onopen = () => {

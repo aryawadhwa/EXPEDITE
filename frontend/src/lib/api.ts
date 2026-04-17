@@ -1,7 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useMemo, useCallback } from "react";
-
-const API_BASE_URL = "http://localhost:8000/api/v1";
+import { API_BASE_URL, buildApiUrl } from "@/lib/env";
 
 interface Attachment {
   asset_id: string;
@@ -267,7 +266,7 @@ export function useApi() {
             formData.append("file", file);
 
             const token = await getToken();
-            const res = await fetch(`${API_BASE_URL}/assets/upload`, {
+            const res = await fetch(buildApiUrl("/assets/upload"), {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,

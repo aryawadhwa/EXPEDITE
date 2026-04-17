@@ -42,6 +42,7 @@ import { toast } from "sonner";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Logo } from "@/components/ui/logo";
+import { buildBrainWsUrl } from "@/lib/env";
 
 interface Attachment {
     asset_id: string;
@@ -238,7 +239,7 @@ export default function MissionChat() {
     useEffect(() => {
         if (!userId) return;
 
-        const ws = new WebSocket(`ws://localhost:8000/ws/brain/${userId}`);
+        const ws = new WebSocket(buildBrainWsUrl(userId));
         wsRef.current = ws;
 
         ws.onmessage = (event) => {
