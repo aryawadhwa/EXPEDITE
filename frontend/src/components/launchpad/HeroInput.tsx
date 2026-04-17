@@ -210,7 +210,7 @@ export function HeroInput() {
   };
 
   return (
-    <div className="relative w-full max-w-3xl mx-auto">
+    <div className="relative mx-auto w-full max-w-3xl overflow-visible">
       {/* Ambient glow */}
       <div
         className={cn(
@@ -226,7 +226,7 @@ export function HeroInput() {
 
       {/* Selected Attachments */}
       {selectedAttachments.length > 0 && (
-        <div className="relative flex flex-wrap gap-2 mb-3 px-1">
+        <div className="relative mb-3 flex flex-wrap gap-2 px-1">
           {selectedAttachments.map((att) => (
             <div
               key={att.id}
@@ -248,7 +248,7 @@ export function HeroInput() {
       <form onSubmit={handleSubmit} className="relative">
         {/* Asset Picker Dropdown */}
         {showAssetPicker && (
-          <div className="absolute bottom-full left-0 mb-2 w-72 bg-popover border border-border rounded-xl shadow-xl z-50 max-h-48 overflow-auto">
+          <div className="absolute bottom-full left-0 z-50 mb-2 max-h-48 w-full max-w-[18rem] overflow-auto rounded-xl border border-border bg-popover shadow-xl sm:w-72">
             {availableAssets.length > 0 ? (
               <>
                 <div className="p-2 text-xs text-muted-foreground border-b border-border">
@@ -276,54 +276,54 @@ export function HeroInput() {
 
         <div
           className={cn(
-            "relative flex items-center gap-2 bg-card/90 backdrop-blur-xl border-2 rounded-2xl transition-all duration-300 p-2",
+            "relative flex flex-col gap-2 rounded-2xl border-2 bg-card/90 p-2 backdrop-blur-xl transition-all duration-300 md:flex-row md:items-center md:justify-between",
             isFocused
               ? "border-primary/50 shadow-xl shadow-primary/10"
               : "border-border/50 shadow-lg",
             isListening && "border-red-500/50 shadow-red-500/20"
           )}
         >
-          {/* Mic Button */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={toggleListening}
-            className={cn(
-              "h-10 w-10 rounded-lg transition-all shrink-0",
-              isListening
-                ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse"
-                : "hover:bg-secondary text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </Button>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={toggleListening}
+              className={cn(
+                "h-10 w-10 shrink-0 rounded-lg transition-all",
+                isListening
+                  ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse"
+                  : "hover:bg-secondary text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </Button>
 
-          {/* Input Field */}
-          <input
-            type="text"
-            value={query}
-            onChange={handleInputChange}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-            onKeyDown={(e) => e.key === "Enter" && !showAssetPicker && handleSubmit(e)}
-            placeholder={
-              isListening 
-                ? "Listening..." 
-                : "Describe your task... (type # for assets)"
-            }
-            className={cn(
-              "flex-1 bg-transparent text-base text-foreground placeholder:text-muted-foreground/70 focus:outline-none py-2.5",
-              isListening && "placeholder:text-red-400"
-            )}
-          />
+            <input
+              type="text"
+              value={query}
+              onChange={handleInputChange}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+              onKeyDown={(e) => e.key === "Enter" && !showAssetPicker && handleSubmit(e)}
+              placeholder={
+                isListening 
+                  ? "Listening..." 
+                  : "Describe your task... (type # for assets)"
+              }
+              className={cn(
+                "min-w-0 flex-1 bg-transparent py-2.5 pr-1 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none md:text-base",
+                isListening && "placeholder:text-red-400"
+              )}
+            />
+          </div>
 
           <Button
             type="submit"
             size="lg"
             disabled={!query.trim() || isLoading}
             className={cn(
-              "h-10 px-5 rounded-lg font-semibold transition-all shrink-0 gap-2 text-white",
+              "h-11 w-full gap-2 rounded-lg px-5 font-semibold text-white transition-all md:ml-auto md:h-10 md:min-w-[120px] md:w-auto md:shrink-0",
               query.trim()
                 ? "bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
                 : "bg-secondary text-muted-foreground"

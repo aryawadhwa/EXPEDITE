@@ -219,15 +219,22 @@ export default function SalesAgentChat({
       </ScrollArea>
 
       <div className="p-4 border-t">
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <Input
+            className="flex-1"
             placeholder="Type your message..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             disabled={loading || !conversationId}
           />
-          <Button onClick={handleSendMessage} disabled={loading || !conversationId || !inputValue.trim()}>
+          <Button
+            size="sm"
+            className="shrink-0"
+            onClick={handleSendMessage}
+            disabled={loading || !conversationId || !inputValue.trim()}
+            aria-label="Send message"
+          >
             Send
           </Button>
         </div>

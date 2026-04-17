@@ -81,14 +81,14 @@ export default function ContactHistory() {
     };
 
     return (
-        <div className="h-full p-6 lg:p-8 overflow-auto">
+        <div className="h-full overflow-auto mobile-page-padding">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-foreground">Contact History</h1>
                     <p className="text-muted-foreground mt-1">Track all email communications and prevent duplicates</p>
                 </div>
-                <Button onClick={exportToCSV} className="gap-2">
+                <Button onClick={exportToCSV} className="w-full gap-2 sm:w-auto">
                     <Download className="w-4 h-4" />
                     Export CSV
                 </Button>

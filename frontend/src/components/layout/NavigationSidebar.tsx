@@ -79,7 +79,7 @@ export function NavigationSidebar({ isCollapsed, onToggle }: NavigationSidebarPr
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 px-2 space-y-1">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4 safe-bottom">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;

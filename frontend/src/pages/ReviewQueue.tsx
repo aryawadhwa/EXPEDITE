@@ -19,6 +19,7 @@ import { Check, X, ChevronLeft, ChevronRight, Inbox, Loader2, CheckCheck, XCircl
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "@/lib/api";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Channel icon helper
 const getChannelIcon = (channel: string) => {
@@ -82,6 +83,7 @@ export default function ReviewQueue() {
 
   const api = useApi();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   // Get filter params from URL query
   const [searchParams] = useSearchParams();
@@ -365,8 +367,8 @@ export default function ReviewQueue() {
 
   if (isLoading) {
     return (
-      <div className="h-full flex flex-col">
-        <header className="flex items-center justify-between px-6 h-14 border-b border-border bg-card/50">
+      <div className="flex h-full flex-col">
+        <header className="flex items-center justify-between border-b border-border bg-card/50 px-4 py-3 md:h-14 md:px-6">
           <div className="flex items-center gap-3">
             <Skeleton className="h-6 w-32" />
             <Skeleton className="h-5 w-16 rounded-full" />
@@ -376,8 +378,8 @@ export default function ReviewQueue() {
             <Skeleton className="h-8 w-8" />
           </div>
         </header>
-        <div className="flex-1 flex overflow-hidden">
-          <div className="w-1/2 border-r border-border p-6 space-y-4">
+        <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
+          <div className="space-y-4 border-b border-border p-4 lg:w-1/2 lg:border-b-0 lg:border-r lg:p-6">
             <div className="flex items-center gap-4">
               <Skeleton className="h-12 w-12 rounded-full" />
               <div className="space-y-2">
@@ -387,7 +389,7 @@ export default function ReviewQueue() {
             </div>
             <Skeleton className="h-32 w-full" />
           </div>
-          <div className="w-1/2 p-6 space-y-4">
+          <div className="space-y-4 p-4 lg:w-1/2 lg:p-6">
             <Skeleton className="h-8 w-3/4" />
             <Skeleton className="h-64 w-full" />
           </div>
@@ -409,14 +411,14 @@ export default function ReviewQueue() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-black/50 backdrop-blur-sm">
+    <div className="flex h-full flex-col bg-black/50 backdrop-blur-sm">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 h-16 border-b border-white/10 bg-black/20 backdrop-blur-md">
-        <div className="flex items-center gap-4">
+      <header className="flex flex-col gap-4 border-b border-white/10 bg-black/20 px-4 py-4 backdrop-blur-md md:flex-row md:items-center md:justify-between md:px-6">
+        <div className="flex min-w-0 items-center gap-3 md:gap-4">
           <div className="p-2 rounded-lg bg-white/5 border border-white/10">
             <Inbox className="w-5 h-5 text-purple-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-lg font-semibold text-white tracking-tight">Review Queue</h1>
             <p className="text-xs text-zinc-500 font-mono">
               {selectMode ? `${selectedDrafts.size} selected` : `PENDING: ${drafts.length}`}
@@ -424,17 +426,17 @@ export default function ReviewQueue() {
           </div>
 
           {currentDraft && !selectMode && (
-            <div className="flex items-center gap-2 ml-4 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-300">
+            <div className="ml-auto flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-300 md:ml-4">
               {getChannelIcon(currentDraft.channel)}
               <span className="uppercase tracking-wider font-medium">{currentDraft.channel || "EMAIL"}</span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
           {/* Bulk Actions */}
           {selectMode ? (
-            <div className="flex items-center gap-2 bg-white/5 p-1 rounded-lg border border-white/10">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1">
               <Button
                 variant="ghost"
                 size="sm"
@@ -513,7 +515,7 @@ export default function ReviewQueue() {
                 Multi-Select
               </Button>
 
-              <div className="flex items-center bg-white/5 rounded-lg border border-white/10 p-0.5 ml-2">
+              <div className="flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5 md:ml-2">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -542,7 +544,7 @@ export default function ReviewQueue() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="ml-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/5 transition-colors"
+                className="text-zinc-600 transition-colors hover:bg-red-500/5 hover:text-red-400 md:ml-2"
                 onClick={async () => {
                   if (confirm("Are you sure you want to clear all pending drafts?")) {
                     setIsActioning(true);
@@ -566,9 +568,9 @@ export default function ReviewQueue() {
       </header>
 
       {/* Split View */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden">
         {/* Left: Prospect List (in select mode) or Single Prospect */}
-        <div className="w-1/2 border-r border-white/10 overflow-auto bg-black/20">
+        <div className="border-b border-white/10 bg-black/20 lg:w-1/2 lg:border-b-0 lg:border-r lg:overflow-auto">
           {selectMode ? (
             <div className="p-4 space-y-2">
               <p className="text-xs font-medium text-zinc-500 uppercase tracking-widest mb-4 px-2">
@@ -625,7 +627,7 @@ export default function ReviewQueue() {
         </div>
 
         {/* Right: Dynamic Content Editor based on Channel */}
-        <div className="w-1/2 overflow-auto bg-black/10">
+        <div className="bg-black/10 lg:w-1/2 lg:overflow-auto">
           {!selectMode && currentDraft && (
             <ReviewCardRenderer
               channel={currentDraft.channel || "email"}
@@ -670,22 +672,22 @@ export default function ReviewQueue() {
 
       {/* Action Footer */}
       {!selectMode && (
-        <footer className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-black/40 backdrop-blur-xl absolute bottom-0 left-0 right-0 z-10">
+        <footer className="safe-bottom sticky bottom-0 z-10 flex flex-col gap-3 border-t border-white/10 bg-black/70 px-4 py-4 backdrop-blur-xl md:flex-row md:items-center md:justify-between md:px-6">
           <Button
             variant="ghost"
-            className="gap-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10"
+            className="justify-start gap-2 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
             onClick={handleReject}
             disabled={isActioning}
           >
             <X className="w-4 h-4" />
             Reject & Edit Strategy
           </Button>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button
               variant="outline"
               className="gap-2 border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white"
               onClick={handleSkip}
-              disabled={isActioning || currentIndex === drafts.length - 1}
+              disabled={isActioning || currentIndex === drafts.length - 1 || (isMobile && currentIndex === drafts.length - 1)}
             >
               Skip
               <ChevronRight className="w-3.5 h-3.5 opacity-50" />

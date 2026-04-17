@@ -542,32 +542,37 @@ export default function MissionChat() {
     };
 
     return (
-        <div className="h-full flex flex-col bg-black bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]">
+        <div className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col bg-black bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))] md:h-full">
             {/* Header */}
-            <header className="flex items-center gap-4 px-6 h-14 border-b border-border bg-card/50">
+            <header className="flex min-h-14 flex-wrap items-center gap-3 border-b border-border bg-card/50 px-4 py-3 md:flex-nowrap md:px-6">
                 <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
                     <ArrowLeft className="w-4 h-4" />
                 </Button>
-                <div className="flex-1">
-                    <h1 className="text-lg font-semibold text-foreground">
+                <div className="min-w-0 flex-1">
+                    <h1 className="truncate text-base font-semibold text-foreground md:text-lg">
                         {mission ? mission.objective?.slice(0, 50) + "..." : "New Mission"}
                     </h1>
                     {mission && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="truncate text-xs text-muted-foreground">
                             Started {new Date(mission.created_at).toLocaleString()}
                         </p>
                     )}
                 </div>
-                <Badge variant={mission?.status === "running" ? "default" : "secondary"}>
+                <Badge variant={mission?.status === "running" ? "default" : "secondary"} className="shrink-0">
                     {mission?.status || "New"}
                 </Badge>
             </header>
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-6">
-                <div className="max-w-3xl mx-auto space-y-4">
+            <ScrollArea className="flex-1">
+                <div className={cn(
+                    "mx-auto max-w-3xl px-4 py-4 pb-4 md:p-6 md:pb-6",
+                    messages.length === 0
+                        ? "flex min-h-full flex-col justify-start md:justify-center"
+                        : "space-y-4"
+                )}>
                     {messages.length === 0 && (
-                        <div className="text-center py-20">
+                        <div className="mx-auto w-full max-w-md text-center">
                             <Logo className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                             <h2 className="text-xl font-semibold text-foreground mb-2">
                                 What's your EXPEDITE mission?
@@ -596,7 +601,7 @@ export default function MissionChat() {
                             )}
 
                             <div className={cn(
-                                "max-w-[80%] rounded-xl px-4 py-3 text-white",
+                                "max-w-[88%] rounded-xl px-4 py-3 text-white sm:max-w-[80%]",
                                 message.role === "user"
                                     ? "bg-primary text-primary-foreground"
                                     : message.role === "system"
@@ -747,7 +752,7 @@ export default function MissionChat() {
                                 )}
                                 {/* Social Media Draft Preview with Post Now + Edit buttons */}
                                 {message.metadata?.action === "draft_preview" && (
-                                    <div className="mt-3 flex gap-2">
+                                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                                         <Button
                                             variant="default"
                                             size="sm"
@@ -894,8 +899,8 @@ export default function MissionChat() {
             </ScrollArea>
 
             {/* Input */}
-            <div className="border-t border-border p-4 bg-card/50">
-                <div className="max-w-3xl mx-auto">
+            <div className="safe-bottom border-t border-border bg-card/95 p-4 backdrop-blur md:bg-card/50 md:backdrop-blur-0">
+                <div className="mx-auto max-w-3xl">
                     {/* Selected Attachments */}
                     {selectedAttachments.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
@@ -908,10 +913,10 @@ export default function MissionChat() {
                         </div>
                     )}
 
-                    <div className="relative flex gap-3">
+                    <div className="relative flex flex-col gap-3">
                         {/* Asset Picker Dropdown */}
                         {showAssetPicker && availableAssets.length > 0 && (
-                            <div className="absolute bottom-full left-0 mb-2 w-64 bg-popover border border-border rounded-xl shadow-xl z-50 max-h-48 overflow-auto">
+                            <div className="absolute bottom-full left-0 z-50 mb-2 max-h-48 w-full max-w-[18rem] overflow-auto rounded-xl border border-border bg-popover shadow-xl sm:w-64">
                                 <div className="p-2 text-xs text-muted-foreground border-b border-border">Select an attachment</div>
                                 {availableAssets.map(asset => (
                                     <button
@@ -927,52 +932,55 @@ export default function MissionChat() {
                         )}
 
                         {showAssetPicker && availableAssets.length === 0 && (
-                            <div className="absolute bottom-full left-0 mb-2 w-64 bg-popover border border-border rounded-xl shadow-xl z-50 p-3 text-sm text-muted-foreground">
+                            <div className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-[18rem] rounded-xl border border-border bg-popover p-3 text-sm text-muted-foreground shadow-xl sm:w-64">
                                 No files uploaded. Go to Settings to add files.
                             </div>
                         )}
 
-                        {/* Mic Button */}
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={toggleListening}
-                            disabled={isLoading}
-                            className={cn(
-                                "rounded-xl transition-all shrink-0",
-                                isListening
-                                    ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse"
-                                    : "hover:bg-secondary text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                        </Button>
+                        <div className="flex min-w-0 items-center gap-3">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={toggleListening}
+                                disabled={isLoading}
+                                className={cn(
+                                    "shrink-0 rounded-xl transition-all",
+                                    isListening
+                                        ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse"
+                                        : "hover:bg-secondary text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                            </Button>
 
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={handleInputChange}
-                            onKeyDown={(e) => e.key === "Enter" && !showAssetPicker && handleSend()}
-                            placeholder={isListening ? "Listening..." : "Describe your EXPEDITE mission..."}
-                            className={cn(
-                                "flex-1 bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50",
-                                isListening && "border-red-500/50 placeholder:text-red-400"
-                            )}
-                            disabled={isLoading}
-                        />
-                        <Button
-                            onClick={handleSend}
-                            disabled={!input.trim() || isLoading}
-                            size="lg"
-                            className="rounded-xl"
-                        >
-                            {isLoading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Send className="w-4 h-4" />
-                            )}
-                        </Button>
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={handleInputChange}
+                                onKeyDown={(e) => e.key === "Enter" && !showAssetPicker && handleSend()}
+                                placeholder={isListening ? "Listening..." : "Describe your EXPEDITE mission..."}
+                                className={cn(
+                                    "min-w-0 w-full flex-1 rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 sm:text-base",
+                                    isListening && "border-red-500/50 placeholder:text-red-400"
+                                )}
+                                disabled={isLoading}
+                            />
+
+                            <Button
+                                onClick={handleSend}
+                                disabled={!input.trim() || isLoading}
+                                size="icon"
+                                className="shrink-0 rounded-xl"
+                                aria-label="Send mission"
+                            >
+                                {isLoading ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Send className="w-4 h-4" />
+                                )}
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>

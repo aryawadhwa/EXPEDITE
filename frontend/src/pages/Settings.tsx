@@ -134,7 +134,7 @@ export default function Settings() {
 
 
   return (
-    <div className="h-full p-6 lg:p-8 overflow-auto max-w-4xl bg-black/50 backdrop-blur-sm">
+    <div className="h-full max-w-4xl overflow-auto bg-black/50 p-4 backdrop-blur-sm md:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">Settings</h1>
@@ -148,7 +148,7 @@ export default function Settings() {
           My Knowledge Assets
         </h2>
         <Card className="p-5 bg-zinc-900/50 backdrop-blur-md border border-white/10 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium text-white">Mission Attachments</p>
               <p className="text-sm text-zinc-400">Upload PDFs, Docs, or Images for agents to use.</p>
@@ -210,7 +210,7 @@ export default function Settings() {
           Notifications
         </h2>
         <Card className="p-5 bg-zinc-900/50 backdrop-blur-md border border-white/10 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium text-white">Email Notifications</p>
               <p className="text-sm text-zinc-400">Get notified when agents complete tasks</p>
@@ -227,7 +227,7 @@ export default function Settings() {
 
           <Separator className="bg-white/10" />
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium text-white">Daily Digest</p>
               <p className="text-sm text-zinc-400">Summary of agent activities</p>
@@ -259,7 +259,7 @@ export default function Settings() {
           AI Behavior
         </h2>
         <Card className="p-5 bg-zinc-900/50 backdrop-blur-md border border-white/10 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium text-white">Auto-Approve Low-Risk Emails</p>
               <p className="text-sm text-zinc-400">Skip review for high-confidence drafts</p>
@@ -325,7 +325,7 @@ export default function Settings() {
           Security
         </h2>
         <Card className="p-5 bg-zinc-900/50 backdrop-blur-md border border-white/10">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium text-white">Two-Factor Authentication</p>
               <p className="text-sm text-zinc-400">Add an extra layer of security</p>

@@ -3,7 +3,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from beanie import init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 import json
 
 from app.core.config import settings
@@ -17,7 +17,7 @@ async def lifespan(app: FastAPI):
     if not settings.MONGODB_URI:
         raise ValueError("MONGODB_URI environment variable is required")
     
-    client = AsyncIOMotorClient(
+    client = AsyncMongoClient(
         settings.MONGODB_URI,
         tlsAllowInvalidCertificates=True,
         maxPoolSize=50,  # Connection pooling

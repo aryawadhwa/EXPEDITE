@@ -163,19 +163,19 @@ export default function ActiveAgents() {
   };
 
   return (
-    <div className="h-full p-6 lg:p-8 overflow-auto bg-black/50 backdrop-blur-sm">
+    <div className="h-full overflow-auto bg-black/50 p-4 backdrop-blur-sm md:p-6 lg:p-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Active Agents</h1>
           <p className="text-zinc-400 mt-1">Monitor and control your AI workforce executing missions</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <Badge variant="secondary" className="gap-1.5 font-mono bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10">
             <Activity className="w-3 h-3" />
             {agents.filter(a => a.status === "active").length} Active
           </Badge>
-          <Button className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_15px_rgba(139,92,246,0.3)]" onClick={() => navigate('/chat/new')}>
+          <Button className="w-full gap-2 bg-primary text-primary-foreground shadow-[0_0_15px_rgba(139,92,246,0.3)] hover:bg-primary/90 sm:w-auto" onClick={() => navigate('/chat/new')}>
             <Bot className="w-4 h-4" />
             Deploy Agent
           </Button>
@@ -288,7 +288,7 @@ export default function ActiveAgents() {
               )}
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/10">
+              <div className="grid grid-cols-3 gap-2 border-t border-white/10 pt-4 md:gap-3">
                 <div className="text-center">
                   <p className="font-mono text-xl font-bold text-white">{agent.stats.processed}</p>
                   <p className="text-[9px] text-zinc-500 uppercase tracking-wider mt-1">Prospects</p>

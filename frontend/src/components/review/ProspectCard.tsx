@@ -30,15 +30,15 @@ export function ProspectCard({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-5 border-b border-border">
-        <div className="flex items-start gap-4">
+      <div className="border-b border-border p-4 md:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center text-lg font-semibold text-foreground">
             {name.split(" ").map(n => n[0]).join("")}
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-semibold text-foreground">{name}</h3>
             <p className="text-sm text-muted-foreground">{title}</p>
-            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+            <div className="mt-2 flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:gap-3">
               <span className="flex items-center gap-1">
                 <Building2 className="w-3.5 h-3.5" />
                 {company}
@@ -49,7 +49,7 @@ export function ProspectCard({
               </span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 self-start sm:self-auto">
             {linkedinUrl && (
               <a
                 href={linkedinUrl}
@@ -83,7 +83,7 @@ export function ProspectCard({
       </div>
 
       {/* Recent Activity */}
-      <div className="flex-1 p-5 space-y-5 overflow-auto">
+      <div className="flex-1 space-y-5 overflow-auto p-4 md:p-5">
         <div>
           <h4 className="text-sm font-medium text-foreground mb-3">Recent Activity</h4>
           <ul className="space-y-2">

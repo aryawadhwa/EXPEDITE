@@ -90,7 +90,7 @@ export default function ProspectResearch() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="container mx-auto max-w-6xl p-4 md:p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Prospect Research</h1>
         <p className="text-muted-foreground">
@@ -105,7 +105,7 @@ export default function ProspectResearch() {
       )}
 
       <Tabs defaultValue="emails" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid h-auto w-full grid-cols-1 sm:grid-cols-3">
           <TabsTrigger value="emails">Email Scraper</TabsTrigger>
           <TabsTrigger value="jobs">Job Boards</TabsTrigger>
           <TabsTrigger value="company">Company Research</TabsTrigger>

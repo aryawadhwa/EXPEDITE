@@ -58,10 +58,10 @@ export default function Profile() {
     if (!user) return null;
 
     return (
-        <div className="h-full p-6 lg:p-8 overflow-auto max-w-7xl mx-auto">
+        <div className="mx-auto h-full max-w-7xl overflow-auto p-4 md:p-6 lg:p-8">
             <div className="flex flex-col gap-8">
 
-                <div className="flex items-center justify-between mb-6">
+                <div className="mb-6 flex items-center justify-between">
                     <div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                             <span>My Account</span>
@@ -74,7 +74,7 @@ export default function Profile() {
                 {/* Custom Profile Layout */}
                 <div className="grid grid-cols-1 gap-8">
                     {/* Header Card */}
-                    <div className="relative overflow-hidden rounded-2xl bg-[#0A0A0A] border border-white/5 p-8 flex flex-col md:flex-row items-center md:items-end gap-6">
+                    <div className="relative flex flex-col items-center gap-6 overflow-hidden rounded-2xl border border-white/5 bg-[#0A0A0A] p-5 md:flex-row md:items-end md:p-8">
                         {/* Grid Pattern Background */}
                         <div className="absolute inset-0 opacity-20 pointer-events-none"
                             style={{
@@ -104,8 +104,8 @@ export default function Profile() {
                             <p className="text-zinc-400 font-medium">{user.primaryEmailAddress?.emailAddress}</p>
                         </div>
 
-                        <div className="relative z-10 flex gap-3">
-                            <Button onClick={() => openUserProfile()} variant="outline" className="bg-white/5 border-white/10 hover:bg-white/10 hover:text-white">
+                        <div className="relative z-10 flex w-full gap-3 md:w-auto">
+                            <Button onClick={() => openUserProfile()} variant="outline" className="w-full border-white/10 bg-white/5 hover:bg-white/10 hover:text-white md:w-auto">
                                 <ExternalLink className="w-4 h-4 mr-2" />
                                 Manage Account
                             </Button>
@@ -166,12 +166,12 @@ export default function Profile() {
 
 
                 <div className="mt-8 pb-10">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h2 className="text-2xl font-bold text-white mb-1">Subscription Plans</h2>
                             <p className="text-muted-foreground text-sm">Choose the plan that fits your needs</p>
                         </div>
-                        <div className="flex items-center gap-2 bg-[#14213D] rounded-lg p-1">
+                        <div className="flex items-center gap-2 rounded-lg bg-[#14213D] p-1 self-start sm:self-auto">
                             <Button
                                 size="sm"
                                 variant={currency === 'USD' ? 'default' : 'ghost'}

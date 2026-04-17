@@ -15,13 +15,15 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [brainOpen, setBrainOpen] = useState(true);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileBrainOpen, setMobileBrainOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const tour = <OnboardingTour />;
 
   if (isMobile) {
     return (
-      <div className="flex flex-col h-screen bg-black relative">
+      <div className="relative flex min-h-screen flex-col bg-black">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -30,37 +32,39 @@ export function AppLayout({ children }: AppLayoutProps) {
         />
         {tour}
         {/* Mobile Header */}
-        <header className="flex items-center justify-between h-14 px-4 border-b border-border bg-sidebar">
-          <Sheet>
+        <header className="safe-top sticky top-0 z-30 flex items-center justify-between border-b border-border bg-sidebar/95 px-4 pb-2 pt-2 backdrop-blur">
+          <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="relative z-40">
                 <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-64 bg-sidebar">
-              <NavigationSidebar isCollapsed={false} onToggle={() => { }} />
+            <SheetContent side="left" className="z-[70] w-[85vw] max-w-72 border-r border-border bg-sidebar p-0">
+              <div className="h-full overflow-y-auto">
+                <NavigationSidebar isCollapsed={false} onToggle={() => { }} />
+              </div>
             </SheetContent>
           </Sheet>
 
           <div className="flex items-center gap-2">
             <Logo className="h-8 w-8 text-primary" />
-            <span className="font-bold text-lg hidden md:block">Expedite</span>
+            <span className="text-base font-bold text-white">Expedite</span>
           </div>
 
-          <Sheet>
+          <Sheet open={mobileBrainOpen} onOpenChange={setMobileBrainOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="relative z-40">
                 <Brain className="w-5 h-5 text-primary" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="p-0 w-80 bg-terminal">
+            <SheetContent side="right" className="z-[70] w-[92vw] max-w-md border-l border-border bg-terminal p-0">
               <LiveBrainSidebar isOpen={true} onToggle={() => { }} />
             </SheetContent>
           </Sheet>
         </header>
 
         {/* Mobile Content */}
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="safe-bottom relative z-10 flex-1 overflow-auto">{children}</main>
       </div>
     );
   }

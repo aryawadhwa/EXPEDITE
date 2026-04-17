@@ -94,6 +94,7 @@
     /* Prevent overscroll bounce/rubber-band effect */
     overscroll-behavior: none;
     overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
@@ -251,6 +252,18 @@
 
   .bg-gradient-glow {
     background: var(--gradient-glow);
+  }
+
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .safe-top {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+
+  .mobile-page-padding {
+    @apply px-4 py-4 md:px-6 md:py-6;
   }
 }
 

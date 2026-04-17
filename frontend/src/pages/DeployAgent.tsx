@@ -35,6 +35,7 @@ import { Search, Save, Play, Puzzle, Box, ArrowLeft, Key, Code, Trash2, Edit, Mo
 import { useNavigate } from 'react-router-dom';
 import { integrations, Integration } from '@/lib/integrations';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const STORAGE_KEY = 'deploy-agent-workflow';
 
@@ -259,6 +260,7 @@ const loadSavedState = () => {
 const DeployAgentContent = () => {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
+    const isMobile = useIsMobile();
 
     // Load saved state
     const savedState = loadSavedState();
@@ -382,23 +384,52 @@ const DeployAgentContent = () => {
         navigate('/agents');
     };
 
+    const addNodeFromPalette = (type: string, data?: unknown) => {
+        const position = isMobile
+            ? { x: 120 + nodes.length * 20, y: 120 + nodes.length * 20 }
+            : { x: 220 + nodes.length * 30, y: 160 + nodes.length * 30 };
+
+        const newNode: Node = {
+            id: getId(),
+            type,
+            position,
+            data: data || {},
+        };
+
+        if (type === 'customCode') {
+            newNode.data = { code: '' };
+        } else if (type === 'condition') {
+            newNode.data = { condition: '' };
+        } else if (type === 'integration' && data && typeof data === 'object') {
+            const typed = data as Integration;
+            newNode.data = {
+                label: typed.name,
+                description: typed.description,
+                apiKey: '',
+                logo: typed.logo
+            };
+        }
+
+        setNodes((nds) => nds.concat(newNode));
+    };
+
     return (
-        <div className="h-screen w-full flex flex-col bg-black">
+        <div className="flex min-h-screen w-full flex-col bg-black">
             {/* Top Bar */}
-            <div className="h-16 border-b border-border flex items-center justify-between px-6 bg-card/50 backdrop-blur z-20">
-                <div className="flex items-center gap-4">
+            <div className="z-20 flex min-h-16 flex-col gap-3 border-b border-border bg-card/50 px-4 py-3 backdrop-blur md:flex-row md:items-center md:justify-between md:px-6">
+                <div className="flex min-w-0 items-center gap-3 md:gap-4">
                     <Button variant="ghost" size="icon" onClick={() => navigate('/agents')}>
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
-                    <div>
+                    <div className="min-w-0 flex-1">
                         <Input
                             value={agentName}
                             onChange={e => setAgentName(e.target.value)}
-                            className="h-8 font-semibold text-lg border-none bg-transparent hover:bg-muted/50 p-2 w-[250px]"
+                            className="h-8 w-full border-none bg-transparent p-2 text-base font-semibold hover:bg-muted/50 md:w-[250px] md:text-lg"
                         />
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                     <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-destructive" onClick={handleClearCanvas}>
                         <RotateCcw className="w-4 h-4" /> Clear
                     </Button>
@@ -411,9 +442,9 @@ const DeployAgentContent = () => {
                 </div>
             </div>
 
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
                 {/* Sidebar */}
-                <div className="w-80 border-r border-border bg-card flex flex-col z-10 shadow-lg">
+                <div className="z-10 flex max-h-[42vh] flex-col border-b border-border bg-card shadow-lg lg:max-h-none lg:w-80 lg:border-b-0 lg:border-r">
                     <div className="p-4 border-b border-border space-y-3">
                         <h3 className="font-semibold text-sm text-foreground/80">Component Library</h3>
                         <div className="relative">
@@ -437,6 +468,7 @@ const DeployAgentContent = () => {
                                         className="p-3 bg-muted/30 border border-border rounded-lg cursor-grab hover:border-primary/50 transition-colors flex flex-col items-center gap-2 text-center"
                                         draggable
                                         onDragStart={(e) => onDragStart(e, 'customCode')}
+                                        onClick={() => addNodeFromPalette('customCode')}
                                     >
                                         <Code className="w-5 h-5 text-emerald-500" />
                                         <span className="text-xs font-medium">Python Code</span>
@@ -445,6 +477,7 @@ const DeployAgentContent = () => {
                                         className="p-3 bg-muted/30 border border-border rounded-lg cursor-grab hover:border-primary/50 transition-colors flex flex-col items-center gap-2 text-center"
                                         draggable
                                         onDragStart={(e) => onDragStart(e, 'condition')}
+                                        onClick={() => addNodeFromPalette('condition')}
                                     >
                                         <Box className="w-5 h-5 text-indigo-500" />
                                         <span className="text-xs font-medium">If / Else</span>
@@ -453,6 +486,7 @@ const DeployAgentContent = () => {
                                         className="p-3 bg-muted/30 border border-border rounded-lg cursor-grab hover:border-primary/50 transition-colors flex flex-col items-center gap-2 text-center"
                                         draggable
                                         onDragStart={(e) => onDragStart(e, 'customCode')}
+                                        onClick={() => addNodeFromPalette('customCode')}
                                     >
                                         <Box className="w-5 h-5 text-emerald-500" />
                                         <span className="text-xs font-medium">Loop</span>
@@ -474,6 +508,7 @@ const DeployAgentContent = () => {
                                                     className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg cursor-grab hover:border-primary/50 hover:shadow-sm transition-all group"
                                                     draggable
                                                     onDragStart={(e) => onDragStart(e, 'integration', integration)}
+                                                    onClick={() => addNodeFromPalette('integration', integration)}
                                                 >
                                                     <div className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors p-1.5">
                                                         {integration.logo ? (
@@ -497,7 +532,7 @@ const DeployAgentContent = () => {
                 </div>
 
                 {/* Canvas */}
-                <div className="flex-1 bg-black relative">
+                <div className="relative min-h-[50vh] flex-1 bg-black lg:min-h-0">
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}

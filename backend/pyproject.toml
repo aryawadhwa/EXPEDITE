@@ -1,0 +1,36 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiocache==0.12.2",
+    "beanie>=2.1.0",
+    "beautifulsoup4>=4.14.3",
+    "boto3>=1.42.90",
+    "composio>=0.11.5",
+    "dnspython>=2.8.0",
+    "email-validator==2.1.0",
+    "fastapi>=0.136.0",
+    "firecrawl-py>=4.22.2",
+    "httpx>=0.28.1",
+    "langchain>=1.2.15",
+    "langchain-groq>=1.1.2",
+    "langchain-openai>=1.1.14",
+    "langgraph>=1.1.6",
+    "lxml>=6.0.4",
+    "neo4j~=5.28",
+    "pymongo>=4.11.0,<5.0.0,!=4.15.0",
+    "pydantic-settings>=2.13.1",
+    "pyjwt>=2.12.1",
+    "pypdf2>=3.0.1",
+    "python-docx>=1.2.0",
+    "python-dotenv>=1.2.2",
+    "python-multipart>=0.0.26",
+    "redis==5.0.1",
+    "requests>=2.33.1",
+    "tenacity==8.2.3",
+    "uvicorn>=0.44.0",
+    "websockets>=16.0",
+]

@@ -154,11 +154,11 @@ export function Integrations() {
     }, [searchQuery, selectedCategory, integrations]);
 
     return (
-        <div className="flex flex-col h-full bg-background p-6 overflow-hidden">
+        <div className="flex h-full flex-col overflow-hidden bg-background p-4 md:p-6">
             {/* Header */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h1 className="text-2xl font-bold">Integrations</h1>
-                <Button className="bg-purple-100 text-purple-700 hover:bg-purple-200 border-none shadow-none">
+                <Button className="w-full border-none bg-purple-100 text-purple-700 shadow-none hover:bg-purple-200 sm:w-auto">
                     <Plus className="w-4 h-4 mr-2" />
                     New Custom Integration
                 </Button>

@@ -112,16 +112,16 @@ const Launchpad = () => {
   };
 
   return (
-    <div className="min-h-full p-6 lg:p-8 space-y-12 max-w-[1600px] mx-auto">
+    <div className="mx-auto min-h-full max-w-[1600px] space-y-10 p-4 sm:p-6 lg:space-y-12 lg:p-8">
       {/* Hero Section */}
-      <section className="pt-8 pb-4 relative">
-        <div className="text-center mb-12 relative z-10">
+      <section className="relative pb-4 pt-6 lg:pt-8">
+        <div className="relative z-10 mb-10 text-center lg:mb-12">
 
 
-          <h1 className="text-5xl lg:text-7xl font-bold text-white mb-6 tracking-tight">
+          <h1 className="mb-5 text-4xl font-bold tracking-tight text-white sm:text-5xl lg:mb-6 lg:text-7xl">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Mission Command</span>
           </h1>
-          <p className="text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+          <p className="mx-auto max-w-2xl px-2 text-base leading-relaxed text-zinc-400 sm:text-lg lg:text-xl">
             Deploy autonomous agents to find, research, and engage your ideal prospects.
           </p>
         </div>
@@ -130,12 +130,12 @@ const Launchpad = () => {
 
       {/* Quick Recipes */}
       <section>
-        <div className="flex items-center justify-between mb-8 px-2">
+        <div className="mb-6 flex flex-col gap-4 px-1 sm:px-2 lg:mb-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1">
             <h2 className="text-2xl font-semibold text-white">Quick Recipes</h2>
             <p className="text-sm text-zinc-500">One-click templates to get started fast</p>
           </div>
-          <button className="text-sm font-medium text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1 group">
+          <button className="group flex items-center gap-1 self-start text-sm font-medium text-purple-400 transition-colors hover:text-purple-300 lg:self-auto">
             View all templates
             <span className="group-hover:translate-x-1 transition-transform">→</span>
           </button>
@@ -153,12 +153,12 @@ const Launchpad = () => {
 
       {/* Active Missions */}
       <section className="pb-20">
-        <div className="flex items-center justify-between mb-8 px-2">
+        <div className="mb-6 flex flex-col gap-4 px-1 sm:px-2 lg:mb-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1">
             <h2 className="text-2xl font-semibold text-white">Active Missions</h2>
             <p className="text-sm text-zinc-500">Monitor your running campaigns</p>
           </div>
-          <div className="flex items-center gap-2 bg-white/5 p-1 rounded-lg border border-white/10">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1">
             {["all", "running", "stopped", "completed"].map((status) => (
               <button
                 key={status}
