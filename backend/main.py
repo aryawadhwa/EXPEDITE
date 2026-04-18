@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from beanie import init_beanie
@@ -34,44 +34,33 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="EXPEDITE", lifespan=lifespan)
 
-# CORS Configuration - Environment-based
-from app.core.config import settings
-
 # Determine allowed origins based on environment
-allowed_origins = [
+allowed_origins = {
     "http://localhost:5173",
     "http://localhost:8080",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:8080",
-]
+}
 
 # Add production frontend URL if configured
-if hasattr(settings, 'FRONTEND_URL') and settings.FRONTEND_URL:
-    allowed_origins.append(settings.FRONTEND_URL)
+if settings.FRONTEND_URL:
+    allowed_origins.add(settings.FRONTEND_URL.strip())
+
+# Allow explicit additional origins from env (comma-separated)
+if settings.CORS_ORIGINS:
+    allowed_origins.update({origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()})
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=sorted(allowed_origins),
+    # Support preview deployments without hardcoding every Vercel URL.
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
-
-# Global OPTIONS handler - MUST be registered BEFORE routers
-@app.options("/{full_path:path}")
-async def options_handler(full_path: str):
-    """Handle CORS preflight requests for all routes"""
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Max-Age": "3600",
-        }
-    )
 
 app.include_router(missions.router, prefix="/api/v1/missions", tags=["missions"])
 app.include_router(reviews.router, prefix="/api/v1/reviews", tags=["reviews"])

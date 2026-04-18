@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     APOLLO_API_KEY: Optional[str] = None
     HUNTER_API_KEY: Optional[str] = None  # Email verification
 
+    # Frontend/CORS settings
+    FRONTEND_URL: Optional[str] = None
+    CORS_ORIGINS: Optional[str] = None  # Comma-separated list of allowed origins
+
     # Neo4j Settings
     NEO4J_URI: Optional[str] = None
     NEO4J_USERNAME: Optional[str] = None
