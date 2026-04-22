@@ -53,29 +53,31 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchDashboardData = async () => {
     try {
       const token = await getToken();
       
-      // Fetch stats
-      const statsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/missions/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const missions = await statsRes.json();
-      
-      // Fetch drafts
-      const draftsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/reviews/pending`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const drafts = await draftsRes.json();
-      
-      // Fetch contacts
-      const contactsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/contacts/history`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const contacts = await contactsRes.json();
+      // ⚡ Bolt Optimization: Fetch dashboard data concurrently to reduce load time
+      const [statsRes, draftsRes, contactsRes] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/api/v1/missions/`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`${import.meta.env.VITE_API_URL}/api/v1/reviews/pending`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`${import.meta.env.VITE_API_URL}/api/v1/contacts/history`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+
+      const [missions, drafts, contacts] = await Promise.all([
+        statsRes.json(),
+        draftsRes.json(),
+        contactsRes.json()
+      ]);
       
       // Calculate stats
       const activeMissions = missions.filter((m: Mission) => 
