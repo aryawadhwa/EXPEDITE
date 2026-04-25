@@ -8,6 +8,8 @@ knowledge assets. It supports PDF, TXT, MD, and DOCX files.
 import io
 from typing import List, Dict, Optional
 from app.models import UserAsset
+from beanie.operators import In
+from beanie import PydanticObjectId
 
 # Optional imports for document parsing
 try:
@@ -27,20 +29,8 @@ class RAGService:
     """Service for extracting and retrieving content from knowledge assets."""
     
     @staticmethod
-    async def get_asset_content(asset_id: str) -> Optional[str]:
-        """
-        Extract text content from a user asset.
-        
-        Supports:
-        - PDF files
-        - Plain text (.txt)
-        - Markdown (.md)
-        - Word documents (.docx)
-        """
-        asset = await UserAsset.get(asset_id)
-        if not asset:
-            return None
-        
+    def _extract_content_from_asset(asset: UserAsset) -> str:
+        """Extract text content synchronously from a UserAsset object."""
         content_type = asset.content_type.lower()
         filename = asset.filename.lower()
         
@@ -72,6 +62,23 @@ class RAGService:
                     
         except Exception as e:
             return f"[Error extracting content from {asset.filename}: {str(e)}]"
+
+    @staticmethod
+    async def get_asset_content(asset_id: str) -> Optional[str]:
+        """
+        Extract text content from a user asset.
+
+        Supports:
+        - PDF files
+        - Plain text (.txt)
+        - Markdown (.md)
+        - Word documents (.docx)
+        """
+        asset = await UserAsset.get(asset_id)
+        if not asset:
+            return None
+
+        return RAGService._extract_content_from_asset(asset)
     
     @staticmethod
     def _extract_pdf(file_data: bytes) -> str:
@@ -106,42 +113,73 @@ class RAGService:
     @staticmethod
     async def get_multiple_assets_content(asset_ids: List[str]) -> Dict[str, str]:
         """
-        Extract content from multiple assets.
+        Extract content from multiple assets using a bulk database query.
         
         Returns a dict mapping asset_id -> content
         """
+        if not asset_ids:
+            return {}
+
+        # Convert string IDs to PydanticObjectId if needed
+        obj_ids = []
+        for id_str in asset_ids:
+            try:
+                obj_ids.append(PydanticObjectId(id_str))
+            except Exception:
+                continue
+
+        if not obj_ids:
+            return {}
+
+        assets = await UserAsset.find(In(UserAsset.id, obj_ids)).to_list()
+
         results = {}
-        for asset_id in asset_ids:
-            content = await RAGService.get_asset_content(asset_id)
+        for asset in assets:
+            content = RAGService._extract_content_from_asset(asset)
             if content:
-                results[asset_id] = content
+                results[str(asset.id)] = content
+
         return results
     
     @staticmethod
     async def build_context_from_assets(asset_ids: List[str], max_chars: int = 8000) -> str:
         """
-        Build a combined context string from multiple assets.
+        Build a combined context string from multiple assets using a single bulk query.
         
         Truncates content to fit within max_chars while preserving
         structure from each document.
         """
         if not asset_ids:
             return ""
-        
-        contents = await RAGService.get_multiple_assets_content(asset_ids)
-        
-        if not contents:
+
+        # Convert string IDs to PydanticObjectId if needed
+        obj_ids = []
+        for id_str in asset_ids:
+            try:
+                obj_ids.append(PydanticObjectId(id_str))
+            except Exception:
+                continue
+
+        if not obj_ids:
             return ""
+
+        assets = await UserAsset.find(In(UserAsset.id, obj_ids)).to_list()
         
-        # Get asset metadata for context
+        if not assets:
+            return ""
+
+        # Re-order to match original asset_ids ordering
+        asset_map = {str(a.id): a for a in assets}
+        ordered_assets = [asset_map[aid] for aid in asset_ids if aid in asset_map]
+
         context_parts = []
         chars_used = 0
         
-        for asset_id, content in contents.items():
-            asset = await UserAsset.get(asset_id)
-            if not asset:
+        for asset in ordered_assets:
+            content = RAGService._extract_content_from_asset(asset)
+            if not content:
                 continue
-            
+
             # Add document header
             header = f"\n--- From: {asset.filename} ---\n"
             
