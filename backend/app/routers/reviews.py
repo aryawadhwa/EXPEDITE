@@ -702,16 +702,30 @@ async def update_draft_attachments(id: str, data: AttachmentUpdate, user: User =
     if not draft:
         raise HTTPException(status_code=404, detail="Draft not found")
     
-    # Validate and fetch asset info
+    from beanie.operators import In
+    from bson import ObjectId
+
+    # Validate and fetch asset info using a bulk query to avoid N+1
     attachments = []
-    for asset_id in data.asset_ids:
-        asset = await UserAsset.get(asset_id)
-        if asset and asset.user_id == user.clerk_id:
-            attachments.append({
-                "asset_id": str(asset.id),
-                "filename": asset.filename,
-                "content_type": asset.content_type
-            })
+
+    if data.asset_ids:
+        try:
+            unique_asset_ids = list(set(data.asset_ids))
+            object_ids = [ObjectId(id) for id in unique_asset_ids]
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid asset ID format")
+
+        assets = await UserAsset.find(In(UserAsset.id, object_ids)).to_list()
+        asset_map = {str(a.id): a for a in assets if a.user_id == user.clerk_id}
+
+        for asset_id in data.asset_ids:
+            asset = asset_map.get(asset_id)
+            if asset:
+                attachments.append({
+                    "asset_id": str(asset.id),
+                    "filename": asset.filename,
+                    "content_type": asset.content_type
+                })
     
     draft.attachments = attachments
     await draft.save()
