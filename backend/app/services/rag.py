@@ -8,6 +8,8 @@ knowledge assets. It supports PDF, TXT, MD, and DOCX files.
 import io
 from typing import List, Dict, Optional
 from app.models import UserAsset
+from beanie.operators import In
+from bson import ObjectId
 
 # Optional imports for document parsing
 try:
@@ -29,7 +31,18 @@ class RAGService:
     @staticmethod
     async def get_asset_content(asset_id: str) -> Optional[str]:
         """
-        Extract text content from a user asset.
+        Extract text content from a user asset by ID.
+        """
+        asset = await UserAsset.get(asset_id)
+        if not asset:
+            return None
+
+        return RAGService._extract_asset_content(asset)
+
+    @staticmethod
+    def _extract_asset_content(asset: UserAsset) -> str:
+        """
+        Extract text content from a user asset object.
         
         Supports:
         - PDF files
@@ -37,10 +50,6 @@ class RAGService:
         - Markdown (.md)
         - Word documents (.docx)
         """
-        asset = await UserAsset.get(asset_id)
-        if not asset:
-            return None
-        
         content_type = asset.content_type.lower()
         filename = asset.filename.lower()
         
@@ -110,11 +119,19 @@ class RAGService:
         
         Returns a dict mapping asset_id -> content
         """
+        if not asset_ids:
+            return {}
+
+        # ⚡ Bolt Optimization: Replace loop querying with single bulk query via Beanie's In operator
+        # converting string ids to ObjectIds to match how Beanie/MongoDB stores them.
+        object_ids = [ObjectId(id) for id in asset_ids]
+        assets = await UserAsset.find(In(UserAsset.id, object_ids)).to_list()
+
         results = {}
-        for asset_id in asset_ids:
-            content = await RAGService.get_asset_content(asset_id)
+        for asset in assets:
+            content = RAGService._extract_asset_content(asset)
             if content:
-                results[asset_id] = content
+                results[str(asset.id)] = content
         return results
     
     @staticmethod
@@ -128,20 +145,22 @@ class RAGService:
         if not asset_ids:
             return ""
         
-        contents = await RAGService.get_multiple_assets_content(asset_ids)
+        # ⚡ Bolt Optimization: Fetch all assets once in a bulk query and construct context,
+        # avoiding a 2x N+1 problem (1x for content, 1x for metadata).
+        object_ids = [ObjectId(id) for id in asset_ids]
+        assets = await UserAsset.find(In(UserAsset.id, object_ids)).to_list()
         
-        if not contents:
+        if not assets:
             return ""
         
-        # Get asset metadata for context
         context_parts = []
         chars_used = 0
         
-        for asset_id, content in contents.items():
-            asset = await UserAsset.get(asset_id)
-            if not asset:
+        for asset in assets:
+            content = RAGService._extract_asset_content(asset)
+            if not content:
                 continue
-            
+
             # Add document header
             header = f"\n--- From: {asset.filename} ---\n"
             
