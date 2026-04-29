@@ -299,7 +299,9 @@ export default function ReviewQueue() {
     let successCount = 0;
     let failCount = 0;
 
-    for (const draftId of selectedDrafts) {
+    // ⚡ Bolt Optimization: Parallelize bulk approval API requests using Promise.all
+    // This reduces overall wait time from O(n) sequentially to O(1) concurrently
+    const approvalPromises = Array.from(selectedDrafts).map(async (draftId) => {
       try {
         const draft = drafts.find(d => (d.id || d._id) === draftId);
         const edits = draftEdits[draftId];
@@ -308,12 +310,16 @@ export default function ReviewQueue() {
           edits?.subject || draft?.subject,
           edits?.body || draft?.body
         );
-        successCount++;
+        return { success: true, draftId };
       } catch (e) {
         console.error(`Failed to approve ${draftId}:`, e);
-        failCount++;
+        return { success: false, draftId };
       }
-    }
+    });
+
+    const results = await Promise.all(approvalPromises);
+    successCount = results.filter(r => r.success).length;
+    failCount = results.filter(r => !r.success).length;
 
     toast.success(`Approved ${successCount} drafts`, {
       description: failCount > 0 ? `${failCount} failed` : undefined
@@ -336,14 +342,20 @@ export default function ReviewQueue() {
     setIsActioning(true);
     let successCount = 0;
 
-    for (const draftId of selectedDrafts) {
+    // ⚡ Bolt Optimization: Parallelize bulk rejection API requests using Promise.all
+    // This reduces overall wait time from O(n) sequentially to O(1) concurrently
+    const rejectionPromises = Array.from(selectedDrafts).map(async (draftId) => {
       try {
         await api.rejectDraft(draftId, bulkRejectFeedback);
-        successCount++;
+        return { success: true, draftId };
       } catch (e) {
         console.error(`Failed to reject ${draftId}:`, e);
+        return { success: false, draftId };
       }
-    }
+    });
+
+    const results = await Promise.all(rejectionPromises);
+    successCount = results.filter(r => r.success).length;
 
     toast.success(`Rejected ${successCount} drafts`, {
       description: "Feedback sent to AI agent."
