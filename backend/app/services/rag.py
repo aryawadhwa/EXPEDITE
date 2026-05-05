@@ -27,20 +27,10 @@ class RAGService:
     """Service for extracting and retrieving content from knowledge assets."""
     
     @staticmethod
-    async def get_asset_content(asset_id: str) -> Optional[str]:
+    def _extract_content_from_asset(asset: UserAsset) -> Optional[str]:
         """
-        Extract text content from a user asset.
-        
-        Supports:
-        - PDF files
-        - Plain text (.txt)
-        - Markdown (.md)
-        - Word documents (.docx)
+        Extract text content from a UserAsset object.
         """
-        asset = await UserAsset.get(asset_id)
-        if not asset:
-            return None
-        
         content_type = asset.content_type.lower()
         filename = asset.filename.lower()
         
@@ -72,6 +62,23 @@ class RAGService:
                     
         except Exception as e:
             return f"[Error extracting content from {asset.filename}: {str(e)}]"
+
+    @staticmethod
+    async def get_asset_content(asset_id: str) -> Optional[str]:
+        """
+        Extract text content from a user asset.
+
+        Supports:
+        - PDF files
+        - Plain text (.txt)
+        - Markdown (.md)
+        - Word documents (.docx)
+        """
+        asset = await UserAsset.get(asset_id)
+        if not asset:
+            return None
+
+        return RAGService._extract_content_from_asset(asset)
     
     @staticmethod
     def _extract_pdf(file_data: bytes) -> str:
@@ -110,11 +117,31 @@ class RAGService:
         
         Returns a dict mapping asset_id -> content
         """
+        from beanie.operators import In
+        import bson
+
         results = {}
-        for asset_id in asset_ids:
-            content = await RAGService.get_asset_content(asset_id)
+        if not asset_ids:
+            return results
+
+        obj_ids = []
+        for id in set(asset_ids):
+            try:
+                if len(id) == 24:
+                    obj_ids.append(bson.ObjectId(id))
+                else:
+                    obj_ids.append(id)
+            except Exception:
+                obj_ids.append(id)
+
+        # Fetch all requested assets in a single query to avoid N+1 problem
+        assets = await UserAsset.find(In(UserAsset.id, obj_ids)).to_list()
+
+        for asset in assets:
+            content = RAGService._extract_content_from_asset(asset)
             if content:
-                results[asset_id] = content
+                results[str(asset.id)] = content
+
         return results
     
     @staticmethod

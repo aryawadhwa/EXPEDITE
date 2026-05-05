@@ -172,14 +172,41 @@ async def build_rag_context(
     content generation (posts, emails, etc.)
     """
     from app.services.rag import rag_service
+    from beanie.operators import In
+    import bson
     
+    if not asset_ids:
+        return {
+            "context": "",
+            "asset_count": 0,
+            "context_length": 0
+        }
+
+    obj_ids = []
+    for id in set(asset_ids):
+        try:
+            if len(id) == 24:
+                obj_ids.append(bson.ObjectId(id))
+            else:
+                obj_ids.append(id)
+        except Exception:
+            obj_ids.append(id)
+
+    # Fetch all requested assets in a single query
+    assets = await UserAsset.find(In(UserAsset.id, obj_ids)).to_list()
+
+    if len(assets) != len(set(asset_ids)):
+        raise HTTPException(
+            status_code=403,
+            detail="One or more assets not found or access denied"
+        )
+
     # Verify ownership of all assets
-    for asset_id in asset_ids:
-        asset = await UserAsset.get(asset_id)
-        if not asset or asset.user_id != user.clerk_id:
+    for asset in assets:
+        if asset.user_id != user.clerk_id:
             raise HTTPException(
                 status_code=403, 
-                detail=f"Asset {asset_id} not found or access denied"
+                detail=f"Asset {asset.id} access denied"
             )
     
     context = await rag_service.build_context_from_assets(asset_ids, max_chars)
