@@ -1,3 +1,4 @@
+import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
@@ -132,6 +133,7 @@ async def approve_all_drafts(mission_id: str = None, user: User = Depends(get_cu
     from app.models import Mission, Prospect
     from beanie.operators import In
     import re
+    import asyncio
     
     # Get missions
     if mission_id:
@@ -175,75 +177,83 @@ async def approve_all_drafts(mission_id: str = None, user: User = Depends(get_cu
     print(f"BULK APPROVE: Processing {len(drafts)} drafts")
     print(f"{'='*60}")
     
-    for i, draft in enumerate(drafts, 1):
-        try:
-            prospect = prospect_map.get(draft.prospect_id)
-            if not prospect or not prospect.public_contact:
-                print(f"{i}/{len(drafts)}  No email for prospect")
-                failed_count += 1
-                continue
-            
-            # Validate email
-            if not re.match(email_pattern, prospect.public_contact):
-                print(f"{i}/{len(drafts)}  Invalid email: {prospect.public_contact}")
-                draft.status = DraftStatus.REJECTED
-                await draft.save()
-                failed_count += 1
-                continue
-            
-            print(f"{i}/{len(drafts)} → Sending to {prospect.name} ({prospect.public_contact})...")
-            
-            # Send email
-            result = await send_email_via_composio(
-                user_id=user.clerk_id,
-                recipient=prospect.public_contact,
-                subject=draft.subject,
-                body=draft.body,
-                attachments=getattr(draft, 'attachments', []) or []
-            )
-            
-            if result.get("success"):
-                draft.status = DraftStatus.SENT
-                await draft.save()
-                print(f"{i}/{len(drafts)}  Sent successfully")
-                sent_count += 1
+    # OPTIMIZATION: Process drafts concurrently with a semaphore limit (5) to avoid N+1 blocking delays when sending emails and querying the DB.
+    semaphore = asyncio.Semaphore(5)
+
+    async def process_draft(i, draft):
+        nonlocal sent_count, failed_count
+        async with semaphore:
+            try:
+                prospect = prospect_map.get(draft.prospect_id)
+                if not prospect or not prospect.public_contact:
+                    print(f"{i}/{len(drafts)}  No email for prospect")
+                    failed_count += 1
+                    return
+
+                # Validate email
+                if not re.match(email_pattern, prospect.public_contact):
+                    print(f"{i}/{len(drafts)}  Invalid email: {prospect.public_contact}")
+                    draft.status = DraftStatus.REJECTED
+                    await draft.save()
+                    failed_count += 1
+                    return
+
+                print(f"{i}/{len(drafts)} → Sending to {prospect.name} ({prospect.public_contact})...")
+
+                # Send email
+                result = await send_email_via_composio(
+                    user_id=user.clerk_id,
+                    recipient=prospect.public_contact,
+                    subject=draft.subject,
+                    body=draft.body,
+                    attachments=getattr(draft, 'attachments', []) or []
+                )
                 
-                # Update contact history
-                try:
-                    email = prospect.public_contact.lower().strip()
-                    existing_contact = await ContactHistory.find_one(
-                        ContactHistory.user_id == user.clerk_id,
-                        ContactHistory.prospect_email == email
-                    )
+                if result.get("success"):
+                    draft.status = DraftStatus.SENT
+                    await draft.save()
+                    print(f"{i}/{len(drafts)}  Sent successfully")
+                    sent_count += 1
                     
-                    if existing_contact:
-                        existing_contact.last_contacted_at = datetime.utcnow()
-                        existing_contact.last_mission_id = prospect.mission_id
-                        existing_contact.total_emails_sent += 1
-                        await existing_contact.save()
-                    else:
-                        new_contact = ContactHistory(
-                            user_id=user.clerk_id,
-                            prospect_email=email,
-                            prospect_name=prospect.name,
-                            first_mission_id=prospect.mission_id,
-                            last_mission_id=prospect.mission_id,
-                            total_emails_sent=1
+                    # Update contact history
+                    try:
+                        email = prospect.public_contact.lower().strip()
+                        existing_contact = await ContactHistory.find_one(
+                            ContactHistory.user_id == user.clerk_id,
+                            ContactHistory.prospect_email == email
                         )
-                        await new_contact.insert()
-                except Exception as e:
-                    print(f"   Contact history update failed: {e}")
+
+                        if existing_contact:
+                            existing_contact.last_contacted_at = datetime.utcnow()
+                            existing_contact.last_mission_id = prospect.mission_id
+                            existing_contact.total_emails_sent += 1
+                            await existing_contact.save()
+                        else:
+                            new_contact = ContactHistory(
+                                user_id=user.clerk_id,
+                                prospect_email=email,
+                                prospect_name=prospect.name,
+                                first_mission_id=prospect.mission_id,
+                                last_mission_id=prospect.mission_id,
+                                total_emails_sent=1
+                            )
+                            await new_contact.insert()
+                    except Exception as e:
+                        print(f"   Contact history update failed: {e}")
+
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    print(f"{i}/{len(drafts)}  Send failed: {error_msg}")
+                    draft.status = DraftStatus.APPROVED
+                    await draft.save()
+                    failed_count += 1
                     
-            else:
-                error_msg = result.get("error", "Unknown error")
-                print(f"{i}/{len(drafts)}  Send failed: {error_msg}")
-                draft.status = DraftStatus.APPROVED
-                await draft.save()
+            except Exception as e:
+                print(f"{i}/{len(drafts)}  Exception: {e}")
                 failed_count += 1
-                
-        except Exception as e:
-            print(f"{i}/{len(drafts)}  Exception: {e}")
-            failed_count += 1
+
+    tasks = [process_draft(i, draft) for i, draft in enumerate(drafts, 1)]
+    await asyncio.gather(*tasks)
     
     print(f"{'='*60}")
     print(f"BULK APPROVE COMPLETE: {sent_count} sent, {failed_count} failed")
