@@ -172,10 +172,28 @@ async def build_rag_context(
     content generation (posts, emails, etc.)
     """
     from app.services.rag import rag_service
+    from beanie.operators import In
+    import bson
+
+    # Verify ownership of all assets using bulk query
+    valid_object_ids = []
+    for id_str in set(asset_ids):
+        try:
+            valid_object_ids.append(bson.ObjectId(id_str))
+        except bson.errors.InvalidId:
+            pass
+
+    if not valid_object_ids:
+        if asset_ids:
+            raise HTTPException(status_code=403, detail="Invalid asset IDs provided")
+        assets = []
+    else:
+        assets = await UserAsset.find(In(UserAsset.id, valid_object_ids)).to_list()
+
+    asset_map = {str(a.id): a for a in assets}
     
-    # Verify ownership of all assets
     for asset_id in asset_ids:
-        asset = await UserAsset.get(asset_id)
+        asset = asset_map.get(asset_id)
         if not asset or asset.user_id != user.clerk_id:
             raise HTTPException(
                 status_code=403, 

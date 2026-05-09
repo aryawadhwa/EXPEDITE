@@ -697,15 +697,31 @@ class AttachmentUpdate(BaseModel):
 async def update_draft_attachments(id: str, data: AttachmentUpdate, user: User = Depends(get_current_user)):
     """Update attachments for a draft by selecting from Knowledge Assets"""
     from app.models import UserAsset
+    from beanie.operators import In
+    import bson
     
     draft = await Draft.get(id)
     if not draft:
         raise HTTPException(status_code=404, detail="Draft not found")
     
-    # Validate and fetch asset info
+    # Validate and fetch asset info using bulk query
+    valid_object_ids = []
+    for id_str in set(data.asset_ids):
+        try:
+            valid_object_ids.append(bson.ObjectId(id_str))
+        except bson.errors.InvalidId:
+            pass
+
+    if valid_object_ids:
+        assets = await UserAsset.find(In(UserAsset.id, valid_object_ids)).to_list()
+    else:
+        assets = []
+
+    asset_map = {str(a.id): a for a in assets}
+
     attachments = []
     for asset_id in data.asset_ids:
-        asset = await UserAsset.get(asset_id)
+        asset = asset_map.get(asset_id)
         if asset and asset.user_id == user.clerk_id:
             attachments.append({
                 "asset_id": str(asset.id),
