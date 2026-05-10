@@ -40,6 +40,11 @@ class RAGService:
         asset = await UserAsset.get(asset_id)
         if not asset:
             return None
+
+        return RAGService.extract_asset_content(asset)
+
+    @staticmethod
+    def extract_asset_content(asset: UserAsset) -> str:
         
         content_type = asset.content_type.lower()
         filename = asset.filename.lower()
@@ -110,11 +115,34 @@ class RAGService:
         
         Returns a dict mapping asset_id -> content
         """
+        from beanie.operators import In
+        from bson import ObjectId
+        from bson.errors import InvalidId
+
         results = {}
-        for asset_id in asset_ids:
-            content = await RAGService.get_asset_content(asset_id)
-            if content:
-                results[asset_id] = content
+        valid_ids = []
+        for aid in set(asset_ids):
+            try:
+                valid_ids.append(ObjectId(aid))
+            except InvalidId:
+                pass
+
+        if not valid_ids:
+            return results
+
+        assets = await UserAsset.find(In(UserAsset.id, valid_ids)).to_list()
+        asset_map = {str(asset.id): asset for asset in assets}
+
+        # Deduplicate preserving order
+        unique_ids = list(dict.fromkeys(asset_ids))
+
+        for aid in unique_ids:
+            if aid in asset_map:
+                asset = asset_map[aid]
+                content = RAGService.extract_asset_content(asset)
+                if content:
+                    results[str(asset.id)] = content
+
         return results
     
     @staticmethod
@@ -125,21 +153,43 @@ class RAGService:
         Truncates content to fit within max_chars while preserving
         structure from each document.
         """
+        from beanie.operators import In
+        from bson import ObjectId
+        from bson.errors import InvalidId
+
         if not asset_ids:
             return ""
         
-        contents = await RAGService.get_multiple_assets_content(asset_ids)
-        
-        if not contents:
+        valid_ids = []
+        for aid in set(asset_ids):
+            try:
+                valid_ids.append(ObjectId(aid))
+            except InvalidId:
+                pass
+
+        if not valid_ids:
             return ""
+
+        assets = await UserAsset.find(In(UserAsset.id, valid_ids)).to_list()
+        if not assets:
+            return ""
+
+        asset_map = {str(asset.id): asset for asset in assets}
         
         # Get asset metadata for context
         context_parts = []
         chars_used = 0
         
-        for asset_id, content in contents.items():
-            asset = await UserAsset.get(asset_id)
-            if not asset:
+        # Deduplicate preserving order
+        unique_ids = list(dict.fromkeys(asset_ids))
+
+        for aid in unique_ids:
+            if aid not in asset_map:
+                continue
+
+            asset = asset_map[aid]
+            content = RAGService.extract_asset_content(asset)
+            if not content:
                 continue
             
             # Add document header
