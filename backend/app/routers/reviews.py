@@ -4,6 +4,8 @@ from typing import List
 from app.models import Draft, DraftStatus, User, Prospect, ContactHistory
 from datetime import datetime
 from app.api.deps import get_current_user
+from beanie.operators import In
+import bson
 
 router = APIRouter()
 
@@ -704,14 +706,29 @@ async def update_draft_attachments(id: str, data: AttachmentUpdate, user: User =
     
     # Validate and fetch asset info
     attachments = []
-    for asset_id in data.asset_ids:
-        asset = await UserAsset.get(asset_id)
-        if asset and asset.user_id == user.clerk_id:
-            attachments.append({
-                "asset_id": str(asset.id),
-                "filename": asset.filename,
-                "content_type": asset.content_type
-            })
+    if data.asset_ids:
+        # Deduplicate and handle ID conversion safely
+        unique_ids = list(set(data.asset_ids))
+        valid_object_ids = []
+        for aid in unique_ids:
+            try:
+                valid_object_ids.append(bson.ObjectId(aid))
+            except bson.errors.InvalidId:
+                continue
+
+        # Batch fetch
+        assets = await UserAsset.find(In(UserAsset.id, valid_object_ids)).to_list()
+        asset_map = {str(a.id): a for a in assets}
+
+        # Preserve original order
+        for asset_id in data.asset_ids:
+            asset = asset_map.get(asset_id)
+            if asset and asset.user_id == user.clerk_id:
+                attachments.append({
+                    "asset_id": str(asset.id),
+                    "filename": asset.filename,
+                    "content_type": asset.content_type
+                })
     
     draft.attachments = attachments
     await draft.save()

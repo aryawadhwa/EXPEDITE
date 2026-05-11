@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Respons
 from typing import List, Dict
 from app.api.deps import get_current_user
 from app.models import User, UserAsset
+from beanie.operators import In
 import base64
+import bson
 
 router = APIRouter()
 
@@ -174,13 +176,27 @@ async def build_rag_context(
     from app.services.rag import rag_service
     
     # Verify ownership of all assets
-    for asset_id in asset_ids:
-        asset = await UserAsset.get(asset_id)
-        if not asset or asset.user_id != user.clerk_id:
-            raise HTTPException(
-                status_code=403, 
-                detail=f"Asset {asset_id} not found or access denied"
-            )
+    if asset_ids:
+        # Deduplicate and convert IDs, handle invalid format
+        unique_ids = list(set(asset_ids))
+        valid_object_ids = []
+        for aid in unique_ids:
+            try:
+                valid_object_ids.append(bson.ObjectId(aid))
+            except bson.errors.InvalidId:
+                raise HTTPException(status_code=403, detail=f"Asset {aid} not found or access denied")
+
+        # Batch fetch assets
+        assets = await UserAsset.find(In(UserAsset.id, valid_object_ids)).to_list()
+        asset_map = {str(a.id): a for a in assets}
+
+        for asset_id in unique_ids:
+            asset = asset_map.get(asset_id)
+            if not asset or asset.user_id != user.clerk_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Asset {asset_id} not found or access denied"
+                )
     
     context = await rag_service.build_context_from_assets(asset_ids, max_chars)
     

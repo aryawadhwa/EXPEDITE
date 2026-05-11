@@ -8,6 +8,8 @@ knowledge assets. It supports PDF, TXT, MD, and DOCX files.
 import io
 from typing import List, Dict, Optional
 from app.models import UserAsset
+from beanie.operators import In
+import bson
 
 # Optional imports for document parsing
 try:
@@ -137,8 +139,21 @@ class RAGService:
         context_parts = []
         chars_used = 0
         
+        # Batch fetch assets to avoid N+1 query
+        valid_object_ids = []
+        for aid in contents.keys():
+            try:
+                valid_object_ids.append(bson.ObjectId(aid))
+            except bson.errors.InvalidId:
+                continue
+
+        assets = []
+        if valid_object_ids:
+            assets = await UserAsset.find(In(UserAsset.id, valid_object_ids)).to_list()
+        asset_map = {str(a.id): a for a in assets}
+
         for asset_id, content in contents.items():
-            asset = await UserAsset.get(asset_id)
+            asset = asset_map.get(asset_id)
             if not asset:
                 continue
             
