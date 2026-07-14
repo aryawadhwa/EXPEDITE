@@ -65,7 +65,7 @@ graph TD
     %% Backend Components
     subgraph Backend ["Backend (FastAPI)"]
         Router[Missions Router]
-        Agent[ScoutAgent (LangGraph)]
+        Agent[ScoutAgent]
         LLM[Unified LLM Service]
         Integrations[Integration Layer]
         
