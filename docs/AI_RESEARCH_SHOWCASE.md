@@ -1,4 +1,4 @@
-# AI Research Asset Showcase: Agentic AI Confluence JUL 2026 @Nasscom
+# AI Research Asset Showcase: Autonomous Outbound & Prospect Intelligence Platform
 **Project Name:** EXPEDITE (OutboundAI)
 
 ---
@@ -132,7 +132,7 @@ The market for B2B sales automation and intelligence is historically fragmented,
 **Total Addressable Market (TAM): ~$50 Billion to $70 Billion.** Represents the projected valuation of the Indian SaaS ecosystem by 2030, driven heavily by AI integration and global capability centers (GCCs).
 **Serviceable Available Market (SAM): ~$17 Billion to $22 Billion.** The projected size of the Indian AI market by 2027, growing at a 25% to 35% CAGR.
 **Serviceable Obtainable Market (SOM): ~$2.5 Billion.** Immediate target beachhead: Indian Seed to Series C SaaS startups, lean recruitment agencies in major tech hubs (Bengaluru, NCR, Pune), and boutique IT/BPO services highly sensitive to SDR headcount costs.
-*(Data Sources: NASSCOM & BCG 2027 India AI Projections; Industry Consensus 2030 India SaaS Market Reports)*
+*(Data Sources: BCG 2027 India AI Projections; Industry Consensus 2030 India SaaS Market Reports)*
 
 ### Macroeconomic Tailwinds (The Indian Context)
 **The Funding Winter & The Efficiency Mandate:** In the post ZIRP (Zero Interest Rate Policy) era, hyper growth fueled by massive headcount is no longer rewarded by Indian VCs. Startups are mandated to achieve higher Revenue Per Employee (RPE). EXPEDITE directly serves this mandate by replacing headcount with a scalable agent.
