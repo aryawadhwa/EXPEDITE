@@ -126,30 +126,30 @@ sequenceDiagram
 ### Executive Investment Thesis
 EXPEDITE sits at the intersection of two massive secular trends: the compression of venture capital forcing startups to adopt highly efficient, low headcount revenue models, and the transition from static LLM wrappers to autonomous, multi agent state machines (Agentic AI). The platform disrupts the traditional B2B outbound motion by replacing expensive human SDRs with a synthetic digital worker, orchestrating pipeline generation at a 99% cost reduction.
 
-### Market Sizing: TAM, SAM & SOM
-The market for B2B sales automation and intelligence is historically fragmented, allowing a unified agentic platform to capture outsized market share. 
+### Market Sizing: TAM, SAM & SOM (India Focus)
+The market for B2B sales automation and intelligence is historically fragmented, allowing a unified agentic platform to capture outsized market share within the rapidly expanding Indian tech ecosystem. 
 
-**Total Addressable Market (TAM): ~$150 Billion.** Represents the global CRM, Sales Intelligence, and Marketing Automation software spend across all industries.
-**Serviceable Available Market (SAM): ~$25 Billion.** The specific market for Sales Engagement platforms and B2B Data Providers (ZoomInfo, Apollo, Outreach).
-**Serviceable Obtainable Market (SOM): ~$2.5 Billion.** Immediate target beachhead: Seed to Series C SaaS startups, lean recruitment agencies, and boutique consulting firms highly sensitive to SDR headcount costs.
-*(Data Sources: Gartner 2025 to 2026 B2B Sales Intelligence Research & MarketsandMarkets 2026 Agentic AI projections)*
+**Total Addressable Market (TAM): ~$50 Billion to $70 Billion.** Represents the projected valuation of the Indian SaaS ecosystem by 2030, driven heavily by AI integration and global capability centers (GCCs).
+**Serviceable Available Market (SAM): ~$17 Billion to $22 Billion.** The projected size of the Indian AI market by 2027, growing at a 25% to 35% CAGR.
+**Serviceable Obtainable Market (SOM): ~$2.5 Billion.** Immediate target beachhead: Indian Seed to Series C SaaS startups, lean recruitment agencies in major tech hubs (Bengaluru, NCR, Pune), and boutique IT/BPO services highly sensitive to SDR headcount costs.
+*(Data Sources: NASSCOM & BCG 2027 India AI Projections; Industry Consensus 2030 India SaaS Market Reports)*
 
-### Macroeconomic Tailwinds
-**The End of ZIRP & The Efficiency Mandate:** In the post Zero Interest Rate Policy (ZIRP) era, hyper growth fueled by massive headcount is no longer rewarded by public markets or VCs. Companies are mandated to achieve higher Revenue Per Employee (RPE). EXPEDITE directly serves this mandate by replacing headcount with a scalable agent.
-**The "Agentic" Shift:** The market rejects basic AI text generators due to hallucination. Demand has shifted toward deterministic, verifiable orchestration (LangGraph state machines) that guarantee output accuracy. The Agentic AI market is projected to grow at a 42% to 46% CAGR through 2030 (Data Source: Mordor Intelligence & Fortune Business Insights 2026 Global Reports).
-**Stricter Email Regulations:** Google and Yahoo’s strict sender guidelines severely punish domains for high bounce rates. EXPEDITE’s cryptographic SMTP verification pipeline acts as an insurance policy for corporate domain reputations.
+### Macroeconomic Tailwinds (The Indian Context)
+**The Funding Winter & The Efficiency Mandate:** In the post ZIRP (Zero Interest Rate Policy) era, hyper growth fueled by massive headcount is no longer rewarded by Indian VCs. Startups are mandated to achieve higher Revenue Per Employee (RPE). EXPEDITE directly serves this mandate by replacing headcount with a scalable agent.
+**The "Agentic" Shift & Make in India:** The Indian enterprise market rejects basic AI text generators due to hallucination. Demand has shifted toward deterministic, verifiable orchestration (LangGraph state machines). As India positions itself as the AI factory of the world, Agentic AI adoption is accelerating at unprecedented rates.
+**Stricter Global Email Regulations:** With Indian SaaS companies primarily exporting software globally, Google and Yahoo’s strict sender guidelines severely punish domains for high bounce rates. EXPEDITE’s cryptographic SMTP verification pipeline acts as an insurance policy for corporate domain reputations targeting US and European clients.
 
 ### Competitive Dynamics (Blue Ocean Strategy)
-The current ecosystem is highly bifurcated. EXPEDITE creates a Blue Ocean by bridging the gap between raw data and contextual intelligence.
+The current ecosystem is highly bifurcated. EXPEDITE creates a Blue Ocean by bridging the gap between raw data and contextual intelligence for the Indian outbound sector.
 
-**Legacy Data Monoliths (e.g., ZoomInfo):** Provide raw, static databases with zero automated reasoning and high subscription costs often exceeding $10,000 Annual Contract Value. 
+**Legacy Data Monoliths (e.g., ZoomInfo):** Provide raw, static databases with zero automated reasoning and high subscription costs often exceeding $10,000 Annual Contract Value (prohibitively expensive for early stage Indian startups). 
 **Basic AI Wrappers:** Prone to hallucinations, no live SMTP verification, and generate generic output.
 **Our Advantage:** EXPEDITE bridges the gap by offering native LLM reasoning, zero upfront heavy contracts, and dynamic real time data pulling with strict Evidence First cryptographic verification.
 
 ### Business Model & Unit Economics
 EXPEDITE operates on a high margin API arbitrage model, leveraging localized caching (Redis) and hyper efficient model routing (Groq LPU architecture).
 
-**Cost Arbitrage (Human vs Synthetic):** Traditional Cost per Lead is ~$50.00 to $150.00. This is based on an average SDR On Target Earnings of $80,000 to $95,000 (Data Source: The Bridge Group 2024 SDR Metrics & Compensation Report), plus software overhead. EXPEDITE Cost per Lead is ~$0.02 to $0.05, offering a 99.9% cost reduction and near infinite pricing elasticity.
+**Cost Arbitrage (Human vs Synthetic):** Traditional Cost per Lead in India is ~$5.00 to $15.00. This is based on an average Indian SDR compensation of ₹7.3 Lakhs to ₹13 Lakhs per year (Data Source: 2026 Indian Tech Salary Benchmarks), plus software overhead. EXPEDITE Cost per Lead is ~$0.02 to $0.05 (approx ₹1.5 to ₹4), offering a 99% cost reduction and near infinite pricing elasticity.
 
 **B2B SaaS Sales (Direct):** 
 *Standard Tier ($99/mo):* Pay per seat subscription for individual founders or recruiters accessing the standard Launchpad.
