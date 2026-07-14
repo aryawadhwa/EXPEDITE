@@ -4,9 +4,19 @@ from app.models import Mission, User, MissionLog, PendingAction
 from app.api.deps import get_current_user
 from app.core.agent import run_mission_agent
 from app.core.config import settings
+from app.core.llm import create_chat_llm
+from app.db import (
+    get_session,
+    create_mission_sql,
+    add_mission_log_sql,
+    list_missions_sql,
+    get_mission_sql,
+    list_logs_sql,
+)
 from pydantic import BaseModel
 import asyncio
 import re
+from sqlmodel import Session
 
 router = APIRouter()
 
@@ -72,6 +82,7 @@ def sanitize_json_string(content: str) -> str:
 class MissionCreate(BaseModel):
     objective: str
     mode: Optional[str] = "task" # "task" or "auto"
+    location: Optional[str] = None
     attachments: Optional[List[Dict]] = []  # List of {asset_id, filename, content_type}
 
 # Direct action patterns - bypass agent workflow for these
@@ -127,15 +138,13 @@ async def detect_and_execute_direct_action(objective: str, mission_id: str, user
                 ).insert()
     
     # Use LLM to extract action content
-    from langchain_groq import ChatGroq
     from langchain_core.messages import SystemMessage, HumanMessage
     import json
     
     try:
-        extract_llm = ChatGroq(
-            temperature=0.0, 
-            groq_api_key=settings.GROQ_API_KEY, 
-            model_name="llama-3.1-8b-instant"
+        extract_llm = create_chat_llm(
+            temperature=0.0,
+            model_name=settings.GEMINI_MODEL
         )
         
         # Add RAG context to prompts if available
@@ -471,7 +480,37 @@ Set ready=false if recipient email is unclear.{rag_injection}"""),
         return {"handled": True, "error": str(e)}
 
 @router.post("/", response_model=Mission)
-async def create_mission(mission_in: MissionCreate, user: User = Depends(get_current_user)):
+async def create_mission(
+    mission_in: MissionCreate,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if settings.USE_SQL_BACKEND:
+        mission = create_mission_sql(session, user.clerk_id, mission_in.objective)
+        attachment_msg = ""
+        if mission_in.attachments:
+            attachment_msg = f" with {len(mission_in.attachments)} attachment(s)"
+        add_mission_log_sql(
+            session=session,
+            mission_id=mission.id,
+            role="system",
+            content=f"Mission started: {mission_in.objective}{attachment_msg}",
+            log_type="success",
+        )
+        add_mission_log_sql(
+            session=session,
+            mission_id=mission.id,
+            role="system",
+            content="Mission queued in local SQL mode.",
+            log_type="thinking",
+        )
+        return Mission(
+            user_id=mission.user_id,
+            objective=mission.objective,
+            status=mission.status,
+            created_at=mission.created_at,
+        )
+
     mission = Mission(user_id=user.clerk_id, objective=mission_in.objective)
     await mission.insert()
     
@@ -507,13 +546,14 @@ async def create_mission(mission_in: MissionCreate, user: User = Depends(get_cur
         # Ideally we refactor 'start_scout' logic to be a shared service function
         # For now, let's call the background task directly
         
-        async def run_scout_wrapper(mid, obj, uid):
+        async def run_scout_wrapper(mid, obj, uid, loc=None):
              # This duplicates logic from routers/agents.py start_scout
              # In a real app we'd move this to services/scout_service.py
              try:
                 inputs = {
                     "mission_id": mid, 
                     "objective": obj,
+                    "location": loc,
                     "status": "planning",
                     "search_queries": [],
                     "visited_urls": [],
@@ -525,7 +565,7 @@ async def create_mission(mission_in: MissionCreate, user: User = Depends(get_cur
              except Exception as e:
                 print(f"Auto-pilot error: {e}")
 
-        asyncio.create_task(run_scout_wrapper(mission_id, mission_in.objective, user.clerk_id))
+        asyncio.create_task(run_scout_wrapper(mission_id, mission_in.objective, user.clerk_id, mission_in.location))
         return mission
 
     # Check if this is a direct action (post, tweet, etc.) - execute immediately
@@ -541,13 +581,11 @@ async def create_mission(mission_in: MissionCreate, user: User = Depends(get_cur
         return mission
     
     # Classify intent: Information Request vs Action Request
-    from langchain_groq import ChatGroq
     from langchain_core.messages import SystemMessage, HumanMessage
     
-    intent_classifier = ChatGroq(
+    intent_classifier = create_chat_llm(
         temperature=0.0,
-        groq_api_key=settings.GROQ_API_KEY,
-        model_name="llama-3.3-70b-versatile"
+        model_name=settings.GEMINI_MODEL
     )
     
     intent_prompt = f"""You are analyzing a user's request to determine their TRUE INTENT, not just keywords.
@@ -613,11 +651,12 @@ Return ONLY: INFORMATION_REQUEST or ACTION_REQUEST"""
         # Run Scout in "research-only" mode (no drafting)
         from app.agents.scout_agent import scout_app
         
-        async def run_research_only(mid, obj, uid):
+        async def run_research_only(mid, obj, uid, loc=None):
             try:
                 inputs = {
                     "mission_id": mid,
                     "objective": obj,
+                    "location": loc,
                     "status": "planning",
                     "search_queries": [],
                     "visited_urls": [],
@@ -724,7 +763,7 @@ Return ONLY: INFORMATION_REQUEST or ACTION_REQUEST"""
                     log_type="error"
                 ).insert()
         
-        asyncio.create_task(run_research_only(mission_id, mission_in.objective, user.clerk_id))
+        asyncio.create_task(run_research_only(mission_id, mission_in.objective, user.clerk_id, mission_in.location))
         return mission
     
     # ACTION_REQUEST: Run full workflow (existing logic)
@@ -733,7 +772,26 @@ Return ONLY: INFORMATION_REQUEST or ACTION_REQUEST"""
     return mission
 
 @router.get("/")
-async def list_missions(user: User = Depends(get_current_user)):
+async def list_missions(
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if settings.USE_SQL_BACKEND:
+        missions = list_missions_sql(session, user.clerk_id)
+        return [
+            {
+                "_id": m.id,
+                "id": m.id,
+                "user_id": m.user_id,
+                "objective": m.objective,
+                "status": m.status,
+                "created_at": m.created_at.isoformat(),
+                "prospects_count": 0,
+                "drafts_count": 0,
+            }
+            for m in missions
+        ]
+
     from app.models import Prospect, Draft, DraftStatus
     
     # 1. Fetch all user missions
@@ -798,8 +856,29 @@ async def list_missions(user: User = Depends(get_current_user)):
     return result
 
 @router.get("/{mission_id}/logs")
-async def get_mission_logs(mission_id: str, user: User = Depends(get_current_user)):
+async def get_mission_logs(
+    mission_id: str,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     """Get all logs for a mission"""
+    if settings.USE_SQL_BACKEND:
+        mission = get_mission_sql(session, mission_id)
+        if not mission or mission.user_id != user.clerk_id:
+            raise HTTPException(status_code=404, detail="Mission not found")
+        logs = list_logs_sql(session, mission_id)
+        return [
+            {
+                "id": log.id,
+                "role": log.role,
+                "content": log.content,
+                "type": log.log_type,
+                "metadata": {},
+                "timestamp": log.timestamp.isoformat(),
+            }
+            for log in logs
+        ]
+
     # Verify mission belongs to user
     mission = await Mission.get(mission_id)
     if not mission or mission.user_id != user.clerk_id:
@@ -950,7 +1029,6 @@ class ChatMessage(BaseModel):
 async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Depends(get_current_user)):
     """Send a chat message and get AI response"""
     from app.core.config import settings
-    from langchain_groq import ChatGroq
     from langchain_core.messages import SystemMessage, HumanMessage
     from app.models import Draft, DraftStatus, Prospect, Agent
     from beanie.operators import In
@@ -986,14 +1064,12 @@ async def chat_with_mission(mission_id: str, chat: ChatMessage, user: User = Dep
         
         # Generate the Reddit post content using the mission objective
         try:
-            from langchain_groq import ChatGroq
             from langchain_core.messages import SystemMessage, HumanMessage
             import json
             
-            gen_llm = ChatGroq(
-                temperature=0.7, 
-                groq_api_key=settings.GROQ_API_KEY, 
-                model_name="llama-3.3-70b-versatile"
+            gen_llm = create_chat_llm(
+                temperature=0.7,
+                model_name=settings.GEMINI_MODEL
             )
             
             gen_prompt = [
@@ -1149,13 +1225,11 @@ Make the content informative and valuable to the community."""),
         # Try to extract name from context or use username
         extracted_name = None
         try:
-            from langchain_groq import ChatGroq
             from langchain_core.messages import SystemMessage, HumanMessage
             
-            extract_llm = ChatGroq(
-                temperature=0.0, 
-                groq_api_key=settings.GROQ_API_KEY, 
-                model_name="llama-3.1-8b-instant"
+            extract_llm = create_chat_llm(
+                temperature=0.0,
+                model_name=settings.GEMINI_MODEL
             )
             extraction_prompt = [
                 SystemMessage(content="Extract the PERSON NAME from the text. Return JSON only: {'name': 'extracted name'}. If unclear, use the LinkedIn username formatted as a name (e.g., 'john-doe' becomes 'John Doe')."),
@@ -1229,10 +1303,9 @@ Make the content informative and valuable to the community."""),
         # Try to extract the name associated with this email from the user's natural language message
         extracted_name = None
         try:
-             extract_llm = ChatGroq(
-                temperature=0.0, 
-                groq_api_key=settings.GROQ_API_KEY, 
-                model_name="llama-3.1-8b-instant"
+             extract_llm = create_chat_llm(
+                temperature=0.0,
+                model_name=settings.GEMINI_MODEL
             )
              extraction_prompt = [
                 SystemMessage(content="You are an Entity Extractor. Extract the PERSON NAME associated with the target email from the user text. Return valid JSON only: {'name': 'extracted name'}. If no name is found, return {'name': null}."),
@@ -1421,13 +1494,11 @@ Make the content informative and valuable to the community."""),
         ).insert()
         
         try:
-            from langchain_groq import ChatGroq
             from langchain_core.messages import SystemMessage, HumanMessage
             
-            llm = ChatGroq(
-                temperature=0.7, 
-                groq_api_key=settings.GROQ_API_KEY, 
-                model_name="llama-3.3-70b-versatile"
+            llm = create_chat_llm(
+                temperature=0.7,
+                model_name=settings.GEMINI_MODEL
             )
             
             system_prompt = """You are an expert outreach specialist.
@@ -1607,10 +1678,9 @@ Mission: {mission.objective}
     if detected_action:
         # Extract content using LLM
         try:
-            extract_llm = ChatGroq(
-                temperature=0.0, 
-                groq_api_key=settings.GROQ_API_KEY, 
-                model_name="llama-3.1-8b-instant"
+            extract_llm = create_chat_llm(
+                temperature=0.0,
+                model_name=settings.GEMINI_MODEL
             )
             
             if detected_action == "twitter_post":
@@ -1840,10 +1910,9 @@ Set ready=false if repo, title, or description is unclear."""),
             return {"message": error_msg, "role": "agent", "type": "error"}
 
     try:
-        llm = ChatGroq(
-            temperature=0.7, 
-            groq_api_key=settings.GROQ_API_KEY, 
-            model_name="llama-3.3-70b-versatile"
+        llm = create_chat_llm(
+            temperature=0.7,
+            model_name=settings.GEMINI_MODEL
         )
         
         system_prompt = f"""You are the Mission Control AI.

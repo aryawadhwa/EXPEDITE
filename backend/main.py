@@ -1,66 +1,93 @@
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from beanie import init_beanie
-from pymongo import AsyncMongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
 import json
+import logging
+import typing
+try:
+    from typing import TypeAlias
+except ImportError:
+    from typing_extensions import TypeAlias
+    typing.TypeAlias = TypeAlias
 
 from app.core.config import settings
 from app.models import User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory, PendingAction
 from app.routers import missions, reviews, agents, contacts
 
+logger = logging.getLogger(__name__)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    # Validate required environment variables
-    if not settings.MONGODB_URI:
-        raise ValueError("MONGODB_URI environment variable is required")
-    
-    client = AsyncMongoClient(
-        settings.MONGODB_URI,
-        tlsAllowInvalidCertificates=True,
-        maxPoolSize=50,  # Connection pooling
-        minPoolSize=10
-    )
-    await init_beanie(database=client.expedite, document_models=[User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory, PendingAction])
-    
-    # Validate all integrations
-    from app.core.healthcheck import startup_validation
-    await startup_validation()
+    # Startup (local-first): run without cloud dependencies by default.
+    if settings.USE_SQL_BACKEND:
+        from app.db import init_sqlite_db
+        init_sqlite_db()
+        from app.services.followup_scheduler import start_scheduler
+        start_scheduler()
+
+    if settings.MONGODB_URI:
+        client = AsyncIOMotorClient(
+            settings.MONGODB_URI,
+            tlsAllowInvalidCertificates=True,
+            maxPoolSize=50,
+            minPoolSize=10
+        )
+        await init_beanie(
+            database=client.expedite,
+            document_models=[User, Mission, Prospect, Draft, MissionLog, Agent, UserAsset, EmailThread, ContactHistory, PendingAction]
+        )
+    else:
+        logger.warning("MONGODB_URI not set. Running in local mode without Beanie initialization.")
+
+    if not settings.LOCAL_MODE:
+        from app.core.healthcheck import startup_validation
+        await startup_validation()
     
     yield
     # Shutdown
 
 app = FastAPI(title="EXPEDITE", lifespan=lifespan)
 
+# CORS Configuration - Environment-based
+from app.core.config import settings
+
 # Determine allowed origins based on environment
-allowed_origins = {
+allowed_origins = [
     "http://localhost:5173",
     "http://localhost:8080",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:8080",
-}
+]
 
 # Add production frontend URL if configured
-if settings.FRONTEND_URL:
-    allowed_origins.add(settings.FRONTEND_URL.strip())
-
-# Allow explicit additional origins from env (comma-separated)
-if settings.CORS_ORIGINS:
-    allowed_origins.update({origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()})
+if hasattr(settings, 'FRONTEND_URL') and settings.FRONTEND_URL:
+    allowed_origins.append(settings.FRONTEND_URL)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=sorted(allowed_origins),
-    # Support preview deployments without hardcoding every Vercel URL.
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
+
+# Global OPTIONS handler - MUST be registered BEFORE routers
+@app.options("/{full_path:path}")
+async def options_handler(full_path: str):
+    """Handle CORS preflight requests for all routes"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
 
 app.include_router(missions.router, prefix="/api/v1/missions", tags=["missions"])
 app.include_router(reviews.router, prefix="/api/v1/reviews", tags=["reviews"])
@@ -82,6 +109,12 @@ from app.routers import scraper
 app.include_router(scraper.router, prefix="/api/v1/scraper", tags=["scraper"])
 from app.routers import sales_agent
 app.include_router(sales_agent.router, prefix="/api/v1/sales-agent", tags=["sales-agent"])
+from app.routers import automation
+app.include_router(automation.router, prefix="/api/v1/automation", tags=["automation"])
+from app.routers import voice
+app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
+from app.routers import webhooks
+app.include_router(webhooks.router, prefix="/api/v1/webhooks", tags=["webhooks"])
 
 
 from app.core.socket import manager

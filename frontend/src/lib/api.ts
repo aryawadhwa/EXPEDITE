@@ -1,6 +1,6 @@
-import { useAuth } from "@clerk/clerk-react";
 import { useMemo, useCallback } from "react";
-import { API_BASE_URL, buildApiUrl } from "@/lib/env";
+import { API_BASE_URL } from "@/config/env";
+import { getAuthToken } from "@/lib/auth";
 
 interface Attachment {
   asset_id: string;
@@ -38,11 +38,9 @@ interface MissionLog {
 }
 
 export function useApi() {
-    const { getToken } = useAuth();
-    
     // Stable fetch wrapper
     const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
-        const token = await getToken();
+        const token = await getAuthToken();
         // ... implementation
         const headers = {
             "Content-Type": "application/json",
@@ -50,7 +48,7 @@ export function useApi() {
             ...options.headers,
         };
         return fetch(`${API_BASE_URL}${url}`, { ...options, headers });
-    }, [getToken]);
+    }, []);
 
     return useMemo(() => ({
         // Generic GET method
@@ -68,10 +66,10 @@ export function useApi() {
         },
 
         // Missions
-        createMission: async (objective: string, attachments: Attachment[] = [], autonomous: boolean = false) => {
+        createMission: async (objective: string, attachments: Attachment[] = [], autonomous: boolean = false, location: string = "") => {
             const res = await fetchWithAuth("/missions/", {
                 method: "POST",
-                body: JSON.stringify({ objective, attachments, autonomous }),
+                body: JSON.stringify({ objective, attachments, autonomous, location: location || undefined }),
             });
             if (!res.ok) {
                 const error = await res.json();
@@ -265,8 +263,8 @@ export function useApi() {
             const formData = new FormData();
             formData.append("file", file);
 
-            const token = await getToken();
-            const res = await fetch(buildApiUrl("/assets/upload"), {
+            const token = await getAuthToken();
+            const res = await fetch(`${API_BASE_URL}/assets/upload`, {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -418,6 +416,30 @@ export function useApi() {
             return res.json();
         },
 
+        getSectorIntel: async (sectors: string[], perSectorLimit = 6) => {
+            const res = await fetchWithAuth('/scraper/sector-intel', {
+                method: 'POST',
+                body: JSON.stringify({ sectors, per_sector_limit: perSectorLimit }),
+            });
+            if (!res.ok) throw new Error('Failed to fetch sector intelligence');
+            return res.json();
+        },
+
+        getCompanyIntel: async (company: string, limit = 5) => {
+            const res = await fetchWithAuth('/scraper/company-intel', {
+                method: 'POST',
+                body: JSON.stringify({ company, limit }),
+            });
+            if (!res.ok) throw new Error('Failed to fetch company intelligence');
+            return res.json();
+        },
+
+        getProofLedger: async () => {
+            const res = await fetchWithAuth('/automation/proof-ledger');
+            if (!res.ok) throw new Error('Failed to fetch proof ledger');
+            return res.json();
+        },
+
         researchCompany: async (companyName: string, companyWebsite?: string) => {
             const res = await fetchWithAuth('/scraper/research-company', {
                 method: 'POST',
@@ -554,5 +576,5 @@ export function useApi() {
             if (!res.ok) throw new Error('Failed to approve all drafts');
             return res.json();
         },
-    }), [fetchWithAuth, getToken]);
+    }), [fetchWithAuth]);
 }

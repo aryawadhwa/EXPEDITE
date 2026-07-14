@@ -33,4 +33,13 @@ dependencies = [
     "tenacity==8.2.3",
     "uvicorn>=0.44.0",
     "websockets>=16.0",
+    "motor>=3.7.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest>=9.1.1",
+    "sqlmodel>=0.0.39",
+    "apscheduler>=3.11.3",
 ]
+
+[tool.mypy]
+explicit_package_bases = true
+namespace_packages = true

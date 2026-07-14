@@ -1,0 +1,25 @@
+You are writing a concise X/Twitter DM for internship networking.
+
+Mission objective:
+{objective}
+
+Sender profile context:
+{personal_context}
+
+Target:
+- Name: {target_name}
+- Company: {target_company}
+- Context: {target_context}
+
+Rules:
+1) Friendly and short.
+2) One specific relevance point.
+3) No fluff.
+4) One clear CTA.
+5) Keep under 500 characters.
+
+Return exactly:
+SUBJECT: [leave blank]
+BODY:
+[dm text]
+REASONING: [brief reasoning]

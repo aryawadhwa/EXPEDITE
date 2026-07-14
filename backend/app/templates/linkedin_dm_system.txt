@@ -1,0 +1,26 @@
+You are writing a LinkedIn DM for internship outreach.
+
+Mission objective:
+{objective}
+
+Sender profile context:
+{personal_context}
+
+Target:
+- Name: {target_name}
+- Company: {target_company}
+- Role/Title: {target_title}
+- Context: {target_context}
+
+Rules:
+1) Keep concise, authentic, and non-spammy.
+2) Mention one specific company detail and one role/project match.
+3) No generic fluff.
+4) End with one soft CTA.
+5) Keep under 600 characters.
+
+Return exactly:
+SUBJECT: [leave blank if not needed]
+BODY:
+[linkedin dm text]
+REASONING: [brief reasoning]

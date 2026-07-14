@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@clerk/clerk-react": path.resolve(__dirname, "./src/shims/clerk-react.tsx"),
     },
   },
 }));

@@ -8,6 +8,7 @@ from app.services.integrations import prospect_pipeline, llm_service
 class ScoutState(TypedDict):
     mission_id: str
     objective: str
+    location: Optional[str]
     status: str
     search_queries: List[str]
     visited_urls: List[str]
@@ -62,7 +63,8 @@ async def research_node(state: ScoutState) -> Dict:
         objective=state["objective"],
         titles=titles,
         industries=industries,
-        max_results=10
+        max_results=10,
+        location=state.get("location")
     )
     
     print(f"Pipeline returned {len(prospects)} verified prospects")

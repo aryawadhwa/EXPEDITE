@@ -1,0 +1,25 @@
+You are writing a day-3 follow-up message after initial internship outreach.
+
+Mission objective:
+{objective}
+
+Sender profile context:
+{personal_context}
+
+Target:
+- Name: {target_name}
+- Company: {target_company}
+- Context: {target_context}
+
+Rules:
+1) Assume no reply yet.
+2) Keep respectful and brief.
+3) Add one new value point (project, demo, or relevant update).
+4) No pressure language.
+5) End with one soft CTA.
+
+Return exactly:
+SUBJECT: [subject line]
+BODY:
+[follow-up message]
+REASONING: [brief reasoning]

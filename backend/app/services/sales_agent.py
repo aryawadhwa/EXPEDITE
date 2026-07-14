@@ -15,10 +15,9 @@ Key Features:
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from pydantic import BaseModel, Field
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from app.core.config import settings
+from app.core.llm import create_chat_llm
 import json
 import logging
 
@@ -92,7 +91,7 @@ class SalesAgentConfig(BaseModel):
     conversation_type: str = "EXPEDITE"  # or "inbound"
     product_catalog: Optional[str] = None
     use_tools: bool = True
-    model_name: str = "gpt-4o-mini"  # Optimized for GPT-4o mini
+    model_name: str = "gemini-1.5-flash"
     temperature: float = 0.7
     max_tokens: int = 500
 
@@ -127,12 +126,11 @@ class SalesGPTAgent:
         self.config = config
         self.conversation: Optional[SalesConversation] = None
         
-        # Initialize LLM (GPT-4o mini)
-        self.llm = ChatOpenAI(
-            model=config.model_name,
+        # Gemini-first, with OpenAI fallback from centralized factory.
+        self.llm = create_chat_llm(
             temperature=config.temperature,
-            max_tokens=config.max_tokens,
-            openai_api_key=settings.OPENAI_API_KEY
+            model_name=config.model_name,
+            max_tokens=config.max_tokens
         )
         
         # Load product catalog if provided
@@ -407,7 +405,7 @@ def create_sales_agent(
         company_name=company_name,
         conversation_purpose=conversation_purpose,
         product_catalog=product_catalog,
-        model_name="gpt-4o-mini",  # Using GPT-4o mini as requested
+        model_name="gemini-1.5-flash",
         temperature=0.7
     )
     

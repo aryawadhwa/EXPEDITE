@@ -1,14 +1,39 @@
-
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.models import User
+from app.models import User, UserSettings
 from app.core.config import settings
-import httpx
 import jwt # pyjwt
+from pydantic import BaseModel
+from typing import Optional
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
+
+
+class LocalUser(BaseModel):
+    clerk_id: str
+    email: str
+    gmail_connection_id: Optional[str] = None
+    slack_connection_id: Optional[str] = None
+    other_connections: dict = {}
+    settings: UserSettings = UserSettings()
+
+    async def save(self):
+        return None
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
+    if settings.LOCAL_MODE:
+        if settings.LOCAL_API_KEY:
+            provided = credentials.credentials if credentials else None
+            if provided != settings.LOCAL_API_KEY:
+                raise HTTPException(status_code=401, detail="Invalid local API key")
+        return LocalUser(
+            clerk_id=settings.LOCAL_USER_ID,
+            email=settings.LOCAL_USER_EMAIL,
+        )
+
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Missing auth credentials")
+
     token = credentials.credentials
     
     # In a real app, verify the token signature using Clerk's JWKS or Secret Key

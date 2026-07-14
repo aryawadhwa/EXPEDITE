@@ -1,13 +1,14 @@
 fastapi
 uvicorn
 beanie
-pymongo>=4.11.0,<5.0.0,!=4.15.0
+motor
 pydantic-settings
 python-dotenv
 langchain
 langgraph
 langchain-groq
 langchain-openai
+langchain-google-genai
 httpx
 pyjwt
 firecrawl-py
@@ -15,20 +16,24 @@ websockets
 boto3
 python-multipart
 composio
-neo4j~=5.28
 # RAG document parsing
 PyPDF2
 python-docx
-# Web scraping
-beautifulsoup4
-lxml
-requests
 # Email verification
 dnspython
 # Retry logic
 tenacity==8.2.3
 # Input validation
 email-validator==2.1.0
-# Caching
-aiocache==0.12.2
-redis==5.0.1
+PyYAML==6.0.2
+sqlmodel==0.0.22
+psycopg[binary]==3.2.9
+apscheduler==3.10.4
+
+# MLX & Local RAG
+mlx
+mlx-lm
+sentence-transformers
+faiss-cpu
+langchain-huggingface
+langchain-community

@@ -6,8 +6,17 @@ knowledge assets. It supports PDF, TXT, MD, and DOCX files.
 """
 
 import io
+import bson
 from typing import List, Dict, Optional
 from app.models import UserAsset
+from beanie.operators import In
+
+try:
+    from langchain_community.vectorstores import FAISS
+    from langchain_huggingface import HuggingFaceEmbeddings
+    HAS_FAISS = True
+except ImportError:
+    HAS_FAISS = False
 
 # Optional imports for document parsing
 try:
@@ -107,58 +116,134 @@ class RAGService:
     async def get_multiple_assets_content(asset_ids: List[str]) -> Dict[str, str]:
         """
         Extract content from multiple assets.
-        
-        Returns a dict mapping asset_id -> content
+
+        Uses a single batch query (no N+1) and returns a dict mapping asset_id -> content.
         """
+        if not asset_ids:
+            return {}
+
+        # ⚡ Batch fetch – one DB round-trip instead of N
+        valid_ids = []
+        for aid in asset_ids:
+            try:
+                valid_ids.append(bson.ObjectId(aid))
+            except Exception:
+                pass
+
+        if not valid_ids:
+            return {}
+
+        assets = await UserAsset.find(In(UserAsset.id, valid_ids)).to_list()
+
         results = {}
-        for asset_id in asset_ids:
-            content = await RAGService.get_asset_content(asset_id)
+        for asset in assets:
+            content = RAGService._extract_content_from_asset(asset)
             if content:
-                results[asset_id] = content
+                results[str(asset.id)] = content
         return results
+
+    @staticmethod
+    def _extract_content_from_asset(asset: UserAsset) -> Optional[str]:
+        """Extract text from an already-fetched UserAsset (sync, no DB call)."""
+        content_type = asset.content_type.lower()
+        filename = asset.filename.lower()
+        try:
+            if content_type == "application/pdf" or filename.endswith(".pdf"):
+                return RAGService._extract_pdf(asset.file_data)
+            elif content_type in ["text/plain", "text/markdown"] or filename.endswith((".txt", ".md")):
+                return asset.file_data.decode("utf-8", errors="ignore")
+            elif content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or filename.endswith(".docx"):
+                return RAGService._extract_docx(asset.file_data)
+            elif content_type == "application/json" or filename.endswith(".json"):
+                return asset.file_data.decode("utf-8", errors="ignore")
+            else:
+                try:
+                    return asset.file_data.decode("utf-8", errors="ignore")
+                except Exception:
+                    return f"[Binary file: {asset.filename}]"
+        except Exception as e:
+            return f"[Error extracting content from {asset.filename}: {str(e)}]"
     
     @staticmethod
-    async def build_context_from_assets(asset_ids: List[str], max_chars: int = 8000) -> str:
+    async def build_context_from_assets(asset_ids: List[str], query: str = "", max_chars: int = 8000) -> str:
         """
         Build a combined context string from multiple assets.
-        
-        Truncates content to fit within max_chars while preserving
-        structure from each document.
+
+        Uses a single batch DB query (no N+1). Falls back to full-context injection
+        when the total content is small or FAISS is not available.
         """
         if not asset_ids:
             return ""
-        
-        contents = await RAGService.get_multiple_assets_content(asset_ids)
-        
+
+        # ⚡ One DB round-trip for all assets
+        valid_ids = []
+        for aid in asset_ids:
+            try:
+                valid_ids.append(bson.ObjectId(aid))
+            except Exception:
+                pass
+
+        if not valid_ids:
+            return ""
+
+        assets = await UserAsset.find(In(UserAsset.id, valid_ids)).to_list()
+        asset_map = {str(a.id): a for a in assets}
+
+        contents: Dict[str, str] = {}
+        for asset in assets:
+            content = RAGService._extract_content_from_asset(asset)
+            if content:
+                contents[str(asset.id)] = content
+
         if not contents:
             return ""
-        
-        # Get asset metadata for context
-        context_parts = []
-        chars_used = 0
-        
-        for asset_id, content in contents.items():
-            asset = await UserAsset.get(asset_id)
-            if not asset:
-                continue
-            
-            # Add document header
-            header = f"\n--- From: {asset.filename} ---\n"
-            
-            # Calculate available space
-            remaining = max_chars - chars_used - len(header) - 100  # Buffer
-            
-            if remaining <= 0:
-                break
-            
-            # Truncate content if needed
-            if len(content) > remaining:
-                content = content[:remaining] + "... [truncated]"
-            
-            context_parts.append(header + content)
-            chars_used += len(header) + len(content)
-        
-        return "\n".join(context_parts)
+
+        total_length = sum(len(c) for c in contents.values())
+        if not HAS_FAISS or not query or total_length < 15000:
+            # Full context injection (no vector search needed)
+            context_parts = []
+            chars_used = 0
+            for asset_id, content in contents.items():
+                asset = asset_map.get(asset_id)
+                filename = asset.filename if asset else asset_id
+                header = f"\n--- From: {filename} ---\n"
+                remaining = max_chars - chars_used - len(header) - 100
+                if remaining <= 0:
+                    break
+                if len(content) > remaining:
+                    content = content[:remaining] + "... [truncated]"
+                context_parts.append(header + content)
+                chars_used += len(header) + len(content)
+            return "\n".join(context_parts)
+
+        # Semantic Search via FAISS + MPS hardware acceleration
+        try:
+            embeddings = HuggingFaceEmbeddings(
+                model_name="all-MiniLM-L6-v2",
+                model_kwargs={"device": "mps"},
+            )
+            all_chunks: List[str] = []
+            chunk_metadatas = []
+            for asset_id, content in contents.items():
+                filename = asset_map.get(asset_id, {}).filename if asset_map.get(asset_id) else "Unknown"
+                chunks = RAGService.chunk_content(content)
+                all_chunks.extend(chunks)
+                chunk_metadatas.extend([{"source": filename}] * len(chunks))
+
+            if not all_chunks:
+                return ""
+
+            vectorstore = FAISS.from_texts(all_chunks, embeddings, metadatas=chunk_metadatas)
+            docs = vectorstore.similarity_search(query, k=5)
+            context_parts = [
+                f"\n--- From: {doc.metadata.get('source', 'Unknown')} ---\n{doc.page_content}"
+                for doc in docs
+            ]
+            return "\n".join(context_parts)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"FAISS/MPS error in RAG: {e}")
+            return ""
     
     @staticmethod
     def chunk_content(content: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:

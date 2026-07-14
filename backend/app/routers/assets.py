@@ -3,8 +3,16 @@ from typing import List, Dict
 from app.api.deps import get_current_user
 from app.models import User, UserAsset
 import base64
+from pydantic import BaseModel
 
 router = APIRouter()
+
+
+class GitHubImportRequest(BaseModel):
+    username: str
+    max_repos: int = 20
+    include_readmes: bool = True
+    include_forks: bool = False
 
 # CORS preflight handler for upload
 @router.options("/upload")
@@ -188,4 +196,68 @@ async def build_rag_context(
         "context": context,
         "asset_count": len(asset_ids),
         "context_length": len(context)
+    }
+
+
+@router.post("/import/github")
+async def import_from_github(
+    req: GitHubImportRequest,
+    user: User = Depends(get_current_user)
+):
+    """
+    Import public GitHub repositories as a single markdown knowledge asset.
+    This lets outbound generation use your projects automatically.
+    """
+    from app.services.github_ingest import github_ingest_service
+
+    if req.max_repos < 1:
+        raise HTTPException(status_code=400, detail="max_repos must be >= 1")
+    if req.max_repos > 100:
+        req.max_repos = 100
+
+    profile = await github_ingest_service.build_profile_markdown(
+        username=req.username,
+        max_repos=req.max_repos,
+        include_readmes=req.include_readmes,
+        include_forks=req.include_forks,
+    )
+
+    markdown = profile.get("summary_markdown", "")
+    repos = profile.get("repos", [])
+    if not markdown or not repos:
+        raise HTTPException(
+            status_code=404,
+            detail="No public repositories found for this username."
+        )
+
+    filename = f"github-profile-{req.username}.md"
+    content_bytes = markdown.encode("utf-8", errors="ignore")
+
+    existing = await UserAsset.find_one(
+        UserAsset.user_id == user.clerk_id,
+        UserAsset.filename == filename
+    )
+    if existing:
+        existing.content_type = "text/markdown"
+        existing.file_data = content_bytes
+        existing.size_bytes = len(content_bytes)
+        await existing.save()
+        asset_id = str(existing.id)
+    else:
+        asset = UserAsset(
+            user_id=user.clerk_id,
+            filename=filename,
+            content_type="text/markdown",
+            file_data=content_bytes,
+            size_bytes=len(content_bytes),
+        )
+        await asset.insert()
+        asset_id = str(asset.id)
+
+    return {
+        "status": "success",
+        "asset_id": asset_id,
+        "filename": filename,
+        "repo_count": len(repos),
+        "message": "GitHub projects imported into knowledge assets."
     }

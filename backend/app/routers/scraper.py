@@ -10,6 +10,7 @@ from app.models import User
 from app.api.deps import get_current_user
 from app.services.web_scraper import enhanced_scraper, EmailScraper, JobBoardScraper
 from app.services.smtp_verifier import EmailVerifier, ValidationLevel
+from app.services.market_intelligence import market_intel_service
 import logging
 
 router = APIRouter()
@@ -50,6 +51,16 @@ class EmailVerifyRequest(BaseModel):
 class EmailVerifyBatchRequest(BaseModel):
     emails: List[str]
     validation_level: str = "mx"
+
+
+class SectorIntelRequest(BaseModel):
+    sectors: List[str]
+    per_sector_limit: int = 6
+
+
+class CompanyIntelRequest(BaseModel):
+    company: str
+    limit: int = 5
 
 
 @router.post("/scrape-emails")
@@ -336,3 +347,35 @@ async def verify_emails_batch(
     except Exception as e:
         logger.error(f"Batch email verification failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sector-intel")
+async def get_sector_intelligence(
+    request: SectorIntelRequest,
+    user: User = Depends(get_current_user)
+):
+    """
+    Rank sectors by hiring/news momentum to guide application focus.
+    """
+    if not request.sectors:
+        raise HTTPException(status_code=400, detail="Please provide at least one sector")
+    signals = await market_intel_service.sector_signals(
+        sectors=request.sectors,
+        per_sector_limit=max(1, min(request.per_sector_limit, 20)),
+    )
+    return {"success": True, "signals": signals}
+
+
+@router.post("/company-intel")
+async def get_company_intelligence(
+    request: CompanyIntelRequest,
+    user: User = Depends(get_current_user)
+):
+    """
+    Return company news + application/interview research links.
+    """
+    intel = await market_intel_service.company_intel(
+        company=request.company,
+        limit=max(1, min(request.limit, 15)),
+    )
+    return {"success": True, "intel": intel}

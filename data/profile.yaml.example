@@ -1,0 +1,35 @@
+identity:
+  name: "Your Name"
+  headline: "CS student focused on AI systems and backend engineering"
+
+goals:
+  target_roles:
+    - "Software Engineering Intern"
+    - "AI/ML Intern"
+  target_domains:
+    - "AI"
+    - "Security"
+    - "Developer Tools"
+
+strengths:
+  - "Strong Python and TypeScript foundations"
+  - "Built production-grade full-stack systems"
+  - "Comfortable with distributed systems and APIs"
+
+projects:
+  - name: "SafeX-ML"
+    stack: ["Python", "PyTorch", "Security"]
+    impact: "Built secure ML pipeline and prepared research submission"
+  - name: "EXPEDITE"
+    stack: ["FastAPI", "LangGraph", "React", "MongoDB"]
+    impact: "Built outbound automation platform with human-in-loop review"
+
+story_snippets:
+  - "I enjoy shipping systems that mix product thinking with robust engineering."
+  - "My projects focus on measurable impact, not toy demos."
+
+message_constraints:
+  - "Keep outreach concise and specific"
+  - "Always include one role-specific relevance point"
+  - "Always include one company-specific observation"
+  - "Avoid generic language"

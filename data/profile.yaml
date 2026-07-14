@@ -1,0 +1,26 @@
+name: Arya Wadhwa
+role_targets: [SWE Intern, AI/ML Intern, Security Research Intern]
+stack: [Python, TypeScript, FastAPI, React, LangChain, Supabase]
+
+projects:
+  - name: SafeX-ML
+    hook: "multimodal security layer for P2D prompt injection on agentic AI"
+    match_tags: [AI security, LLM, agents, adversarial ML]
+  - name: EXPEDITE
+    hook: "agentic outbound platform with LangGraph + multi-channel Composio"
+    match_tags: [LLM agents, FastAPI, full-stack, startup tools]
+  - name: Ledger
+    hook: "personal finance tracker with Supabase MCP real-time sync"
+    match_tags: [fintech, Supabase, React, live demo]
+
+story_snippets:
+  - "second-year undergrad on a 4-person security research team targeting IEEE S&P"
+  - "shipped a full LangGraph agentic system end-to-end as a side project"
+  - "building in public — all projects on GitHub with writeups"
+
+message_constraints:
+  - "Rule 1: include exactly one company-specific detail."
+  - "Rule 2: include exactly one role-specific match from project tags."
+  - "Rule 3: avoid generic fluff terms."
+  - "Rule 4: end with one short CTA only."
+  - "Rule 5: maximum 3 paragraphs and under 150 words."

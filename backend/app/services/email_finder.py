@@ -180,7 +180,8 @@ class EmailFinder:
     
     async def enrich_prospect_with_email(
         self, 
-        prospect: Dict
+        prospect: Dict,
+        persona: str = "corporate"
     ) -> Dict:
         """
         Enrich a prospect dict with email if not present.
@@ -206,18 +207,50 @@ class EmailFinder:
         emails = await self.find_emails_for_company(domain, limit=5)
         
         if emails:
-            # Use first email with highest confidence
-            best_email = max(emails, key=lambda x: x.get("confidence", 0))
-            prospect["public_contact"] = best_email["email"]
-            prospect["email_confidence"] = best_email["confidence"]
-            prospect["email_source"] = "Hunter.io"
+            from app.services.smtp_verifier import EmailVerifier, ValidationLevel
+            verifier = EmailVerifier(smtp_safe_check=True)
+
+            # 1. Filter out generic "info@" style emails
+            generic_prefixes = ['info@', 'support@', 'sales@', 'contact@', 'hello@', 'marketing@', 'admin@', 'office@', 'help@']
+            valid_emails = [e for e in emails if not any(e['email'].lower().startswith(p) for p in generic_prefixes)]
             
-            # Update name if we have better info
-            if best_email.get("first_name") and best_email.get("last_name"):
-                prospect["name"] = f"{best_email['first_name']} {best_email['last_name']}"
+            if not valid_emails:
+                return prospect
+
+            # 2. Prioritize roles based on persona
+            if persona == "academic":
+                target_keywords = ['professor', 'research', 'lab', 'principal investigator', 'postdoc', 'university', 'science', 'faculty', 'phd']
+            elif persona == "startup":
+                target_keywords = ['founder', 'ceo', 'cto', 'engineering', 'lead', 'head']
+            else:
+                target_keywords = ['hr', 'recruiting', 'talent', 'people', 'hiring', 'university', 'campus']
+                
+            targeted_emails = [e for e in valid_emails if any(kw in e.get('department', '').lower() or kw in e.get('position', '').lower() for kw in target_keywords)]
             
-            if best_email.get("position"):
-                prospect["title"] = best_email["position"]
+            # Use targeted emails if found, otherwise fall back to any non-generic valid email
+            target_list = targeted_emails if targeted_emails else valid_emails
+            
+            # Sort by confidence
+            target_list.sort(key=lambda x: x.get("confidence", 0), reverse=True)
+
+            # 3. SMTP Verification to ensure email is REAL
+            best_email = None
+            for email_obj in target_list:
+                result = verifier.verify(email_obj["email"], validation_level=ValidationLevel.MX_BLACKLIST)
+                if result.valid:
+                    best_email = email_obj
+                    break
+            
+            if best_email:
+                prospect["public_contact"] = best_email["email"]
+                prospect["email_confidence"] = best_email["confidence"]
+                prospect["email_source"] = "Hunter.io + Verified"
+                
+                if best_email.get("first_name") and best_email.get("last_name"):
+                    prospect["name"] = f"{best_email['first_name']} {best_email['last_name']}"
+                
+                if best_email.get("position"):
+                    prospect["title"] = best_email["position"]
         
         return prospect
 

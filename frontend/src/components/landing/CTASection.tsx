@@ -2,7 +2,6 @@ import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 import { GlassButton } from "@/components/ui/glass-button";
 
 export function CTASection() {
@@ -53,22 +52,12 @@ export function CTASection() {
             </div>
 
             <div className="flex items-center gap-6">
-              <SignedIn>
-                <Link to="/dashboard">
-                  <GlassButton size="md" variant="primary" className="text-base px-8 py-4 rounded-full">
-                    Launch Mission Control
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </GlassButton>
-                </Link>
-              </SignedIn>
-              <SignedOut>
-                <SignInButton mode="modal">
-                  <GlassButton size="md" variant="primary" className="text-base px-8 py-4 rounded-full">
-                    Get Started
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </GlassButton>
-                </SignInButton>
-              </SignedOut>
+              <Link to="/dashboard">
+                <GlassButton size="md" variant="primary" className="text-base px-8 py-4 rounded-full">
+                  Launch Mission Control
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </GlassButton>
+              </Link>
             </div>
           </div>
         </div>

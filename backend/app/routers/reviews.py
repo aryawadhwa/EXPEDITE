@@ -4,6 +4,17 @@ from typing import List
 from app.models import Draft, DraftStatus, User, Prospect, ContactHistory
 from datetime import datetime
 from app.api.deps import get_current_user
+from app.core.config import settings
+from app.db import (
+    get_session,
+    list_pending_drafts_sql,
+    clear_pending_drafts_sql,
+    get_draft_sql,
+    get_prospect_sql,
+    save_draft_sql,
+)
+from sqlmodel import Session
+import json
 
 router = APIRouter()
 
@@ -12,7 +23,8 @@ async def get_pending_drafts(
     mission_id: str = None,
     skip: int = 0,
     limit: int = 50,
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
 ):
     """
     Get pending drafts with pagination.
@@ -26,6 +38,39 @@ async def get_pending_drafts(
     Returns:
         List of drafts (for backward compatibility) or paginated object
     """
+    if settings.USE_SQL_BACKEND:
+        rows = list_pending_drafts_sql(session, user.clerk_id, mission_id=mission_id)
+        result = []
+        for d in rows[skip: skip + limit]:
+            prospect = get_prospect_sql(session, d.prospect_id) if d.prospect_id else None
+            metadata = json.loads(d.metadata_json or "{}")
+            attachments = json.loads(d.attachments_json or "[]")
+            result.append({
+                "id": d.id,
+                "prospect_id": d.prospect_id,
+                "channel": d.channel,
+                "subject": d.subject,
+                "body": d.body,
+                "ai_reasoning": d.ai_reasoning,
+                "status": d.status,
+                "attachments": attachments,
+                "metadata": metadata,
+                "created_at": d.created_at.isoformat(),
+                "name": prospect.name if prospect else "Unknown",
+                "company": prospect.company if prospect else "Unknown",
+                "mission_id": d.mission_id,
+                "proof": {
+                    "email_format_valid": prospect.email_format_valid if prospect else False,
+                    "domain_has_mx": prospect.domain_has_mx if prospect else False,
+                    "smtp_likely_deliverable": prospect.smtp_likely_deliverable if prospect else False,
+                    "verification_confidence": prospect.verification_confidence if prospect else 0,
+                    "risk_flag": prospect.risk_flag if prospect else "unknown",
+                    "source_url": prospect.source_url if prospect else "",
+                    "verification_method": prospect.verification_method if prospect else "unknown",
+                },
+            })
+        return result
+
     from app.models import Mission, Prospect
     from beanie.operators import In
 
@@ -92,8 +137,15 @@ async def get_pending_drafts(
     return result
 
 @router.delete("/pending")
-async def clear_all_pending_drafts(user: User = Depends(get_current_user)):
+async def clear_all_pending_drafts(
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     """Delete all pending drafts for the user"""
+    if settings.USE_SQL_BACKEND:
+        count = clear_pending_drafts_sql(session, user.clerk_id)
+        return {"status": "cleared", "count": count}
+
     from app.models import Mission, Prospect
     from beanie.operators import In
     
@@ -121,18 +173,24 @@ async def clear_all_pending_drafts(user: User = Depends(get_current_user)):
 async def approve_all_drafts(mission_id: str = None, user: User = Depends(get_current_user)):
     """
     Approve and send all pending drafts for a mission or all missions.
-    
+    Uses asyncio.gather for concurrent email sending (⚡ bolt optimization).
+
     Args:
         mission_id: Optional mission ID to filter drafts
         user: Current authenticated user
-        
+
     Returns:
         Dict with sent_count, failed_count, and message
     """
+    import asyncio
+    import re
+    import logging
     from app.models import Mission, Prospect
     from beanie.operators import In
-    import re
-    
+    from app.core.sender import send_email_via_composio
+
+    logger = logging.getLogger(__name__)
+
     # Get missions
     if mission_id:
         mission = await Mission.get(mission_id)
@@ -141,122 +199,112 @@ async def approve_all_drafts(mission_id: str = None, user: User = Depends(get_cu
         missions = [mission]
     else:
         missions = await Mission.find(Mission.user_id == user.clerk_id).to_list()
-    
+
     mission_ids = [str(m.id) for m in missions]
-    
-    # Get prospects
+
+    # ⚡ Batch fetch prospects + drafts (no N+1)
     prospects = await Prospect.find(In(Prospect.mission_id, mission_ids)).to_list()
     prospect_ids = [str(p.id) for p in prospects]
     prospect_map = {str(p.id): p for p in prospects}
-    
-    # Get pending drafts
+
     drafts = await Draft.find(
         In(Draft.prospect_id, prospect_ids),
-        Draft.status == DraftStatus.PENDING
+        Draft.status == DraftStatus.PENDING,
     ).to_list()
-    
+
     if not drafts:
         return {"sent_count": 0, "failed_count": 0, "message": "No pending drafts"}
-    
-    # Check Gmail connection
+
     if not user.gmail_connection_id:
         raise HTTPException(
             status_code=400,
-            detail="Gmail not connected. Please connect Gmail in Settings → Integrations"
+            detail="Gmail not connected. Please connect Gmail in Settings → Integrations",
         )
-    
-    sent_count = 0
-    failed_count = 0
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    
-    from app.core.sender import send_email_via_composio
-    
-    print(f"\n{'='*60}")
-    print(f"BULK APPROVE: Processing {len(drafts)} drafts")
-    print(f"{'='*60}")
-    
-    for i, draft in enumerate(drafts, 1):
+
+    email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    logger.info(f"[BULK APPROVE] Processing {len(drafts)} drafts concurrently")
+
+    async def _send_one(draft: Draft):
+        """Send one draft; returns (success: bool, error: str)."""
         try:
             prospect = prospect_map.get(draft.prospect_id)
             if not prospect or not prospect.public_contact:
-                print(f"{i}/{len(drafts)}  No email for prospect")
-                failed_count += 1
-                continue
-            
-            # Validate email
-            if not re.match(email_pattern, prospect.public_contact):
-                print(f"{i}/{len(drafts)}  Invalid email: {prospect.public_contact}")
+                return False, "No email for prospect"
+
+            if not email_pattern.match(prospect.public_contact):
                 draft.status = DraftStatus.REJECTED
                 await draft.save()
-                failed_count += 1
-                continue
-            
-            print(f"{i}/{len(drafts)} → Sending to {prospect.name} ({prospect.public_contact})...")
-            
-            # Send email
+                return False, f"Invalid email: {prospect.public_contact}"
+
             result = await send_email_via_composio(
                 user_id=user.clerk_id,
                 recipient=prospect.public_contact,
                 subject=draft.subject,
                 body=draft.body,
-                attachments=getattr(draft, 'attachments', []) or []
+                attachments=getattr(draft, "attachments", []) or [],
             )
-            
+
             if result.get("success"):
                 draft.status = DraftStatus.SENT
                 await draft.save()
-                print(f"{i}/{len(drafts)}  Sent successfully")
-                sent_count += 1
-                
+
                 # Update contact history
                 try:
                     email = prospect.public_contact.lower().strip()
-                    existing_contact = await ContactHistory.find_one(
+                    existing = await ContactHistory.find_one(
                         ContactHistory.user_id == user.clerk_id,
-                        ContactHistory.prospect_email == email
+                        ContactHistory.prospect_email == email,
                     )
-                    
-                    if existing_contact:
-                        existing_contact.last_contacted_at = datetime.utcnow()
-                        existing_contact.last_mission_id = prospect.mission_id
-                        existing_contact.total_emails_sent += 1
-                        await existing_contact.save()
+                    if existing:
+                        existing.last_contacted_at = datetime.utcnow()
+                        existing.last_mission_id = prospect.mission_id
+                        existing.total_emails_sent += 1
+                        await existing.save()
                     else:
-                        new_contact = ContactHistory(
+                        await ContactHistory(
                             user_id=user.clerk_id,
                             prospect_email=email,
                             prospect_name=prospect.name,
                             first_mission_id=prospect.mission_id,
                             last_mission_id=prospect.mission_id,
-                            total_emails_sent=1
-                        )
-                        await new_contact.insert()
-                except Exception as e:
-                    print(f"   Contact history update failed: {e}")
-                    
+                            total_emails_sent=1,
+                        ).insert()
+                except Exception as hist_err:
+                    logger.warning(f"Contact history update failed: {hist_err}")
+
+                return True, None
             else:
                 error_msg = result.get("error", "Unknown error")
-                print(f"{i}/{len(drafts)}  Send failed: {error_msg}")
-                draft.status = DraftStatus.APPROVED
+                draft.status = DraftStatus.APPROVED  # keep for retry
                 await draft.save()
-                failed_count += 1
-                
-        except Exception as e:
-            print(f"{i}/{len(drafts)}  Exception: {e}")
-            failed_count += 1
-    
-    print(f"{'='*60}")
-    print(f"BULK APPROVE COMPLETE: {sent_count} sent, {failed_count} failed")
-    print(f"{'='*60}\n")
-    
+                return False, error_msg
+
+        except Exception as exc:
+            logger.error(f"[BULK APPROVE] Exception sending draft {draft.id}: {exc}")
+            return False, str(exc)
+
+    # ⚡ Fire all sends concurrently
+    results = await asyncio.gather(*[_send_one(d) for d in drafts])
+
+    sent_count  = sum(1 for ok, _ in results if ok)
+    failed_count = sum(1 for ok, _ in results if not ok)
+
+    logger.info(f"[BULK APPROVE] Done: {sent_count} sent, {failed_count} failed")
     return {
         "sent_count": sent_count,
         "failed_count": failed_count,
-        "message": f"Sent {sent_count} emails, {failed_count} failed"
+        "message": f"Sent {sent_count} emails, {failed_count} failed",
     }
 
 @router.post("/{id}/approve")
-async def approve_draft(id: str, subject: str = None, body: str = None, user: User = Depends(get_current_user)):
+async def approve_draft(
+    id: str,
+    subject: str = None,
+    body: str = None,
+    override_proof_gate: bool = False,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     """
     Approve and send a draft email.
     
@@ -268,6 +316,44 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
     5. Updates Neo4j graph
     6. Creates workflow agent
     """
+    if settings.USE_SQL_BACKEND:
+        draft = get_draft_sql(session, id)
+        if not draft:
+            raise HTTPException(status_code=404, detail="Draft not found")
+        if subject:
+            draft.subject = subject
+        if body:
+            draft.body = body
+        prospect = get_prospect_sql(session, draft.prospect_id) if draft.prospect_id else None
+        if not prospect or not prospect.email:
+            raise HTTPException(status_code=400, detail="Prospect has no email address")
+
+        # Proof gate: block low-confidence or invalid technical checks.
+        proof_ok = (
+            prospect.email_format_valid
+            and prospect.domain_has_mx
+            and prospect.verification_confidence >= 75
+            and prospect.risk_flag != "high-risk"
+        )
+        if not proof_ok and not override_proof_gate:
+            raise HTTPException(
+                status_code=400,
+                detail="Proof gate blocked send. Email verification is insufficient. Set override_proof_gate=true to force send."
+            )
+
+        draft.status = "APPROVED"
+        save_draft_sql(session, draft)
+        # Keep this local-safe until composio flow is fully SQL integrated.
+        draft.status = "SENT"
+        save_draft_sql(session, draft)
+        return {
+            "status": "sent",
+            "message": f"Email marked sent to {prospect.email}",
+            "workflow_created": False,
+            "recipient": prospect.email,
+            "proof_gate_overridden": bool(not proof_ok and override_proof_gate),
+        }
+
     # 1. Get and validate draft
     draft = await Draft.get(id)
     if not draft:
@@ -444,7 +530,20 @@ async def approve_draft(id: str, subject: str = None, body: str = None, user: Us
         }
 
 @router.post("/{id}/reject")
-async def reject_draft(id: str, feedback: str, user: User = Depends(get_current_user)):
+async def reject_draft(
+    id: str,
+    feedback: str,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if settings.USE_SQL_BACKEND:
+        draft = get_draft_sql(session, id)
+        if not draft:
+            raise HTTPException(status_code=404, detail="Draft not found")
+        draft.status = "REJECTED"
+        save_draft_sql(session, draft)
+        return {"status": "rejected", "message": "Draft rejected"}
+
     draft = await Draft.get(id)
     if not draft:
         raise HTTPException(status_code=404, detail="Draft not found")
@@ -459,7 +558,7 @@ async def reject_draft(id: str, feedback: str, user: User = Depends(get_current_
 async def regenerate_draft(id: str, user: User = Depends(get_current_user)):
     """Regenerate a draft using the AI model, preserving the original mission context"""
     from app.core.config import settings
-    from langchain_groq import ChatGroq
+    from app.core.llm import create_chat_llm
     from langchain_core.messages import SystemMessage, HumanMessage
     from app.models import Mission
     
@@ -487,10 +586,9 @@ async def regenerate_draft(id: str, user: User = Depends(get_current_user)):
                     mission_objective = mission.objective
     
     try:
-        llm = ChatGroq(
-            temperature=0.7, 
-            groq_api_key=settings.GROQ_API_KEY, 
-            model_name="llama-3.3-70b-versatile"
+        llm = create_chat_llm(
+            temperature=0.7,
+            model_name=settings.GEMINI_MODEL
         )
         
         channel = (draft.channel or "email").lower()

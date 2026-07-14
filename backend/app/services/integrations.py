@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Callable
 from app.core.config import settings
 from datetime import datetime
 import logging
+from aiocache import cached
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,7 @@ class HunterIntegration(BaseIntegration):
         self.api_key = settings.HUNTER_API_KEY
         self.base_url = "https://api.hunter.io/v2"
     
+    @cached(ttl=3600)
     async def domain_search(
         self,
         domain: str,
@@ -219,6 +221,7 @@ class GroqIntegration:
         self.api_key = settings.GROQ_API_KEY
         self.model = "llama-3.3-70b-versatile"
     
+    @cached(ttl=3600)
     async def generate_json(self, prompt: str, retries: int = 2) -> Dict:
         """Generate JSON response"""
         from langchain_groq import ChatGroq
@@ -259,6 +262,7 @@ class OpenAIIntegration:
         self.api_key = settings.OPENAI_API_KEY
         self.model = "gpt-4o-mini"
     
+    @cached(ttl=3600)
     async def generate_json(self, prompt: str) -> Dict:
         """Generate JSON response"""
         from langchain_openai import ChatOpenAI
@@ -330,7 +334,8 @@ class ProspectPipeline:
         industries: List[str] = None,
         max_results: int = 10,
         progress_callback: Optional[Callable] = None,
-        use_web_scraping: bool = True  # NEW: Enable web scraping
+        use_web_scraping: bool = True,
+        location: Optional[str] = None
     ) -> List[Dict]:
         """
         Find prospects using Hunter.io only
@@ -344,7 +349,7 @@ class ProspectPipeline:
         try:
             return await wait_for(
                 self._find_prospects_internal(
-                    objective, titles, industries, max_results, progress_callback
+                    objective, titles, industries, max_results, progress_callback, location
                 ),
                 timeout=30.0
             )
@@ -365,7 +370,8 @@ class ProspectPipeline:
         titles: List[str],
         industries: List[str],
         max_results: int,
-        progress_callback: Optional[Callable]
+        progress_callback: Optional[Callable],
+        location: Optional[str] = None
     ) -> List[Dict]:
         """Internal pipeline implementation"""
         prospects = []
@@ -374,7 +380,7 @@ class ProspectPipeline:
         if progress_callback:
             await progress_callback("extraction", 20, "Extracting target companies...")
         
-        domains = await self._extract_company_domains(objective, industries or ["technology"])
+        domains = await self._extract_company_domains(objective, industries or ["technology"], location)
         logger.info(f"[Pipeline] Extracted {len(domains)} company domains")
         
         if not domains:
@@ -431,14 +437,17 @@ class ProspectPipeline:
     async def _extract_company_domains(
         self,
         objective: str,
-        industries: List[str]
+        industries: List[str],
+        location: Optional[str] = None
     ) -> List[str]:
         """Use LLM to extract target company domains"""
+        location_context = f"\nTarget Location: {location}" if location else ""
+        
         prompt = f"""Extract company domains for this objective: {objective}
 
-Industries: {', '.join(industries)}
+Industries: {', '.join(industries)}{location_context}
 
-Return JSON with a list of well-known company domains in these industries.
+Return JSON with a list of well-known company domains in these industries{" and specifically headquartered or active in the target location" if location else ""}.
 Focus on companies that would have the type of people described in the objective.
 
 Example format:

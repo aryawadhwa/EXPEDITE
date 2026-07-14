@@ -4,199 +4,110 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
-import Dashboard from "./pages/Dashboard";
-import Launchpad from "./pages/Launchpad";
-import ReviewQueue from "./pages/ReviewQueue";
-import ActiveAgents from "./pages/ActiveAgents";
-import DeployAgent from "./pages/DeployAgent";
-import Settings from "./pages/Settings";
-import Landing from "./pages/Landing";
-import NotFound from "./pages/NotFound";
-import MissionChat from "./pages/MissionChat";
-import Calendar from "./pages/Calendar";
-import ContactHistory from "./pages/ContactHistory";
-import { Integrations } from "./pages/Integrations";
-import Profile from "./pages/Profile";
-import ProspectResearch from "./pages/ProspectResearch";
-import LoadingScreen from "@/components/ui/LoadingScreen";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, lazy, type ReactNode } from "react";
 
-import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/clerk-react";
-import SignIn from "./pages/SignIn";
-import SignUp from "./pages/SignUp";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Launchpad = lazy(() => import("./pages/Launchpad"));
+const ReviewQueue = lazy(() => import("./pages/ReviewQueue"));
+const ActiveAgents = lazy(() => import("./pages/ActiveAgents"));
+const DeployAgent = lazy(() => import("./pages/DeployAgent"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Landing = lazy(() => import("./pages/Landing"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const MissionChat = lazy(() => import("./pages/MissionChat"));
+const Calendar = lazy(() => import("./pages/Calendar"));
+const ContactHistory = lazy(() => import("./pages/ContactHistory"));
+const Integrations = lazy(() => import("./pages/Integrations").then(module => ({ default: module.Integrations })));
+const Profile = lazy(() => import("./pages/Profile"));
+const ProspectResearch = lazy(() => import("./pages/ProspectResearch"));
+const VoiceCall = lazy(() => import("./pages/VoiceCall"));
+
+import LoadingScreen from "@/components/ui/LoadingScreen";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
+const ProtectedLayout = ({ children }: { children: ReactNode }) => (
+  <AppLayout>{children}</AppLayout>
+);
+
 // Wrapper to handle route transitions
 const AppContent = () => {
-  const location = useLocation();
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    // Trigger loading animation on route change
-    setIsLoading(true);
-    const timer = setTimeout(() => setIsLoading(false), 1500);
-    return () => clearTimeout(timer);
-  }, [location.pathname]);
-
   return (
-    <>
-      {isLoading && <LoadingScreen />}
+    <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Landing />} />
-        <Route path="/sign-in" element={<SignIn />} />
-        <Route path="/sign-up" element={<SignUp />} />
 
-        {/* Protected Routes */}
+        {/* App Routes (single-user local mode) */}
         <Route path="/dashboard" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <Dashboard />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <Dashboard />
+          </ProtectedLayout>
         } />
         <Route path="/launchpad" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <Launchpad />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <Launchpad />
+          </ProtectedLayout>
         } />
         <Route path="/chat/:missionId" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <MissionChat />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <MissionChat />
+          </ProtectedLayout>
         } />
         <Route path="/review" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <ReviewQueue />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <ReviewQueue />
+          </ProtectedLayout>
         } />
         <Route path="/calendar" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <Calendar />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <Calendar />
+          </ProtectedLayout>
         } />
         <Route path="/contacts" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <ContactHistory />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <ContactHistory />
+          </ProtectedLayout>
         } />
         <Route path="/agents" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <ActiveAgents />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <ActiveAgents />
+          </ProtectedLayout>
         } />
         <Route path="/agents/deploy" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <DeployAgent />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <DeployAgent />
+          </ProtectedLayout>
         } />
         <Route path="/settings" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <Settings />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <Settings />
+          </ProtectedLayout>
         } />
         <Route path="/integrations" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <Integrations />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <Integrations />
+          </ProtectedLayout>
         } />
         <Route path="/profile" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <Profile />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <Profile />
+          </ProtectedLayout>
         } />
         <Route path="/research" element={
-          <>
-            <SignedIn>
-              <AppLayout>
-                <ProspectResearch />
-              </AppLayout>
-            </SignedIn>
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          </>
+          <ProtectedLayout>
+            <ProspectResearch />
+          </ProtectedLayout>
+        } />
+        <Route path="/voice" element={
+          <ProtectedLayout>
+            <VoiceCall />
+          </ProtectedLayout>
         } />
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+    </Suspense>
   );
 };
 

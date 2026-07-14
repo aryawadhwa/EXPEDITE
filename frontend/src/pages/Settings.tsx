@@ -21,7 +21,8 @@ import {
   Shield,
   Zap,
   ExternalLink,
-  Check
+  Check,
+  Lock
 } from "lucide-react";
 
 
@@ -338,6 +339,33 @@ export default function Settings() {
           </div>
         </Card>
       </section>
-    </div >
+
+      {/* Trust & Privacy Center */}
+      <section className="mb-8 mt-8">
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Lock className="w-5 h-5 text-primary" />
+          Trust & Privacy Center
+        </h2>
+        <Card className="p-5 bg-zinc-900/50 backdrop-blur-md border border-white/10 space-y-4">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/20">
+                GDPR Compliant
+              </Badge>
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+                SOC2 Ready
+              </Badge>
+            </div>
+            <p className="text-sm text-zinc-300">
+              Your data is processed in isolated execution environments. We strictly adhere to GDPR guidelines for data minimization and processing.
+            </p>
+            <div className="flex items-center gap-2 mt-2">
+              <Shield className="w-4 h-4 text-green-400" />
+              <p className="text-sm text-zinc-400 font-medium">Zero Raw Passwords Stored</p>
+            </div>
+          </div>
+        </Card>
+      </section>
+    </div>
   );
 }

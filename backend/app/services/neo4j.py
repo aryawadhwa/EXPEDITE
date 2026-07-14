@@ -1,6 +1,7 @@
 import logging
-from typing import List, Dict, Optional, Any
-from neo4j import GraphDatabase
+from typing import List, Dict, Any
+from pathlib import Path
+import json
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -9,9 +10,24 @@ class Neo4jService:
     def __init__(self):
         self._driver = None
         self._database = settings.NEO4J_DATABASE
+        self._local_path = Path(__file__).resolve().parents[3] / "data" / "contacts.json"
+        self._local_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self._local_path.exists():
+            self._local_path.write_text("{}", encoding="utf-8")
+
+    def _read_local(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self._local_path.read_text(encoding="utf-8") or "{}")
+        except Exception:
+            return {}
+
+    def _write_local(self, payload: Dict[str, Any]) -> None:
+        self._local_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         
     def connect(self):
         """Establish connection to Neo4j database"""
+        if settings.LOCAL_MODE:
+            return
         if self._driver:
             return
 
@@ -39,6 +55,8 @@ class Neo4jService:
 
     def execute_query(self, query: str, params: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """Execute a Cypher query and return results as a list of dictionaries"""
+        if settings.LOCAL_MODE:
+            return []
         if not self._driver:
             self.connect()
             if not self._driver:
@@ -63,6 +81,13 @@ class Neo4jService:
         Find or create a Person node by name.
         Behaves deterministically: if exists, return it; if not, create it.
         """
+        if settings.LOCAL_MODE:
+            db = self._read_local()
+            person = db.get(name) or {"name": name, "contacts": {}}
+            db[name] = person
+            self._write_local(db)
+            return person
+
         query = """
         MERGE (p:Person {name: $name})
         RETURN p
@@ -79,6 +104,14 @@ class Neo4jService:
         
         Channels: email, linkedin, github, twitter, phone, etc.
         """
+        if settings.LOCAL_MODE:
+            db = self._read_local()
+            person = db.get(person_name) or {"name": person_name, "contacts": {}}
+            person["contacts"][channel.lower()] = identifier
+            db[person_name] = person
+            self._write_local(db)
+            return True
+
         # Normalize channel to uppercase for relationship type convention (e.g., HAS_EMAIL)
         # But user asked for specific node labels like 'Email', 'LinkedIn'. 
         # Let's follow the pattern: (Person)-[:HAS_<CHANNEL>]->(ChannelNode)
@@ -115,6 +148,11 @@ class Neo4jService:
         Retrieve all known contact methods for a person.
         Returns a dictionary: { "email": "sriram@example.com", "linkedin": "..." }
         """
+        if settings.LOCAL_MODE:
+            db = self._read_local()
+            person = db.get(person_name) or {}
+            return person.get("contacts", {})
+
         # Dynamic query to fetch all outgoing relationships that look like contact methods
         query = """
         MATCH (p:Person {name: $name})-[r]->(c)

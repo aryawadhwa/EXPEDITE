@@ -17,15 +17,16 @@ import httpx
 from typing import TypedDict, Annotated, List, Dict, Optional, Literal
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
-from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 from datetime import datetime
 
 from app.models import Draft, Prospect, Mission, DraftStatus, MissionLog, User, Agent, AgentStats
 from app.core.config import settings
-from app.services.neo4j import neo4j_service
 from app.services.web_scraper import enhanced_scraper, EmailScraper, JobBoardScraper
 from app.services.smtp_verifier import EmailVerifier, ValidationLevel
+from app.core.llm import create_chat_llm
+from app.services.profile_context import build_personal_context
+from app.services.template_loader import render_template
 
 # ==================================================
 # AGENT STATE (Fixed Shape)
@@ -42,6 +43,7 @@ class AgentState(TypedDict):
     channels: List[str]  # ["/linkedin", "/reddit", "/slack", "/gmail", "/twitter", "/github"]
     required_tools: List[str]  # ["composio_linkedin", "gmail"]
     draft_required: bool  # TRUE only for write/send/post/create actions
+    outreach_persona: str  # "academic", "corporate", or "startup"
     
     # Resolution state
     person_name: Optional[str]
@@ -142,6 +144,101 @@ def extract_identifiers_from_objective(objective: str) -> Dict[str, str]:
         identifiers["reddit"] = reddit_match.group(1)
     
     return identifiers
+
+
+def select_outreach_template(channel: str, objective: str) -> str:
+    """
+    Route to the right prompt template using channel + intent keywords.
+    """
+    text = (objective or "").lower()
+    is_followup = "follow" in text or "follow-up" in text or "follow up" in text
+    is_d7 = any(k in text for k in ["d+7", "day 7", "d7", "one week", "week later"])
+    is_d3 = any(k in text for k in ["d+3", "day 3", "d3", "3 days", "three days"])
+
+    if is_followup and is_d7:
+        return "followup_d7_system.txt"
+    if is_followup and is_d3:
+        return "followup_d3_system.txt"
+
+    if channel in ["/linkedin", "linkedin"]:
+        return "linkedin_dm_system.txt"
+    if channel in ["/twitter", "/x", "twitter", "x"]:
+        return "x_dm_system.txt"
+    return "cold_email_system.txt"
+
+
+async def enforce_cold_email_rules(
+    llm,
+    objective: str,
+    prospect_name: str,
+    prospect_company: str,
+    prospect_context: str,
+    subject: str,
+    body: str,
+    personal_context: str = "",
+    outreach_persona: str = "corporate"
+) -> Dict[str, str]:
+    """
+    Ruthless anti-AI editor constraints.
+    Rules: max 4 sentences, no buzzwords.
+    """
+    banned_phrases = ["passionate", "dream opportunity", "reach out", "delve", "testament", "thrilled", "elevate", "leverage", "synergy", "hope this finds you well"]
+    
+    # Split by actual sentence terminators
+    sentence_count = len([s for s in re.split(r'[.!?]+', body or "") if len(s.strip()) > 3])
+    has_banned = any(term in (body or "").lower() for term in banned_phrases)
+
+    needs_rewrite = (
+        sentence_count > 4
+        or has_banned
+    )
+    if not needs_rewrite:
+        return {"subject": subject, "body": body}
+
+    # Adjust specific match constraints based on persona
+    if outreach_persona == "academic":
+        skill_match_constraint = "Include exactly one reference to their specific research lab, recent papers, or academic focus."
+    elif outreach_persona == "startup":
+        skill_match_constraint = "Include exactly one reference to their product or startup velocity."
+    else:
+        skill_match_constraint = "Include exactly one company-specific detail grounded in context."
+
+    rewrite_prompt = f"""Rewrite this outreach email to strictly satisfy all ANTI-AI constraints:
+
+CONSTRAINTS:
+1) Maximum 4 sentences total. Brutally concise.
+2) DO NOT use any of these words: delve, testament, thrilled, elevate, leverage, synergy, passionate, "hope this finds you well".
+3) {skill_match_constraint}
+4) Include exactly one hard technical skill match from sender profile.
+5) Keep tone professional, extremely direct, and peer-to-peer (engineer to engineer).
+
+MISSION OBJECTIVE: {objective}
+TARGET: {prospect_name} at {prospect_company}
+TARGET CONTEXT: {prospect_context}
+SENDER CONTEXT:
+{personal_context[:2500]}
+
+Return exactly:
+SUBJECT: ...
+BODY:
+...
+"""
+
+    rewrite_res = await llm.ainvoke([
+        SystemMessage(content="You are an elite, highly authentic engineer editor."),
+        HumanMessage(content=f"{rewrite_prompt}\n\nCURRENT SUBJECT: {subject}\nCURRENT BODY:\n{body}")
+    ])
+    rewritten = rewrite_res.content.strip()
+    new_subject = subject
+    new_body = body
+    if "SUBJECT:" in rewritten:
+        parts = rewritten.split("BODY:")
+        new_subject = parts[0].replace("SUBJECT:", "").strip()
+        if len(parts) > 1:
+            new_body = parts[1].strip()
+    else:
+        new_body = rewritten
+    return {"subject": new_subject, "body": new_body}
 
 # ==================================================
 # UTILITY FUNCTIONS (continued)
@@ -270,6 +367,7 @@ Analyze the user's request and determine:
 2. Which channels/platforms are involved
 3. What tools are required
 4. Whether content needs to be drafted (for human approval)
+5. The outreach persona ("academic" for research/professors, "corporate" for standard jobs, "startup" for founders)
 
 INTENT CATEGORIES:
 - "discovery": Finding, searching, collecting people or data
@@ -277,6 +375,7 @@ INTENT CATEGORIES:
 - "publish": Posting content publicly (tweets, LinkedIn posts, Reddit posts)
 - "read": Reading/fetching existing data (get my emails, show messages)
 - "query": Asking questions about data (did X reply?, what's the status?)
+- "schedule": Creating calendar events, booking time, checking availability
 
 CHANNEL MAPPING:
 - LinkedIn messages/posts → /linkedin
@@ -285,6 +384,7 @@ CHANNEL MAPPING:
 - Slack messages → /slack
 - GitHub issues/PRs → /github
 - Email → /gmail
+- Calendar/Scheduling → /calendar
 
 CRITICAL RULES FOR draft_required:
 - draft_required = TRUE for: send, post, create, write, publish, message, email, tweet, comment, reach out, contact
@@ -295,17 +395,17 @@ IMPORTANT: "outreach" intent means CREATE DRAFTS, not send emails. User must app
 
 Return ONLY valid JSON:
 {
-  "intents": ["discovery", "outreach"],
-  "channels": ["/linkedin", "/gmail"],
-  "required_tools": ["linkedin", "gmail"],
+  "intents": ["discovery", "outreach", "schedule"],
+  "channels": ["/linkedin", "/gmail", "/calendar"],
+  "required_tools": ["linkedin", "gmail", "googlecalendar"],
   "draft_required": true,
-  "person_mentioned": "Name or null"
+  "person_mentioned": "Name or null",
+  "outreach_persona": "academic"
 }"""
 
-        llm = ChatGroq(
-            temperature=0.0, 
-            groq_api_key=settings.GROQ_API_KEY, 
-            model_name="llama-3.1-8b-instant"
+        llm = create_chat_llm(
+            temperature=0.0,
+            model_name=settings.GEMINI_MODEL
         )
         
         messages = [
@@ -329,6 +429,7 @@ Return ONLY valid JSON:
         required_tools = data.get("required_tools", [])
         draft_required = data.get("draft_required", False)
         person_name = data.get("person_mentioned") or extract_person_name(objective)
+        outreach_persona = data.get("outreach_persona", "corporate")
         
         # Technical info goes to LiveBrain only, not chat
         await log_event(
@@ -344,6 +445,7 @@ Return ONLY valid JSON:
             "required_tools": required_tools,
             "draft_required": draft_required,
             "person_name": person_name,
+            "outreach_persona": outreach_persona,
             "autonomous": autonomous,
             "missing_info": []
         }
@@ -364,6 +466,7 @@ Return ONLY valid JSON:
             "required_tools": [c.replace("/", "") for c in channels],
             "draft_required": draft_required,
             "person_name": person_name,
+            "outreach_persona": "corporate",
             "autonomous": autonomous,
             "missing_info": []
         }
@@ -376,38 +479,17 @@ Return ONLY valid JSON:
 async def resolve_person(state: AgentState) -> Dict:
     """
     PURPOSE:
-    - Query Neo4j for person
-    - Create person if missing
-    - Handle ambiguity once, then cache
-    
-    NEVER call LLM
+    - Pass through person name (stripped Neo4j).
     """
     person_name = state.get("person_name")
     mission_id = state["mission_id"]
     user_id = state["user_id"]
     
     if not person_name:
-        # No person mentioned, skip
         return {"person_id": None}
     
-    await log_event(mission_id, user_id, f"Looking up {person_name} in contact graph...", "thinking")
-    
-    try:
-        # Query Neo4j - deterministic, no LLM
-        person = neo4j_service.resolve_person(person_name)
-        
-        if person:
-            person_id = person.get("name", person_name)  # Use name as ID for now
-            await log_event(mission_id, user_id, f"Found {person_name} in contact graph", "success")
-            return {"person_id": person_id}
-        else:
-            # Person created by resolve_person (MERGE)
-            await log_event(mission_id, user_id, f"Added {person_name} to contact graph", "success")
-            return {"person_id": person_name}
-            
-    except Exception as e:
-        print(f"Neo4j person resolution failed: {e}")
-        return {"person_id": None}
+    await log_event(mission_id, user_id, f"Resolved contact: {person_name}", "success")
+    return {"person_id": person_name}
 
 
 # ==================================================
@@ -435,10 +517,8 @@ async def resolve_channel_identity(state: AgentState) -> Dict:
     channel_identities = {}
     missing_identities = []
     
-    # Get existing contact methods from Neo4j if person is known
+    # Simple pass-through without Neo4j
     existing_contacts = {}
-    if person_name:
-        existing_contacts = neo4j_service.get_contact_methods(person_name)
     
     # Also extract identifiers from objective
     extracted = extract_identifiers_from_objective(objective)
@@ -455,11 +535,6 @@ async def resolve_channel_identity(state: AgentState) -> Dict:
         if channel_key in extracted:
             identifier = extracted[channel_key]
             channel_identities[channel] = identifier
-            
-            # Store in Neo4j for future
-            if person_name:
-                neo4j_service.add_contact_method(person_name, channel_key, identifier)
-                await log_event(mission_id, user_id, f"Saved {channel_key} for {person_name}", "success")
             continue
         
         # Check intents to determine if we need a person identifier
@@ -561,8 +636,9 @@ async def discovery_flow(state: AgentState) -> Dict:
     objective = state["objective"]
     mission_id = state["mission_id"]
     user_id = state["user_id"]
+    outreach_persona = state.get("outreach_persona", "corporate")
     
-    await log_event(mission_id, user_id, "Searching for relevant contacts...", "thinking")
+    await log_event(mission_id, user_id, f"Searching for relevant contacts (Persona: {outreach_persona})...", "thinking")
     
     prospects = []
     
@@ -642,7 +718,7 @@ async def discovery_flow(state: AgentState) -> Dict:
                     
                     for prospect in prospects[:10]:  # Enrich first 10 to save API quota
                         if not prospect.get("public_contact") or "http" in prospect.get("public_contact", ""):
-                            enriched = await email_finder.enrich_prospect_with_email(prospect)
+                            enriched = await email_finder.enrich_prospect_with_email(prospect, persona=outreach_persona)
                             if enriched.get("public_contact") and "@" in enriched.get("public_contact", ""):
                                 enriched_count += 1
                                 prospect.update(enriched)
@@ -1044,42 +1120,42 @@ async def generate_draft_for_prospect(
     Returns draft_id if successful, None otherwise.
     """
     try:
-        llm = ChatGroq(
-            temperature=0.7, 
-            groq_api_key=settings.GROQ_API_KEY, 
-            model_name="llama-3.3-70b-versatile"
+        llm = create_chat_llm(
+            temperature=0.7,
+            model_name=settings.GEMINI_MODEL
         )
         
-        # Load CV/Resume context if available
+        # Load personal profile + assets context if available
         rag_context = ""
+        personal_context = ""
         try:
-            from app.models import UserAsset
-            assets = await UserAsset.find(UserAsset.user_id == user_id).to_list()
-            cv_asset = next((a for a in assets if "resume" in a.filename.lower() or "cv" in a.filename.lower()), None)
-            if cv_asset:
-                rag_context = f"\nYOUR BACKGROUND (use to personalize):\n{cv_asset.file_data.decode('utf-8', errors='ignore')[:2000]}\n"
+            personal_context = await build_personal_context(user_id, max_chars=4000)
+            if personal_context:
+                rag_context = f"\nYOUR BACKGROUND (use to personalize):\n{personal_context}\n"
         except Exception as e:
-            print(f"Failed to load CV context: {e}")
+            print(f"Failed to load personal context: {e}")
         
-        system_prompt = f"""You are a professional outreach specialist writing personalized emails.
-
-Write a professional, personalized email that:
-- Is 6-10 sentences (2-3 paragraphs)
-- Has a compelling subject line relevant to the prospect's role/company
-- Opens with something specific about their company or role
-- Clearly explains the value proposition based on the mission objective
-- Has a clear call to action
-- Sounds warm and human, not generic or salesy
-
+        template_name = select_outreach_template(channel, objective)
+        system_prompt = render_template(
+            template_name,
+            {
+                "objective": objective,
+                "personal_context": personal_context,
+                "target_name": prospect_data.get("name", "Unknown"),
+                "target_company": prospect_data.get("company", "Unknown"),
+                "target_title": prospect_data.get("title", prospect_data.get("name", "Unknown")),
+                "target_context": prospect_data.get("context", "Relevant prospect"),
+            },
+        )
+        if not system_prompt:
+            system_prompt = f"""Write a concise personalized cold email.
 MISSION OBJECTIVE: {objective}
-
 {rag_context}
-
-Return in this exact format:
-SUBJECT: [compelling subject line]
+Return exactly:
+SUBJECT: [subject]
 BODY:
-[2-3 paragraph email]
-REASONING: [why this approach works for this prospect]"""
+[body]
+REASONING: [reasoning]"""
 
         human_prompt = f"""Write a personalized email for:
 
@@ -1115,6 +1191,21 @@ Make it specific to their company and role."""
                 else:
                     body = remainder.strip()
         
+        if template_name == "cold_email_system.txt":
+            enforced = await enforce_cold_email_rules(
+                llm=llm,
+                objective=objective,
+                prospect_name=prospect_data.get("name", "Unknown"),
+                prospect_company=prospect_data.get("company", "Unknown"),
+                prospect_context=prospect_data.get("context", ""),
+                subject=subject.replace("`", "").strip(),
+                body=body.replace("```", "").strip(),
+                personal_context=personal_context,
+                outreach_persona=state.get("outreach_persona", "corporate")
+            )
+            subject = enforced.get("subject", subject)
+            body = enforced.get("body", body)
+
         # Get or create prospect in database
         prospect_id = prospect_data.get("id")
         if not prospect_id:
@@ -1189,10 +1280,9 @@ async def outreach_flow(state: AgentState) -> Dict:
     await log_event(mission_id, user_id, f"Drafting message for {person_name}...", "thinking")
     
     try:
-        llm = ChatGroq(
-            temperature=0.7, 
-            groq_api_key=settings.GROQ_API_KEY, 
-            model_name="llama-3.3-70b-versatile"
+        llm = create_chat_llm(
+            temperature=0.7,
+            model_name=settings.GEMINI_MODEL
         )
         
         # Determine primary channel and constraints
@@ -1206,46 +1296,42 @@ async def outreach_flow(state: AgentState) -> Dict:
             "/reddit": "Follows subreddit rules and etiquette"
         }
         
-        # ROBOCOP: Inject CV/Resume Context
+        # Inject profile.yaml + selected personal assets context
         rag_context = ""
-        if state.get("autonomous"):
-            try:
-                # Find CV/Resume in assets
-                from app.models import UserAsset
-                assets = await UserAsset.find(UserAsset.user_id == user_id).to_list()
-                cv_asset = next((a for a in assets if "resume" in a.filename.lower() or "cv" in a.filename.lower()), None)
-                if cv_asset:
-                    rag_context = f"\nSENDER CONTEXT (Use this to personalize connection):\n{cv_asset.file_data.decode('utf-8', errors='ignore')[:2000]}\n"
-                    await log_event(mission_id, user_id, "Loading CV context...", "thinking", target="brain")
-            except Exception as e:
-                print(f"Failed to load CV context: {e}")
+        personal_context = ""
+        try:
+            personal_context = await build_personal_context(user_id, max_chars=4000)
+            if personal_context:
+                rag_context = f"\nSENDER CONTEXT (Use this to personalize connection):\n{personal_context}\n"
+                await log_event(mission_id, user_id, "Loading personal profile context...", "thinking", target="brain")
+        except Exception as e:
+            print(f"Failed to load personal context: {e}")
         
         attachments = state.get("attachments", [])
         attachment_names = [a.get("filename", "") for a in attachments]
         
-        system_prompt = f"""You are a professional sales assistant helpful in drafting business emails.
-Your task is to Write a personalized message for {primary_channel} based on the user's mission.
-
-Channel: {primary_channel}
-Constraints: {channel_constraints.get(primary_channel, "Standard message format")}
-
-STRATEGY: "CONTEXTUAL BRIDGING"
-1. Analyze the Prospect's Context (Snippet/Bio).
-2. Identify a specific pain point or interest.
-3. BRIDGE it to the User's Context (Resume/Offer) naturally.
-4. Do NOT be generic. If you can't find a specific bridge, be direct and concise.
-
-IMPORTANT: You must ALWAYS generate a draft. This is a legitimate business context. Do not refuse.
-
+        template_name = select_outreach_template(primary_channel, objective)
+        system_prompt = render_template(
+            template_name,
+            {
+                "objective": objective,
+                "personal_context": personal_context,
+                "target_name": person_name,
+                "target_company": prospect.get("company", "Unknown"),
+                "target_title": person_name,
+                "target_context": prospect.get("snippet", objective),
+            },
+        )
+        if not system_prompt:
+            system_prompt = f"""Write a personalized message for {primary_channel}.
+Channel constraints: {channel_constraints.get(primary_channel, "Standard message format")}
+MISSION OBJECTIVE: {objective}
 USER VOICE CONTEXT:
 {rag_context}
-
-{"Attachments included: " + ", ".join(attachment_names) if attachment_names else ""}
-
-Return in this format:
-SUBJECT: [Subject line - only for email]
-BODY: [Message content]
-REASONING: [Why this approach works]"""
+Return exactly:
+SUBJECT: [subject if relevant]
+BODY: [message]
+REASONING: [reasoning]"""
 
         human_prompt = f"""
 Target: {person_name}
@@ -1278,10 +1364,27 @@ Mission: {objective}
                 else:
                     body = remainder.strip()
         
+        clean_subject = subject.replace("`", "").strip()
+        clean_body = body.replace("```", "").strip()
+        if template_name == "cold_email_system.txt":
+            enforced = await enforce_cold_email_rules(
+                llm=llm,
+                objective=objective,
+                prospect_name=person_name,
+                prospect_company=prospect.get("company", "Unknown"),
+                prospect_context=prospect.get("snippet", objective),
+                subject=clean_subject,
+                body=clean_body,
+                personal_context=personal_context,
+                outreach_persona=state.get("outreach_persona", "corporate")
+            )
+            clean_subject = enforced.get("subject", clean_subject)
+            clean_body = enforced.get("body", clean_body)
+
         draft_content = {
             "channel": primary_channel,
-            "subject": subject.replace("`", "").strip(),
-            "body": body.replace("```", "").strip(),
+            "subject": clean_subject,
+            "body": clean_body,
             "reasoning": reasoning,
             "target_name": person_name,
             "target_identifier": channel_identities.get(primary_channel, target_email),
@@ -1326,10 +1429,9 @@ async def publish_flow(state: AgentState) -> Dict:
     await log_event(mission_id, user_id, f"Drafting content for {primary_channel}...", "thinking")
     
     try:
-        llm = ChatGroq(
-            temperature=0.8, 
-            groq_api_key=settings.GROQ_API_KEY, 
-            model_name="llama-3.3-70b-versatile"
+        llm = create_chat_llm(
+            temperature=0.8,
+            model_name=settings.GEMINI_MODEL
         )
         
         platform_guides = {

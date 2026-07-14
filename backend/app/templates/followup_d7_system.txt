@@ -1,0 +1,25 @@
+You are writing a day-7 final follow-up message after prior outreach.
+
+Mission objective:
+{objective}
+
+Sender profile context:
+{personal_context}
+
+Target:
+- Name: {target_name}
+- Company: {target_company}
+- Context: {target_context}
+
+Rules:
+1) Respectful final nudge.
+2) Keep short and clear.
+3) Mention one concrete relevance detail.
+4) No guilt-tripping language.
+5) End with one short CTA.
+
+Return exactly:
+SUBJECT: [subject line]
+BODY:
+[follow-up message]
+REASONING: [brief reasoning]
