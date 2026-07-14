@@ -124,29 +124,37 @@ sequenceDiagram
 ## Slide 4: Market Research, Business Model and Asset Scalability
 
 ### Executive Investment Thesis
-EXPEDITE sits at the intersection of two massive secular trends: the compression of venture capital (forcing startups to adopt highly efficient, low headcount revenue models) and the transition from static LLM wrappers to autonomous, multi agent state machines (Agentic AI). The platform disrupts the traditional B2B outbound motion by replacing expensive human SDRs with a synthetic digital worker, orchestrating pipeline generation at a 99% cost reduction.
+EXPEDITE sits at the intersection of two massive secular trends: the compression of venture capital forcing startups to adopt highly efficient, low headcount revenue models, and the transition from static LLM wrappers to autonomous, multi agent state machines (Agentic AI). The platform disrupts the traditional B2B outbound motion by replacing expensive human SDRs with a synthetic digital worker, orchestrating pipeline generation at a 99% cost reduction.
 
 ### Market Sizing: TAM, SAM & SOM
+The market for B2B sales automation and intelligence is historically fragmented, allowing a unified agentic platform to capture outsized market share. 
+
 **Total Addressable Market (TAM): ~$150 Billion.** Represents the global CRM, Sales Intelligence, and Marketing Automation software spend across all industries.
 **Serviceable Available Market (SAM): ~$25 Billion.** The specific market for Sales Engagement platforms and B2B Data Providers (ZoomInfo, Apollo, Outreach).
 **Serviceable Obtainable Market (SOM): ~$2.5 Billion.** Immediate target beachhead: Seed to Series C SaaS startups, lean recruitment agencies, and boutique consulting firms highly sensitive to SDR headcount costs.
 *(Data Sources: Gartner 2025 to 2026 B2B Sales Intelligence Research & MarketsandMarkets 2026 Agentic AI projections)*
 
 ### Macroeconomic Tailwinds
-**The End of ZIRP & The Efficiency Mandate:** Post ZIRP, companies are mandated to achieve higher Revenue Per Employee (RPE). EXPEDITE directly serves this mandate by replacing headcount with a scalable agent.
+**The End of ZIRP & The Efficiency Mandate:** In the post Zero Interest Rate Policy (ZIRP) era, hyper growth fueled by massive headcount is no longer rewarded by public markets or VCs. Companies are mandated to achieve higher Revenue Per Employee (RPE). EXPEDITE directly serves this mandate by replacing headcount with a scalable agent.
 **The "Agentic" Shift:** The market rejects basic AI text generators due to hallucination. Demand has shifted toward deterministic, verifiable orchestration (LangGraph state machines) that guarantee output accuracy. The Agentic AI market is projected to grow at a 42% to 46% CAGR through 2030 (Data Source: Mordor Intelligence & Fortune Business Insights 2026 Global Reports).
-**Stricter Email Regulations:** Google/Yahoo’s strict sender guidelines punish domains for high bounce rates. EXPEDITE’s cryptographic SMTP verification pipeline acts as an insurance policy for corporate domain reputations.
+**Stricter Email Regulations:** Google and Yahoo’s strict sender guidelines severely punish domains for high bounce rates. EXPEDITE’s cryptographic SMTP verification pipeline acts as an insurance policy for corporate domain reputations.
 
 ### Competitive Dynamics (Blue Ocean Strategy)
-**Legacy Data Monoliths (e.g., ZoomInfo):** Provide raw, static databases with zero automated reasoning and high subscription costs ($10,000+ ACV). 
+The current ecosystem is highly bifurcated. EXPEDITE creates a Blue Ocean by bridging the gap between raw data and contextual intelligence.
+
+**Legacy Data Monoliths (e.g., ZoomInfo):** Provide raw, static databases with zero automated reasoning and high subscription costs often exceeding $10,000 Annual Contract Value. 
 **Basic AI Wrappers:** Prone to hallucinations, no live SMTP verification, and generate generic output.
 **Our Advantage:** EXPEDITE bridges the gap by offering native LLM reasoning, zero upfront heavy contracts, and dynamic real time data pulling with strict Evidence First cryptographic verification.
 
 ### Business Model & Unit Economics
-**Cost Arbitrage:** Traditional Cost per Lead is ~$50.00 to $150.00. This is based on an average SDR On Target Earnings of $80,000 to $95,000 (Data Source: The Bridge Group 2024 SDR Metrics & Compensation Report), plus software overhead. EXPEDITE Cost per Lead is ~$0.02 to $0.05, offering a 99.9% cost reduction and near infinite pricing elasticity.
+EXPEDITE operates on a high margin API arbitrage model, leveraging localized caching (Redis) and hyper efficient model routing (Groq LPU architecture).
+
+**Cost Arbitrage (Human vs Synthetic):** Traditional Cost per Lead is ~$50.00 to $150.00. This is based on an average SDR On Target Earnings of $80,000 to $95,000 (Data Source: The Bridge Group 2024 SDR Metrics & Compensation Report), plus software overhead. EXPEDITE Cost per Lead is ~$0.02 to $0.05, offering a 99.9% cost reduction and near infinite pricing elasticity.
+
 **B2B SaaS Sales (Direct):** 
 *Standard Tier ($99/mo):* Pay per seat subscription for individual founders or recruiters accessing the standard Launchpad.
 *Enterprise Tier ($499+/mo):* Consumption based API model scaling directly with the volume of leads verified and drafts generated.
+
 **B2G & Enterprise Licensing:** Licensing the core LangGraph orchestrator IP for industry specific, white labeled, on premise solutions.
 
 ### Portfolio Analysis & Expansion Potential
@@ -156,3 +164,16 @@ EXPEDITE sits at the intersection of two massive secular trends: the compression
 ### Technology Adoption & Placement
 **Positioning:** An enterprise grade, ultra low cost, and eco friendly alternative to traditional outbound lead generation and human SDR teams.
 **Placement Strategy:** Ideal for resource limited settings (seed stage startups) where speed, affordability, and precision are critical to survival. High potential for massive early adoption in tech, finance, and specialized recruiting sectors.
+
+### Strategic Risks & Mitigants
+**Platform Risk (OpenAI/Groq Dependency):** 
+Risk: Pricing changes or API outages from LLM providers.
+Mitigant: Model agnostic architecture. EXPEDITE already utilizes a dynamic fallback routing system (Groq to OpenAI gpt 4o mini) and can seamlessly integrate open source models (Llama 3/Mistral) if required.
+**Data Provider Rate Limits:** 
+Risk: Throttle limits from Hunter or Apollo.
+Mitigant: The asynchronous queue and intelligent Redis caching layer prevent redundant calls and elegantly handle rate limit back offs without crashing the UI.
+
+---
+*Backup Material / Reference:* 
+*Repository Architecture Diagram available in standard README.*
+*Live ROI Dashboard tracks manual hours saved heuristically (30m per lead).*
