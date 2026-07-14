@@ -32,16 +32,16 @@ The application is built on a split architecture: a lightweight React/Vite front
 ```mermaid
 graph TD
     %% Frontend Components
-    subgraph Frontend [Frontend (React + Vite)]
+    subgraph Frontend ["Frontend (React + Vite)"]
         UI[Launchpad UI] --> ApiClient[API Client]
         Dashboard[ROI Dashboard] --> ApiClient
     end
 
     %% Backend Components
-    subgraph Backend [Backend (FastAPI)]
+    subgraph Backend ["Backend (FastAPI)"]
         Router[Missions Router]
-        Agent[ScoutAgent (LangGraph)]
-        LLM[LLM Service (OpenAI/Groq)]
+        Agent[ScoutAgent]
+        LLM[LLM Service]
         Integrations[Integration Layer]
         
         ApiClient -->|POST /missions| Router
@@ -51,7 +51,7 @@ graph TD
     end
     
     %% External Services
-    subgraph External [External Services]
+    subgraph External ["External Services"]
         Hunter[Hunter.io API]
         Apollo[Apollo API]
         WebScraper[Firecrawl / Web]
@@ -62,7 +62,7 @@ graph TD
     end
 
     %% Database
-    subgraph DB [Database]
+    subgraph DB ["Database"]
         Mongo[(MongoDB)]
         Router --> Mongo
         Agent --> Mongo
