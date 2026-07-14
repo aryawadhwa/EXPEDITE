@@ -44,3 +44,6 @@ out/
 backend/brain/
 frontend/dist/
 data/profile.yaml
+*.pptx
+~$*.pptx
+
