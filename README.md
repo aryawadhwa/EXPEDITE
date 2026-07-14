@@ -2,6 +2,7 @@
 
 <div align="center">
   <img src="https://img.shields.io/badge/Status-LIVE-success" alt="Status" />
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome" />
   <img src="https://img.shields.io/badge/Security-GDPR%20Compliant-green" alt="GDPR Compliant" />
   <img src="https://img.shields.io/badge/Architecture-LangGraph%20Agents-blue" alt="Architecture" />
   <img src="https://img.shields.io/badge/Stack-FastAPI%20%7C%20React-purple" alt="Tech Stack" />
@@ -111,6 +112,9 @@ EXPEDITE was built with enterprise-grade security in mind:
 - **GDPR Compliant:** Designed with data minimization principles.
 - **Isolated Execution:** User data is processed in isolated execution environments.
 - **Zero Raw Passwords:** Strict enforcement against storing raw passwords; robust auth via Clerk.
+
+## Contributing
+We love open-source contributions! If you're interested in helping us build EXPEDITE, please check out our [Contributing Guidelines](CONTRIBUTING.md) for details on how to set up your local environment, navigate the codebase, and submit Pull Requests.
 
 ## Key Features
 - **ROI Analytics Dashboard:** Real-time visibility into manual hours saved and leads verified.
