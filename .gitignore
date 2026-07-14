@@ -43,3 +43,4 @@ out/
 # Project specific
 backend/brain/
 frontend/dist/
+data/profile.yaml

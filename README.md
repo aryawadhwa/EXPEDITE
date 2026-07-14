@@ -1,4 +1,4 @@
-# EXPEDITE (OutboundAI) 🚀
+# EXPEDITE (OutboundAI)
 
 <div align="center">
   <img src="https://img.shields.io/badge/Status-LIVE-success" alt="Status" />
@@ -13,7 +13,7 @@ Built for scale, speed, and real-world ROI.
 
 ---
 
-## 💡 Methodology
+## Methodology
 
 EXPEDITE operates on an **Evidence-First Pipeline**. Unlike traditional scraping wrappers, EXPEDITE leverages agentic orchestration to ensure every prospect is verified and every drafted email contains personalized, highly relevant context.
 
@@ -25,7 +25,7 @@ EXPEDITE operates on an **Evidence-First Pipeline**. Unlike traditional scraping
 
 ---
 
-## 🏗️ Architecture & Flow Diagram
+## Architecture & Flow Diagram
 
 The application is built on a split architecture: a lightweight React/Vite frontend and a robust, async-first FastAPI backend.
 
@@ -71,7 +71,7 @@ graph TD
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Python 3.12+ (managed via `uv`)
@@ -106,13 +106,13 @@ npm run dev
 
 ---
 
-## 🔒 Security & Privacy (Trust Center)
+## Security & Privacy (Trust Center)
 EXPEDITE was built with enterprise-grade security in mind:
 - **GDPR Compliant:** Designed with data minimization principles.
 - **Isolated Execution:** User data is processed in isolated execution environments.
 - **Zero Raw Passwords:** Strict enforcement against storing raw passwords; robust auth via Clerk.
 
-## 📈 Key Features
+## Key Features
 - **ROI Analytics Dashboard:** Real-time visibility into manual hours saved and leads verified.
 - **Location-Specific Targeting:** Hyper-local prospect searching directly from the Launchpad.
 - **Intelligent Caching:** Heavily cached external API calls to minimize latency and costs.
